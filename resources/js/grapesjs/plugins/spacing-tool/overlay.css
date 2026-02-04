@@ -1,0 +1,63 @@
+.gjs-spacing-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index: 1000;
+}
+
+.gjs-spacing-handle {
+    position: absolute;
+    width: 10px;
+    height: 10px;
+    background-color: #3b82f6; /* Blue-500 */
+    border: 1px solid #fff;
+    border-radius: 50%;
+    pointer-events: auto;
+    cursor: grab;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+    z-index: 1001;
+    transition: transform 0.1s;
+}
+
+.gjs-spacing-handle:hover {
+    transform: translate(-50%, -50%) scale(1.2);
+    background-color: #2563eb; /* Blue-600 */
+}
+
+.gjs-spacing-handle:active {
+    cursor: grabbing;
+    background-color: #1d4ed8; /* Blue-700 */
+}
+
+/* Specific cursors for different sides */
+.gjs-handle-margin-top, .gjs-handle-padding-top { cursor: ns-resize; }
+.gjs-handle-margin-bottom, .gjs-handle-padding-bottom { cursor: ns-resize; }
+.gjs-handle-margin-left, .gjs-handle-padding-left { cursor: ew-resize; }
+.gjs-handle-margin-right, .gjs-handle-padding-right { cursor: ew-resize; }
+
+.gjs-spacing-handle.gjs-handle-margin-top { background-color: #f59e0b; } /* Amber for margin */
+.gjs-spacing-handle.gjs-handle-margin-right { background-color: #f59e0b; }
+.gjs-spacing-handle.gjs-handle-margin-bottom { background-color: #f59e0b; }
+.gjs-spacing-handle.gjs-handle-margin-left { background-color: #f59e0b; }
+
+.gjs-spacing-value-label {
+    position: absolute;
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-family: sans-serif;
+    pointer-events: none;
+    white-space: nowrap;
+    transform: translate(-50%, -130%);
+    z-index: 1002;
+    display: none;
+}
+
+.gjs-spacing-handle:hover .gjs-spacing-value-label,
+.gjs-spacing-handle:active .gjs-spacing-value-label {
+    display: block;
+}
