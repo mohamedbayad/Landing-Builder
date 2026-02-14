@@ -146,7 +146,8 @@
             saveUrl: "{{ route('landings.pages.update', [$landing, $page]) }}",
             csrfToken: "{{ csrf_token() }}",
             grapesJsJson: {!! $page->grapesjs_json ?? 'null' !!},
-            appCssUrl: "{{ Vite::asset('resources/css/app.css') }}"
+            appCssUrl: "{{ Vite::asset('resources/css/app.css') }}",
+            customHead: `{!! addslashes($landing->settings->custom_head_scripts ?? '') !!}` // Inject template CSS/Fonts
         };
         
         // Simple UI Toggle Logic (Bridge between Blade & GrapesJS)

@@ -43,6 +43,9 @@ class TemplateController extends Controller
         $localZipPath = $storagePath . '/source.zip';
         $zipFile->move($storagePath, 'source.zip');
 
+        // Increase execution time for large files (5 minutes)
+        set_time_limit(300);
+
         // 1. Extract ZIP
         $extracted = false;
         
@@ -56,7 +59,18 @@ class TemplateController extends Controller
         } 
         
         if (!$extracted) {
-            // Fallback: PowerShell Expand-Archive
+            // Try 'tar' command (available on Windows 10+ and faster than PowerShell)
+            // tar -xf source.zip -C destination
+            $tarCommand = "tar -xf \"$localZipPath\" -C \"$storagePath\"";
+            exec($tarCommand, $tarOutput, $tarReturn);
+            
+            if ($tarReturn === 0) {
+                $extracted = true;
+            }
+        }
+
+        if (!$extracted) {
+            // Fallback: PowerShell Expand-Archive (Slow but reliable)
             // Use local path which we know is safe
             $command = "powershell -Command \"Expand-Archive -Path '$localZipPath' -DestinationPath '$storagePath' -Force\"";
             exec($command, $output, $returnVar);
@@ -80,131 +94,22 @@ class TemplateController extends Controller
             'name' => $request->name,
             'description' => 'Uploaded custom template.',
             'preview_image_path' => $previewPath,
+            'storage_path' => $publicPath, // Store relative path for later use
             'is_active' => true,
         ]);
 
-        // 3. Process Pages
-        // Recursive search for HTML files
-        $files = File::allFiles($storagePath);
-        $publicUrlBase = '/storage/' . $publicPath . '/'; 
-
-        $pagesFound = 0;
-        foreach ($files as $file) {
-            if ($file->getExtension() === 'html') {
-                $filename = $file->getFilename(); 
-                $slug = $file->getFilenameWithoutExtension(); 
-                
-                // Determine Type
-                $type = 'other';
-                if ($slug === 'index') $type = 'index';
-                if ($slug === 'checkout') $type = 'checkout';
-                if ($slug === 'thankyou' || $slug === 'thank-you') $type = 'thankyou';
-
-                $rawContent = File::get($file->getPathname());
-
-                // Parse HTML to extract body and relevant head tags (CSS/JS)
-                $bodyContent = $rawContent;
-                $extraHead = '';
-
-                // Extract Body
-                if (preg_match('/<body[^>]*>(.*?)<\/body>/is', $rawContent, $matches)) {
-                    $bodyContent = $matches[1];
-                }
-
-                // Extract Head tags (link, script, style) but exclude standard ones (title, meta charset/viewport, tailwind cdn)
-                if (preg_match('/<head[^>]*>(.*?)<\/head>/is', $rawContent, $matches)) {
-                    $headContent = $matches[1];
-                    // Match link, script, style
-                    preg_match_all('/<(link|script|style)[^>]*>.*?<\/\1>|<(link|script)[^>]*>/is', $headContent, $tags);
-                    if (!empty($tags[0])) {
-                        foreach ($tags[0] as $tag) {
-                            // Filter out charset and viewport meta tags which are handled by the main layout
-                            if (strpos($tag, 'charset') === false && strpos($tag, 'viewport') === false) {
-                                $extraHead .= $tag . "\n";
-                            }
-                        }
-                    }
-                }
-
-                // Prepend extra head content to body content so it's included in the page
-                // Ideally this would go to $css or $js fields, but for simplicity we keep it in html for now
-                // or we wrap it in a container? NO, just prepend.
-                $content = $extraHead . $bodyContent;
-
-                // 4. Asset Replacement
-                // Calculate relative path from this file to the storage root to adjust assets if needed?
-                // For simplicity, we assume assets are referenced as "assets/..." in the HTML.
-                // We just prefix them with the Public URL Base + (Subdirectory Path if needed)
-                // Actually, regardless of where the file is, if it says "assets/img.jpg", and assets is at root...
-                // If structure is:
-                // root/
-                //   index.html
-                //   assets/
-                // Then index.html -> "assets/..." works if we map "assets/" -> "$publicUrlBase/assets/"
-                
-                // If structure is:
-                // root/
-                //   mysite/
-                //     index.html
-                //     assets/
-                // Then index.html -> "assets/..." works if we map "assets/" -> "$publicUrlBase/mysite/assets/"
-                
-                // We can find the relative path of the file to the storage path
-                $relativePath = $file->getRelativePath(); // e.g. "mysite" or "" (empty)
-                
-                // Update Base URL to include the subdirectory
-                $currentBaseUrl = $publicUrlBase . ($relativePath ? $relativePath . '/' : '');
-
-                // Generic Relative Path Fix for href and src
-                // Matches href="anything" that doesn't start with http, /, #, or mailto
-                $content = preg_replace_callback('/(href|src)=["\']([^"\']+)["\']/i', function($matches) use ($currentBaseUrl) {
-                    $attr = $matches[1];
-                    $path = $matches[2];
-                    
-                    // Skip absolute URLs, anchors, or special protocols
-                    if (str_starts_with($path, 'http') || str_starts_with($path, '/') || str_starts_with($path, '#') || str_starts_with($path, 'mailto:') || str_starts_with($path, 'tel:')) {
-                        return $matches[0];
-                    }
-
-                    return $attr . '="' . $currentBaseUrl . $path . '"';
-                }, $content);
-                
-                // Specific fix for template page links (optional, if we want to map them to routes later, but for now keep as is or assume they are static)
-                // The regex above will assume they are assets. 
-                // We might want to revert .html links if we want to handle them as pages, but for GrapesJS imported blocks, 
-                // we mainly care about images and css.
-                // Let's explicitly fix common page links if we want them to remain navigable or replaceable.
-                // But the user issue is styles. The regex above fixes <link href="style.css"> to <link href=".../style.css">
-
-
-                TemplatePage::create([
-                    'template_id' => $template->id,
-                    'type' => $type,
-                    'name' => ucfirst($slug),
-                    'slug' => $slug,
-                    'html' => $content,
-                    'css' => '', 
-                    'js' => '',
-                ]);
-                $pagesFound++;
-            }
-        }
+        // Template files are now stored on disk and will be processed when applying to landing
+        // No need to create TemplatePage records during upload
         
-        if ($pagesFound === 0) {
-             return back()->with('error', 'Uploaded ZIP contained no HTML files.');
-        }
-
-        return redirect()->route('templates.index')->with('status', 'Template uploaded successfully! Found ' . $pagesFound . ' pages.');
+        return redirect()->route('templates.index')->with('success', 'Template uploaded successfully.');
     }
 
     public function import(Request $request, Template $template)
     {
-        // 1. Create Landing
-        // We'll assume the user has a workspace. For MVP we'll grab the first workspace or create one if missing (though M1 ensures it).
+        // 1. Create Landing with UUID
         $user = Auth::user();
         $workspace = $user->workspaces()->first();
 
-        // Safety check if no workspace
         if (!$workspace) {
             $workspace = $user->workspaces()->create(['name' => 'My Workspace']);
         }
@@ -218,42 +123,90 @@ class TemplateController extends Controller
             'name' => $landingName,
             'slug' => $slug,
             'status' => 'draft',
+            'uuid' => (string) Str::uuid(),
         ]);
 
-        // 2. Clone Pages
-        // Strategy: We only want the 'index' page from the template (as per user request).
-        // Then we auto-generate 'checkout' and 'thank-you' pages if they don't exist in the template,
-        // or effectively we ALWAYS provide "system" checkout/thankyou pages so they are dynamic.
-        
-        // Find Index Page
-        $indexPage = $template->pages()->where('type', 'index')->first();
-        
-        if (!$indexPage) {
-            // Fallback: take the first page if no specific index
-             $indexPage = $template->pages()->first();
+        // 2. Copy Template Files to Landing Storage
+        // Get template storage path from database
+        $templatePath = storage_path("app/public/{$template->storage_path}");
+
+        if (!$templatePath || !File::exists($templatePath)) {
+            return redirect()->route('dashboard')->with('error', 'Template files not found');
         }
 
-        if ($indexPage) {
-            LandingPage::create([
-                'landing_id' => $landing->id,
-                'type' => 'index',
-                'name' => 'Home', // Standardize name
-                'slug' => 'index',
-                'status' => 'draft',
-                'html' => $indexPage->html,
-                'css' => $indexPage->css,
-                'js' => $indexPage->js,
-                'grapesjs_json' => $indexPage->grapesjs_json,
-            ]);
+        // Create landing directory
+        $landingPath = storage_path("app/public/landings/{$landing->uuid}");
+        if (!File::exists($landingPath)) {
+            File::makeDirectory($landingPath, 0755, true);
         }
+
+        // Check if template has a single root directory (common in ZIPs)
+        // If so, copy the CONTENTS of that directory, not the directory itself
+        $items = File::directories($templatePath);
+        $files = File::files($templatePath);
         
-        // 3. Auto-Generate Funnel Steps (Checkout & Thank You) if they weren't imported
-        // We actually want to FORCE these to be our system pages so they are dynamic.
-        // Even if the template had them, we might ignore them to ensure functionality, 
-        // OR we could import them but inject our functionality.
-        // User Request: "include only the landing page... generate Checkout and Thank You pages automatically"
-        
-        // Create Checkout Page
+        // Filter out ignored directories (e.g. __MACOSX, .git)
+        $realItems = array_filter($items, function($item) {
+             $basename = basename($item);
+             return !in_array($basename, ['__MACOSX', '.git']);
+        });
+
+        // Filter out ignored files (e.g. source.zip which is the upload itself, system files)
+        $realFiles = array_filter($files, function($file) {
+             $basename = $file->getFilename();
+             return !in_array($basename, ['source.zip', '.DS_Store', 'Thumbs.db', 'desktop.ini']);
+        });
+
+        if (count($realItems) === 1 && count($realFiles) === 0) {
+            // Single root directory - copy its contents
+            $rootDir = reset($realItems); // Get the first real directory
+            File::copyDirectory($rootDir, $landingPath);
+        } else {
+            // Multiple items or files at root - copy everything
+            File::copyDirectory($templatePath, $landingPath);
+        }
+
+        // Cleanup: Remove source.zip from landing if it was copied
+        if (File::exists($landingPath . '/source.zip')) {
+            File::delete($landingPath . '/source.zip');
+        }
+
+        // 3. Process HTML with Service
+        $processor = new \App\Services\TemplateZipProcessorService();
+        $indexHtmlPath = $landingPath . '/index.html';
+        $baseUrl = "/storage/landings/{$landing->uuid}/";
+
+        if (!File::exists($indexHtmlPath)) {
+            return redirect()->route('dashboard')->with('error', 'Template index.html not found');
+        }
+
+        $parsed = $processor->processHtml($indexHtmlPath, $baseUrl);
+
+        // 4. Create Landing Pages with Processed Content
+        LandingPage::create([
+            'landing_id' => $landing->id,
+            'type' => 'index',
+            'name' => 'Home',
+            'slug' => 'index',
+            'status' => 'draft',
+            'html' => $parsed['body_html'],
+            'css' => $parsed['css'],
+            'js' => '',
+        ]);
+
+        // 5. Save HEAD elements to Landing Settings
+        $landing->settings()->updateOrCreate([], [
+            'meta_title' => $parsed['title'] ?: $landing->name,
+            'custom_head_scripts' => $parsed['custom_head'],
+        ]);
+
+        // 6. Index Media for Library (Recursive scan of entire landing folder)
+        // This ensures images in assets/media/imgs or any other structure are found.
+        if (File::exists($landingPath)) {
+            $processor->indexMedia($landingPath, $landing->id, Auth::id());
+        }
+
+        // 7. Create Checkout Page
         LandingPage::create([
             'landing_id' => $landing->id,
             'type' => 'checkout',
@@ -265,7 +218,7 @@ class TemplateController extends Controller
             'js' => '',
         ]);
 
-        // Create Thank You Page
+        // 8. Create Thank You Page
         LandingPage::create([
             'landing_id' => $landing->id,
             'type' => 'thankyou',
@@ -362,8 +315,6 @@ class TemplateController extends Controller
             'js' => '',
         ]);
 
-        // Redirect to Landing pages list (M3) or simple success for now
-        // For now, redirect back with success message
-        return redirect()->route('dashboard')->with('status', 'Funnel created successfully! (Index imported, Checkout & Thank You generated)');
+        return redirect()->route('dashboard')->with('status', 'Landing created from template successfully!');
     }
 }

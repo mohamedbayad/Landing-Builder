@@ -20,6 +20,7 @@
                         <button @click="tab = 'general'" :class="{ 'border-indigo-500 text-indigo-600 dark:text-indigo-400': tab === 'general', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'general' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             General
                         </button>
+
                         <button @click="tab = 'seo'" :class="{ 'border-indigo-500 text-indigo-600 dark:text-indigo-400': tab === 'seo', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'seo' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             SEO & Metadata
                         </button>
@@ -31,6 +32,9 @@
                         </button>
                         <button @click="tab = 'cart'" :class="{ 'border-indigo-500 text-indigo-600 dark:text-indigo-400': tab === 'cart', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'cart' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             Shopping Cart
+                        </button>
+                        <button @click="tab = 'countdown'" :class="{ 'border-indigo-500 text-indigo-600 dark:text-indigo-400': tab === 'countdown', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'countdown' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
+                            Countdown Timer
                         </button>
                     </nav>
                 </div>
@@ -62,6 +66,8 @@
                                 </div>
                             </div>
                         </div>
+
+
 
                         <!-- SEO Tab -->
                         <div x-show="tab === 'seo'" x-cloak style="display: none;">
@@ -244,6 +250,62 @@
                                                     <input type="color" name="cart_btn_text_color" id="cart_btn_text_color" value="{{ old('cart_btn_text_color', $landing->cart_btn_text_color ?? '#ffffff') }}" class="h-10 w-16 p-1 rounded border border-gray-300 dark:border-gray-600">
                                                     <input type="text" value="{{ old('cart_btn_text_color', $landing->cart_btn_text_color ?? '#ffffff') }}" class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5" oninput="document.getElementById('cart_btn_text_color').value = this.value">
                                                 </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Countdown Tab -->
+                        <div x-show="tab === 'countdown'" x-cloak style="display: none;">
+                            <div class="space-y-8">
+                                <div class="bg-gray-50 dark:bg-gray-700/30 p-5 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-4">Countdown Configuration</h3>
+                                    
+                                    <div class="space-y-6">
+                                        <label class="relative flex items-start">
+                                            <div class="flex items-center h-5">
+                                                <input id="countdown_enabled" name="countdown_enabled" type="checkbox" value="1" {{ old('countdown_enabled', $landing->countdown_enabled ?? false) ? 'checked' : '' }} class="focus:ring-indigo-500 h-4 w-4 text-indigo-600 border-gray-300 rounded">
+                                            </div>
+                                            <div class="ml-3 text-sm">
+                                                <span class="block font-medium text-gray-900 dark:text-white">Enable Countdown Timer</span>
+                                                <span class="block text-gray-500 dark:text-gray-400 text-xs mt-1">Show countdown timers on your landing page.</span>
+                                            </div>
+                                        </label>
+
+                                        <div x-data="{ mode: '{{ $landing->countdown_end_at ? 'fixed' : 'duration' }}' }" class="space-y-4 border-t border-gray-200 dark:border-gray-600 pt-4">
+                                            <div>
+                                                <span class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Timer Mode</span>
+                                                <div class="flex items-center gap-4">
+                                                    <label class="inline-flex items-center">
+                                                        <input type="radio" x-model="mode" value="fixed" class="form-radio text-indigo-600">
+                                                        <span class="ml-2 text-gray-700 dark:text-gray-300">Fixed Date & Time</span>
+                                                    </label>
+                                                    <label class="inline-flex items-center">
+                                                        <input type="radio" x-model="mode" value="duration" class="form-radio text-indigo-600">
+                                                        <span class="ml-2 text-gray-700 dark:text-gray-300">Evergreen Duration (Minutes)</span>
+                                                    </label>
+                                                </div>
+                                            </div>
+
+                                            <!-- Fixed Date Input -->
+                                            <div x-show="mode === 'fixed'" class="transition-all">
+                                                <label for="countdown_end_at" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date & Time</label>
+                                                <input type="datetime-local" name="countdown_end_at" id="countdown_end_at" 
+                                                       value="{{ old('countdown_end_at', $landing->countdown_end_at ? $landing->countdown_end_at->format('Y-m-d\TH:i') : '') }}" 
+                                                       class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5">
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Timer will count down to this specific date.</p>
+                                            </div>
+
+                                            <!-- Duration Input -->
+                                            <div x-show="mode === 'duration'" class="transition-all">
+                                                <label for="countdown_duration_minutes" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Duration (Minutes)</label>
+                                                <input type="number" name="countdown_duration_minutes" id="countdown_duration_minutes" 
+                                                       value="{{ old('countdown_duration_minutes', $landing->countdown_duration_minutes ?? 15) }}" 
+                                                       min="1"
+                                                       class="block w-full rounded-lg border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500 sm:text-sm py-2.5">
+                                                <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Timer will loop or restart based on this duration (simulated evergreen).</p>
                                             </div>
                                         </div>
                                     </div>

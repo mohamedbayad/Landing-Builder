@@ -77,7 +77,10 @@ class LandingController extends Controller
             'cart_btn_text_color' => 'nullable|string|max:7',
             'cart_position' => 'nullable|string|in:bottom-right,bottom-left,top-right,top-left,bottom-bar',
             'cart_x_offset' => 'nullable|integer|min:0',
+            'cart_x_offset' => 'nullable|integer|min:0',
             'cart_y_offset' => 'nullable|integer|min:0',
+            'countdown_end_at' => 'nullable|date',
+            'countdown_duration_minutes' => 'nullable|integer|min:1',
         ]);
 
         $landing->update([
@@ -91,6 +94,16 @@ class LandingController extends Controller
             'cart_text_color' => $validated['cart_text_color'] ?? '#000000',
             'cart_btn_color' => $validated['cart_btn_color'] ?? '#3b82f6',
             'cart_btn_text_color' => $validated['cart_btn_text_color'] ?? '#ffffff',
+            'countdown_enabled' => $request->has('countdown_enabled'),
+            'countdown_end_at' => $validated['countdown_end_at'] ?? null,
+            'countdown_duration_minutes' => $validated['countdown_duration_minutes'] ?? null,
+            // If enabling duration mode for first time or re-enabling, we might want to reset started_at?
+            // For now, let's say we set started_at only if it's null and we are saving a duration. 
+            // Or maybe update it whenever we save settings? 
+            // Better: If switching to duration mode, set started_at to now if it's not set.
+            'countdown_started_at' => ($request->has('countdown_enabled') && !empty($validated['countdown_duration_minutes'])) 
+                                      ? ($landing->countdown_started_at ?? now()) 
+                                      : $landing->countdown_started_at,
         ]);
 
         $landing->settings()->updateOrCreate(

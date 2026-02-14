@@ -10,6 +10,7 @@ return new class extends Migration
     {
         Schema::create('landings', function (Blueprint $table) {
             $table->id();
+            $table->uuid('uuid')->unique();
             $table->foreignId('workspace_id')->constrained()->cascadeOnDelete();
             $table->foreignId('template_id')->nullable()->constrained('templates')->nullOnDelete();
             $table->string('name');

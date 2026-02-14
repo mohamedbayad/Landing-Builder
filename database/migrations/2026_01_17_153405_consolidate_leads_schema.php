@@ -42,6 +42,16 @@ return new class extends Migration
         }
 
         // 2. Drop polymorphic columns
+        // Separate dropIndex to help SQLite
+        try {
+            Schema::table('leads', function (Blueprint $table) {
+                // Try to drop index by explicit name to avoid Doctrine requirement
+                $table->dropIndex('leads_source_type_source_id_index');
+            });
+        } catch (\Exception $e) {
+            // Ignore if index doesn't exist or other error
+        }
+
         Schema::table('leads', function (Blueprint $table) {
             if (Schema::hasColumn('leads', 'source_type')) {
                 $table->dropColumn(['source_type', 'source_id']);

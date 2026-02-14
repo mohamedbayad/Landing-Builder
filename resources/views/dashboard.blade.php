@@ -248,7 +248,7 @@
                                                 </span>
                                             </td>
                                             <td class="px-4 py-3 text-right">
-                                                <a href="{{ route('landings.edit', $landing) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-xs font-medium">Edit</a>
+                                                <a href="{{ route('landings.edit', $landing->id) }}" class="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 text-xs font-medium">Edit</a>
                                             </td>
                                         </tr>
                                     @empty

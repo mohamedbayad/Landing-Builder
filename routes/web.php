@@ -30,8 +30,20 @@ Route::middleware('auth')->group(function () {
     Route::get('/forms', [App\Http\Controllers\FormController::class, 'index'])->name('forms.index');
     Route::resource('form-endpoints', App\Http\Controllers\FormEndpointController::class)->only(['store', 'destroy']);
     
+    // Session Recordings - Admin
+    Route::get('/dashboard/recordings', [App\Http\Controllers\SessionRecordingController::class, 'index'])->name('recordings.index');
+    Route::get('/dashboard/recordings/{recording}/events', [App\Http\Controllers\SessionRecordingController::class, 'show'])->name('recordings.show');
+    Route::delete('/dashboard/recordings/{recording}', [App\Http\Controllers\SessionRecordingController::class, 'destroy'])->name('recordings.destroy');
 
-
+    // Analytics (New)
+    Route::get('/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('analytics.index');
+    Route::get('/analytics/data', [App\Http\Controllers\AnalyticsController::class, 'data'])->name('analytics.data');
+    
+    // Tracking (Public - Web middleware for Cookies)
+    // Tracking (Public - Web middleware for Cookies)
+    Route::post('/api/track/event', [App\Http\Controllers\AnalyticsTrackerController::class, 'trackEvent'])
+        ->name('analytics.track')
+        ->middleware('throttle:120,1'); // 120 per minute (high traffic)
     // Legacy/Placeholder routes removal or update if needed
     // Route::post('/landings/{landing}/payment/stripe', ...)->name('payment.stripe.create'); // Old
     // Route::post('/landings/{landing}/payment/paypal', ...)->name('payment.paypal.create'); // Old
@@ -57,12 +69,33 @@ Route::middleware('auth')->group(function () {
     Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
     Route::patch('/profile', [ProfileController::class, 'update'])->name('profile.update');
     Route::delete('/profile', [ProfileController::class, 'destroy'])->name('profile.destroy');
+
+
+
+
+    // Landing Media Library
+    Route::get('/landings/{landing}/media', [App\Http\Controllers\LandingMediaController::class, 'index'])->name('landings.media.index');
+    Route::post('/landings/{landing}/media', [App\Http\Controllers\LandingMediaController::class, 'store'])
+        ->name('landings.media.store')
+        ->middleware('throttle:30,1'); // Limit uploads
+    Route::delete('/landings/{landing}/media/{media}', [App\Http\Controllers\LandingMediaController::class, 'destroy'])->name('landings.media.destroy');
+
+    // Dashboard Media Library (Unified)
+    Route::get('/media', [App\Http\Controllers\MediaAssetController::class, 'index'])->name('media.index');
+    Route::get('/api/media', [App\Http\Controllers\MediaAssetController::class, 'list'])->name('media.list');
+    Route::post('/api/media', [App\Http\Controllers\MediaAssetController::class, 'store'])
+        ->name('media.store')
+        ->middleware('throttle:30,1'); // Limit uploads
+    Route::delete('/api/media/{media}', [App\Http\Controllers\MediaAssetController::class, 'destroy'])->name('media.destroy');
 });
 
 require __DIR__.'/auth.php';
 
 // Public Routes (Catch-all should be last if possible, but strict slug matching avoids issues)
-Route::post('/cart/sync', [App\Http\Controllers\LandingController::class, 'syncCart'])->name('cart.sync');
+    // Countdown Timer API
+    Route::get('/l/{landing}/countdown', [App\Http\Controllers\CountdownController::class, 'show'])->name('landings.countdown');
+
+    Route::post('/cart/sync', [App\Http\Controllers\CartController::class, 'sync'])->name('cart.sync');
 Route::get('/landings/{landing}/checkout', [App\Http\Controllers\PublicLandingController::class, 'checkoutFlow'])->name('landings.checkout');
 Route::get('/', [App\Http\Controllers\PublicLandingController::class, 'home'])->name('public.home');
 Route::get('/{slug}', [App\Http\Controllers\PublicLandingController::class, 'page'])->where('slug', '^[a-zA-Z0-9-_]+$')->name('public.page');

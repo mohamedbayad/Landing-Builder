@@ -6,6 +6,7 @@ import grapesjsPluginForms from 'grapesjs-plugin-forms';
 import SpacingTool from './grapesjs/plugins/spacing-tool';
 import editorOverrides from './editor-overrides';
 import landingParserPlugin from './grapesjs/landing-parser-plugin';
+import countdownPlugin from './grapesjs/countdown-plugin';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -21,6 +22,15 @@ document.addEventListener('DOMContentLoaded', () => {
         width: '100%', // Make sure canvas takes full width
         fromElement: false, // We load manually
         storageManager: false,
+        assetManager: {
+            upload: `/landings/${window.editorData.landingId}/media`, // Use relative path or full URL
+            uploadName: 'files', // Controller expects 'files'
+            multiUpload: true,
+            autoAdd: true,
+            headers: {
+                'X-CSRF-TOKEN': window.editorData.csrfToken
+            }
+        },
         selectorManager: { componentFirst: true },
         deviceManager: {
             devices: [
@@ -116,7 +126,8 @@ document.addEventListener('DOMContentLoaded', () => {
             grapesjsPluginForms,
             SpacingTool,
             editorOverrides,
-            landingParserPlugin
+            landingParserPlugin,
+            countdownPlugin
         ],
         pluginsOpts: {
             [grapesjsTailwind]: {},
@@ -147,7 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 // But editor.Panels manages internal GrapesJS panels, not the DOM elements directly unless they are mounted.
                 // Let's stick to registering it and later I might need to manually append a button if Panels are disabled.
             },
-            [editorOverrides]: {}
+            [editorOverrides]: {},
+            [countdownPlugin]: {}
         }
     });
 
@@ -179,6 +191,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Force resize
         editor.trigger('change:canvasOffset');
+
+        // INJECT CUSTOM HEAD (Template Styles)
+        if (window.editorData.customHead) {
+            const canvasHead = editor.Canvas.getDocument().head;
+            canvasHead.insertAdjacentHTML('beforeend', window.editorData.customHead);
+            console.log('Injected custom head scripts/styles into canvas');
+        }
 
         // FORCE IMAGE DOUBLE-CLICK -> OPEN ASSETS
         const body = editor.Canvas.getBody();
@@ -217,6 +236,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     editor.on('load', () => {
+        // Load Assets
+        const loadAssets = async () => {
+            try {
+                const response = await fetch(`/landings/${window.editorData.landingId}/media`);
+                const assets = await response.json();
+                editor.AssetManager.add(assets);
+            } catch (error) {
+                console.error('Failed to load assets', error);
+            }
+        };
+        loadAssets();
+
         // Remove default panels if they were added by presets
         const panels = editor.Panels;
         ['views-container', 'options', 'defaults'].forEach(id => {
@@ -228,6 +259,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const tabElements = document.getElementById('tab-elements');
     const tabGlobals = document.getElementById('tab-globals');
+    // Create Media Tab if not exists in DOM, or inject it
+    // The user wants a visible sidebar button/tab named "Media".
+    // We can inject it into the nav where 'tab-elements' and 'tab-globals' are.
+
+    // Inject Media Tab
+    const navContainer = tabElements?.parentNode;
+    let tabMedia = document.getElementById('tab-media');
+
+    if (navContainer && !tabMedia) {
+        tabMedia = document.createElement('button');
+        tabMedia.id = 'tab-media';
+        tabMedia.className = 'flex-1 py-4 px-1 text-center border-b-2 border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300 focus:outline-none transition-colors duration-150';
+        tabMedia.innerHTML = '<span class="text-sm font-medium">Media</span>';
+        navContainer.appendChild(tabMedia);
+    }
 
     const panelBlocks = document.getElementById('panel-blocks');
     const panelSettings = document.getElementById('panel-settings');
@@ -242,7 +288,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabElements) {
             tabElements.classList.add('text-gray-200', 'border-b-2', 'border-indigo-500');
-            tabElements.classList.remove('text-gray-500');
+            tabElements.classList.remove('text-gray-500', 'border-transparent');
+        }
+        if (tabGlobals) {
+            tabGlobals.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabGlobals.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabMedia) {
+            tabMedia.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabMedia.classList.add('text-gray-500', 'border-transparent');
         }
     }
 
@@ -254,7 +308,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (tabElements) {
             tabElements.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
-            tabElements.classList.add('text-gray-500');
+            tabElements.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabGlobals) {
+            tabGlobals.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabGlobals.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabMedia) {
+            tabMedia.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabMedia.classList.add('text-gray-500', 'border-transparent');
         }
     }
 
@@ -263,11 +325,44 @@ document.addEventListener('DOMContentLoaded', () => {
         if (searchBar) searchBar.classList.add('hidden');
         if (panelSettings) panelSettings.classList.add('hidden');
         if (panelLayers) panelLayers.classList.remove('hidden');
+
+        if (tabElements) {
+            tabElements.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabElements.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabGlobals) {
+            tabGlobals.classList.add('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabGlobals.classList.remove('text-gray-500', 'border-transparent');
+        }
+        if (tabMedia) {
+            tabMedia.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabMedia.classList.add('text-gray-500', 'border-transparent');
+        }
+    }
+
+    function openMediaLibrary() {
+        // Trigger GrapesJS Asset Manager
+        editor.runCommand('open-assets');
+
+        // Visual feedback for tab selection
+        if (tabElements) {
+            tabElements.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabElements.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabGlobals) {
+            tabGlobals.classList.remove('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabGlobals.classList.add('text-gray-500', 'border-transparent');
+        }
+        if (tabMedia) {
+            tabMedia.classList.add('text-gray-200', 'border-b-2', 'border-indigo-500');
+            tabMedia.classList.remove('text-gray-500', 'border-transparent');
+        }
     }
 
     // Event Listeners
     if (tabElements) tabElements.addEventListener('click', showBlocks);
     if (tabGlobals) tabGlobals.addEventListener('click', showLayers);
+    if (tabMedia) tabMedia.addEventListener('click', openMediaLibrary);
 
     // Auto-switch on selection
     editor.on('component:selected', () => {
@@ -355,7 +450,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Create the button
     const spacingBtn = document.createElement('button');
-    spacingBtn.className = 'text-gray-400 hover:text-white p-1 mx-2 relative'; // Match Undo/Redo style more closely
+    spacingBtn.className = 'text-gray-400 hover:text-white p-1 mx-2 relative transition-colors'; // Match Undo/Redo style more closely
     spacingBtn.title = 'Spacing Tool';
     spacingBtn.id = 'btn-spacing-tool';
     spacingBtn.innerHTML = `

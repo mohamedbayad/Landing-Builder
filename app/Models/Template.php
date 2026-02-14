@@ -9,7 +9,7 @@ class Template extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['name', 'description', 'preview_image_path', 'is_active'];
+    protected $fillable = ['name', 'description', 'preview_image_path', 'storage_path', 'is_active'];
 
     protected $casts = [
         'is_active' => 'boolean',

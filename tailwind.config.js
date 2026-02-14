@@ -13,10 +13,7 @@ export default {
 
     theme: {
         extend: {
-            fontFamily: {
-                sans: ['"Inter"', 'Figtree', ...defaultTheme.fontFamily.sans],
-                display: ['"Anton"', 'sans-serif'],
-            },
+            
             colors: {
                 brand: {
                     orange: '#FF7A00',

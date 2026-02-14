@@ -3,6 +3,7 @@
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
+use Illuminate\Http\Request;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -14,6 +15,17 @@ return Application::configure(basePath: dirname(__DIR__))
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeaders::class,
+            \App\Http\Middleware\TrackPageVisit::class,
+        ]);
+        
+        // CRITICAL: Exclude session recording routes from string manipulation
+        // These middleware can corrupt or truncate large JSON payloads
+        $middleware->trimStrings(except: [
+            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*'),
+        ]);
+        
+        $middleware->convertEmptyStringsToNull(except: [
+            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*'),
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
