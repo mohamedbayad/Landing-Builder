@@ -138,6 +138,7 @@
     <div id="gjs" style="display:none">
         {!! $page->html !!}
     </div>
+    <div id="gjs-css" style="display:none">{!! $page->css !!}</div>
 
     <script>
         window.editorData = {
@@ -147,7 +148,31 @@
             csrfToken: "{{ csrf_token() }}",
             grapesJsJson: {!! $page->grapesjs_json ?? 'null' !!},
             appCssUrl: "{{ Vite::asset('resources/css/app.css') }}",
-            customHead: `{!! addslashes($landing->settings->custom_head_scripts ?? '') !!}` // Inject template CSS/Fonts
+            customHead: {!! json_encode(
+                '<script src="/js/tailwind.js"></script>' .
+                '<script>tailwind.config = {darkMode: "class", theme: {extend: {colors: {primary: "#5D4037", secondary: "#BC8440"}}}}</script>' .
+                '<style>
+                    /* Editor Helpers: Reveal hidden content when selected */
+                    .gjs-selected .details-content, 
+                    .product-card.gjs-selected .details-content,
+                    .details-content.gjs-selected {
+                        max-height: none !important; 
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                        display: block !important;
+                    }
+                    /* Force Details/Summary open when selected OR when child is selected */
+                    details.gjs-selected > *:not(summary),
+                    details:has(.gjs-selected) > *:not(summary) {
+                        display: block !important;
+                        height: auto !important;
+                        opacity: 1 !important;
+                        visibility: visible !important;
+                    }
+                </style>' .
+                ($landing->settings->custom_head_scripts ?? ''),
+                JSON_HEX_TAG
+            ) !!}
         };
         
         // Simple UI Toggle Logic (Bridge between Blade & GrapesJS)

@@ -2,8 +2,10 @@
 
 namespace App\Http\Controllers;
 
+use App\Services\LicenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cache;
 
 class SettingsController extends Controller
 {
@@ -23,10 +25,53 @@ class SettingsController extends Controller
         return view('settings.index', compact('workspace'));
     }
 
-    public function update(Request $request)
+    public function update(Request $request, LicenseService $licenseService)
     {
         $workspace = Auth::user()->workspaces()->first();
         $settings = $workspace->settings;
+
+        // License Activation
+        if ($request->has('license_key')) {
+            $validated = $request->validate([
+                'license_key' => 'required|string',
+            ]);
+
+            $result = $licenseService->activate($validated['license_key']);
+
+            if ($result['success']) {
+                $settings->update([
+                    'license_key' => $validated['license_key'],
+                    'license_status' => 'active',
+                    'license_data' => $result,
+                ]);
+                
+                // Cache the token for middleware usage
+                Cache::put('license_token', $result['token'], now()->addDays(30)); 
+
+                return redirect()->route('settings.index')->with('status', 'license-activated');
+            } else {
+                // If the user tried to re-activate the CURRENT key and it failed, mark as inactive
+                if ($settings->license_key === $validated['license_key']) {
+                     $settings->update(['license_status' => 'inactive']);
+                     Cache::forget('license_token');
+                }
+
+                return redirect()->route('settings.index')
+                    ->with('error', $result['message'])
+                    ->withInput(); // Keep the key in input
+            }
+        }
+        
+        // Manual Deactivation / Removal
+        if ($request->has('remove_license')) {
+             $settings->update([
+                'license_key' => null,
+                'license_status' => 'inactive',
+                'license_data' => null,
+            ]);
+            Cache::forget('license_token');
+            return redirect()->route('settings.index')->with('status', 'license-removed');
+        }
 
         // Basic Workspace Fields (Payment, Currency)
         if ($request->has('currency')) {

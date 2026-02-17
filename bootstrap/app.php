@@ -17,6 +17,12 @@ return Application::configure(basePath: dirname(__DIR__))
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\TrackPageVisit::class,
         ]);
+
+        $middleware->alias([
+            'check.license' => \App\Http\Middleware\CheckLicenseMiddleware::class,
+            'license.check' => \App\Http\Middleware\CheckLicenseMiddleware::class,
+            'license.realtime' => \App\Http\Middleware\VerifyLicenseOnRequest::class,
+        ]);
         
         // CRITICAL: Exclude session recording routes from string manipulation
         // These middleware can corrupt or truncate large JSON payloads

@@ -19,6 +19,9 @@
                 <button @click="tab = 'whatsapp'" :class="{ 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white': tab === 'whatsapp', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'whatsapp' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     WhatsApp Automation
                 </button>
+                <button @click="tab = 'license'" :class="{ 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white': tab === 'license', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'license' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                    License
+                </button>
             </div>
 
             <!-- Content -->
@@ -478,6 +481,70 @@
                                 <button type="submit" class="px-6 py-2.5 bg-green-600 rounded-lg text-white font-semibold hover:bg-green-700 shadow-lg">Save WhatsApp Settings</button>
                             </div>
                         </form>
+                    </div>
+
+                    <!-- TAB: LICENSE -->
+                    <div x-show="tab === 'license'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
+                        <div class="mb-6">
+                            <h3 class="text-xl font-bold text-gray-900 dark:text-white">License Management</h3>
+                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Activate your license to unlock premium features and templates.</p>
+                        </div>
+
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <div>
+                                    <h4 class="text-lg font-semibold text-gray-900 dark:text-white">License Status</h4>
+                                    <p class="text-sm text-gray-500">Current status of your installation.</p>
+                                </div>
+                                <span class="px-3 py-1 rounded-full text-sm font-medium {{ ($workspace->settings->license_status === 'active') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
+                                    {{ ucfirst($workspace->settings->license_status ?? 'Inactive') }}
+                                </span>
+                            </div>
+
+                            <div class="mb-4">
+                                @if(session('status') === 'license-activated')
+                                    <div class="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800" role="alert">
+                                        <span class="font-medium">Success!</span> License activated successfully.
+                                    </div>
+                                @endif
+                                
+                                @if(session('status') === 'license-removed')
+                                    <div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800" role="alert">
+                                        <span class="font-medium">Removed!</span> License deactivated.
+                                    </div>
+                                @endif
+                            </div>
+
+                            <form method="POST" action="{{ route('settings.update') }}">
+                                @csrf
+                                @method('PUT')
+                                
+                                <div class="mb-4">
+                                    <label for="license_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300">License Key</label>
+                                    <input type="text" name="license_key" id="license_key" value="{{ old('license_key', $workspace->settings->license_key) }}" class="mt-1 block w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500" placeholder="LICENSE-XXXX-YYYY-ZZZZ">
+                                    @error('license_key')
+                                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
+                                    @enderror
+                                    @if(session('error'))
+                                         <p class="text-red-500 text-xs mt-1">{{ session('error') }}</p>
+                                    @endif
+                                </div>
+
+                                <div class="flex justify-between items-center">
+                                    @if($workspace->settings->license_status === 'active')
+                                        <button type="submit" name="remove_license" value="1" class="text-red-500 hover:text-red-700 text-sm font-medium focus:outline-none" onclick="return confirm('Are you sure you want to deactivate and remove this license?');">
+                                            Deactivate License
+                                        </button>
+                                    @else
+                                        <div></div> <!-- Spacer -->
+                                    @endif
+
+                                    <button type="submit" class="px-6 py-2.5 bg-indigo-600 rounded-lg text-white font-semibold hover:bg-indigo-700 shadow-lg">
+                                        {{ ($workspace->settings->license_status === 'active') ? 'Update License' : 'Activate License' }}
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
                     </div>
 
                 </div>

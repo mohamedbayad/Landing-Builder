@@ -13,9 +13,14 @@ Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'inde
     ->name('dashboard');
 
 Route::middleware('auth')->group(function () {
-    Route::get('/templates', [App\Http\Controllers\TemplateController::class, 'index'])->name('templates.index');
+    Route::middleware('check.license')->group(function () {
+        Route::get('/templates', [App\Http\Controllers\TemplateController::class, 'index'])
+        ->name('templates.index')
+        ->middleware('license.realtime');
+        Route::post('/templates/{id}/import', [App\Http\Controllers\TemplateController::class, 'import'])->name('templates.import');
+    });
+
     Route::post('/templates/upload', [App\Http\Controllers\TemplateController::class, 'upload'])->name('templates.upload');
-    Route::post('/templates/{template}/import', [App\Http\Controllers\TemplateController::class, 'import'])->name('templates.import');
 
     Route::resource('landings', App\Http\Controllers\LandingController::class)->except(['create', 'store']);
     
@@ -55,8 +60,18 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/landings/{landing}/pages/{page}/edit', [App\Http\Controllers\LandingPageController::class, 'edit'])->name('landings.pages.edit');
     Route::put('/landings/{landing}/pages/{page}', [App\Http\Controllers\LandingPageController::class, 'update'])->name('landings.pages.update');
+    Route::get('/landings/{landing}/editor', [App\Http\Controllers\LandingController::class, 'editor'])
+        ->name('landings.editor')
+        ->middleware('license.realtime'); 
+
+    // Additional editor-related routes if any, e.g. saving
+    Route::post('/landings/{landing}/save', [App\Http\Controllers\LandingController::class, 'save'])
+        ->name('landings.save')
+        ->middleware('license.realtime');
     Route::post('/landings/{landing}/main', [App\Http\Controllers\LandingController::class, 'setAsMain'])->name('landings.main');
-    Route::post('/landings/{landing}/publish', [App\Http\Controllers\LandingController::class, 'publish'])->name('landings.publish');
+    Route::post('/landings/{landing}/publish', [App\Http\Controllers\LandingController::class, 'publish'])
+        ->name('landings.publish')
+        ->middleware('license.realtime');
     
     // Funnel Management
     Route::get('/landings/{landing}/funnel', [App\Http\Controllers\FunnelController::class, 'show'])->name('landings.funnel');

@@ -177,6 +177,12 @@ document.addEventListener('DOMContentLoaded', () => {
     } else if (hiddenContainer && hiddenContainer.innerHTML.trim().length > 0) {
         // Fallback to HTML if JSON is empty/invalid
         editor.setComponents(hiddenContainer.innerHTML);
+
+        // Fallback to CSS
+        const hiddenCss = document.getElementById('gjs-css');
+        if (hiddenCss && hiddenCss.innerHTML.trim().length > 0) {
+            editor.setStyle(hiddenCss.innerHTML);
+        }
     }
 
     // --- LOGIC: Clean up Default UI (Post-Init) ---

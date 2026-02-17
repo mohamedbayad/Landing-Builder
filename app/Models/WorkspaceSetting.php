@@ -37,6 +37,10 @@ class WorkspaceSetting extends Model
         'whatsapp_open_new_tab',
         'whatsapp_template_landing',
         'whatsapp_template_thankyou',
+        // License
+        'license_key',
+        'license_status',
+        'license_data',
     ];
 
     protected $casts = [
@@ -46,6 +50,7 @@ class WorkspaceSetting extends Model
         'whatsapp_enabled' => 'boolean',
         'whatsapp_redirect_enabled' => 'boolean',
         'whatsapp_open_new_tab' => 'boolean',
+        'license_data' => 'array',
     ];
 
     public function workspace()
