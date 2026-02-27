@@ -12,7 +12,7 @@ class FunnelController extends Controller
     public function show(Landing $landing)
     {
         // Ensure user owns this landing
-        if ($landing->workspace->user_id !== auth()->id()) {
+        if ($landing->workspace->user_id != auth()->id()) {
             abort(403);
         }
 
@@ -55,7 +55,7 @@ class FunnelController extends Controller
 
     public function storeProduct(Request $request, Landing $landing)
     {
-         if ($landing->workspace->user_id !== auth()->id()) abort(403);
+         if ($landing->workspace->user_id != auth()->id()) abort(403);
 
          $validated = $request->validate([
              'name' => 'required|string',
@@ -72,8 +72,8 @@ class FunnelController extends Controller
 
     public function deleteProduct(Request $request, Landing $landing, Product $product)
     {
-        if ($landing->workspace->user_id !== auth()->id()) abort(403);
-        if ($product->landing_id !== $landing->id) abort(403);
+        if ($landing->workspace->user_id != auth()->id()) abort(403);
+        if ($product->landing_id != $landing->id) abort(403);
 
         $product->delete();
         return back()->with('status', 'Product deleted.');
@@ -81,7 +81,7 @@ class FunnelController extends Controller
 
     public function storeCheckoutFields(Request $request, Landing $landing)
     {
-        if ($landing->workspace->user_id !== auth()->id()) abort(403);
+        if ($landing->workspace->user_id != auth()->id()) abort(403);
         
         // Input: fields array [field_name => [enabled, required, label]]
         $fields = $request->input('fields', []);

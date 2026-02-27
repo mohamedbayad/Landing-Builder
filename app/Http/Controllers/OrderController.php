@@ -128,7 +128,7 @@ class OrderController extends Controller
     public function update(Request $request, Order $order)
     {
         // Ensure user owns the order (via landing -> workspace)
-        if ($order->landing->workspace->user_id !== Auth::id()) {
+        if ($order->landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 

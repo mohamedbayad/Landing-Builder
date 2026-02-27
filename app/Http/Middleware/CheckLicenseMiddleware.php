@@ -35,12 +35,20 @@ class CheckLicenseMiddleware
                          Cache::put('license_token', $workspace->settings->license_data['token'], now()->addDays(30));
                          return $next($request);
                     }
+                    // Fallback to allowing if active even without token re-cache
+                     return $next($request);
+                } else {
+                    \Illuminate\Support\Facades\Log::warning("License Check Failed: Status is " . $workspace->settings->license_status);
                 }
+            } else {
+                 \Illuminate\Support\Facades\Log::warning("License Check Failed: No Workspace or Settings found for User ID: " . $user->id);
             }
+        } else {
+             \Illuminate\Support\Facades\Log::warning("License Check Failed: No Authenticated User");
         }
 
         if ($request->expectsJson()) {
-            return response()->json(['message' => 'License required.'], 403);
+            return response()->json(['message' => 'License required.', 'debug' => 'Check logs for details.'], 403);
         }
 
         return redirect()->route('settings.index')->with('error', 'Please activate your license to access this feature.');

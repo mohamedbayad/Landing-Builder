@@ -11,11 +11,11 @@ class LandingPageController extends Controller
 {
     public function edit(Landing $landing, LandingPage $page)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
-        if ($page->landing_id !== $landing->id) {
+        if ($page->landing_id != $landing->id) {
             abort(404);
         }
 
@@ -47,10 +47,10 @@ class LandingPageController extends Controller
 
     public function update(Request $request, Landing $landing, LandingPage $page)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
-        if ($page->landing_id !== $landing->id) {
+        if ($page->landing_id != $landing->id) {
             abort(404);
         }
 

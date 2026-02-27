@@ -28,7 +28,7 @@ class FormEndpointController extends Controller
     public function destroy(FormEndpoint $endpoint)
     {
         // Check ownership
-        if ($endpoint->workspace->user_id !== Auth::id()) {
+        if ($endpoint->workspace->user_id != Auth::id()) {
             abort(403);
         }
 

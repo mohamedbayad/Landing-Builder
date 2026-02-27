@@ -50,9 +50,22 @@ class VerifyLicenseOnRequest
         // Direct check for "Kill Switch" efficacy.
         
         try {
-            $licensingUrl = config('services.licensing.url', env('LICENSING_SERVER_URL')) . '/check-status';
+            // Use config() for production safety (env() returns null if cached)
+            $baseUrl = config('services.licensing.url');
             
-            $response = Http::timeout(2)->post($licensingUrl, [
+            if (!$baseUrl) {
+                 // Fallback to env() just in case config cache issue, but log warning
+                 $baseUrl = env('LICENSING_SERVER_URL');
+                 if (!$baseUrl) {
+                    Log::error("License Check Failed: LICENSING_SERVER_URL not configured.");
+                    throw new \Exception("Licensing Server URL missing");
+                 }
+            }
+
+            $licensingUrl = rtrim($baseUrl, '/') . '/check-status';
+            
+            // Increased timeout for shared hosting
+            $response = Http::timeout(5)->post($licensingUrl, [
                 'token' => $token
             ]);
 
@@ -61,10 +74,12 @@ class VerifyLicenseOnRequest
                 if ($status === 'active') {
                      return $next($request);
                 }
+                 Log::warning("License Verification Refused: Status is '$status'. Token: " . substr($token, 0, 10) . "...");
+            } else {
+                Log::warning("License Verification HTTP Error: " . $response->status() . " - " . $response->body());
             }
             
             // If we reach here, license is NOT active (blocked, expired, or invalid)
-            Log::warning("License Verification Failed: " . $response->body());
             
             // Clear local license state
             Cache::forget('license_token');
@@ -74,31 +89,22 @@ class VerifyLicenseOnRequest
             if ($user) {
                 $workspace = $user->workspaces()->first();
                 if ($workspace && $workspace->settings) {
-                    $workspace->settings()->update(['license_status' => 'inactive']); // or 'revoked' if we had that enum, sticking to inactive for now to match UI logic
+                    $workspace->settings()->update(['license_status' => 'inactive']); 
                 }
             }
             
             if ($request->expectsJson()) {
-                 return response()->json(['message' => 'License is no longer valid.'], 403);
+                 return response()->json(['message' => 'License is no longer valid.', 'debug' => 'Check server logs.'], 403);
             }
             return redirect()->route('settings.index')->with('error', 'Your license has been revoked or expired. Access to Builder is blocked.');
 
         } catch (\Exception $e) {
-            // Network failure? 
-            // If Licensing Server is down, do we block user? 
-            // "Kill Switch" usually implies Fail-Closed for security, but bad UX if server down.
-            // User requirement: "If I delete/ban... immediately block".
-            // Implementation: We will Log warning and ALLOW if network error (Fail-Open) to prevent outage if LS is down?
-            // OR Fail-Closed? "Strict Middleware" suggests Fail-Closed.
-            // Let's go with Fail-Closed for "Strict" requirement, or maybe softer?
-            // I'll implement Fail-Closed (Block) as requested for "Real-Time Verification".
-            // Actually, for SaaS, usually you allow if server unreachable to avoid angry customers during your own downtime.
-            // But if user wants "Kill Switch", they usually prioritize control.
-            // I will implement a default BLOCK on network error but log it.
-            
             Log::error("License Check Failed (Network/Error): " . $e->getMessage());
              if ($request->expectsJson()) {
-                 return response()->json(['message' => 'License verification server unreachable.'], 403);
+                 return response()->json([
+                     'message' => 'License verification server unreachable.',
+                     'debug' => $e->getMessage() // Only for admin/debugging, maybe hide in prod? Left for now as they are admin.
+                 ], 403);
             }
              return redirect()->route('settings.index')->with('error', 'Unable to verify license status. Please check your connection.');
         }

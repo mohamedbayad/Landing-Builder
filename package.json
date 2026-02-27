@@ -22,8 +22,11 @@
         "chart.js": "^4.5.1",
         "grapesjs": "^0.22.14",
         "grapesjs-accordion": "^1.0.10",
+        "grapesjs-icons": "^0.0.4",
         "grapesjs-plugin-forms": "^2.0.6",
         "grapesjs-preset-webpage": "^1.0.3",
-        "grapesjs-tailwind": "^1.0.13"
+        "grapesjs-tailwind": "^1.0.13",
+        "iconify-icon": "^3.0.2",
+        "lz-string": "^1.5.0"
     }
 }

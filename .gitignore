@@ -21,3 +21,12 @@
 Homestead.json
 Homestead.yaml
 Thumbs.db
+
+# Custom Domains Feature (Hidden/Coming Soon)
+/app/Models/CustomDomain.php
+/app/Http/Controllers/CustomDomainController.php
+/app/Services/DomainVerificationService.php
+/app/Jobs/VerifyPendingDomainsJob.php
+/app/Http/Middleware/DetectCustomDomain.php
+/resources/views/dashboard/domains/
+/database/migrations/*_create_custom_domains_table.php

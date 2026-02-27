@@ -12,7 +12,15 @@ class LicenseService
 
     public function __construct()
     {
-        $this->baseUrl = env('LICENSING_SERVER_URL', 'http://127.0.0.1:8001/api');
+        // Use config to support cached configuration in production
+        $this->baseUrl = config('services.licensing.url');
+
+        if (!$this->baseUrl) {
+            $this->baseUrl = env('LICENSING_SERVER_URL', 'http://127.0.0.1:8001/api');
+            if (!config('services.licensing.url')) {
+                 Log::warning("LicenseService: LICENSING_SERVER_URL config missing. Using fallback/env.");
+            }
+        }
     }
 
     public function activate($key)

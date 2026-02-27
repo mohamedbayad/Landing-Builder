@@ -15,7 +15,7 @@ class LandingMediaController extends Controller
      */
     public function index(Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -48,7 +48,7 @@ class LandingMediaController extends Controller
      */
     public function store(Request $request, Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -155,7 +155,7 @@ class LandingMediaController extends Controller
      */
     public function destroy(Landing $landing, MediaAsset $media) // Model binding needs careful check if ID matches
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
         
@@ -164,7 +164,7 @@ class LandingMediaController extends Controller
         // User said: "User can only see/manage their own media (user_id scope)."
         // Let's allow if user_id matches.
         
-        if ($media->user_id !== Auth::id()) {
+        if ($media->user_id != Auth::id()) {
             abort(403);
         }
 

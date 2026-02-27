@@ -1,4 +1,6 @@
-import grapesjs from 'grapesjs';
+import grapesjs, { usePlugin } from 'grapesjs';
+import grapesjsIcons from 'grapesjs-icons';
+import 'iconify-icon';
 import 'grapesjs/dist/css/grapes.min.css';
 import grapesjsTailwind from 'grapesjs-tailwind';
 import grapesjsPresetWebpage from 'grapesjs-preset-webpage';
@@ -7,6 +9,9 @@ import SpacingTool from './grapesjs/plugins/spacing-tool';
 import editorOverrides from './editor-overrides';
 import landingParserPlugin from './grapesjs/landing-parser-plugin';
 import countdownPlugin from './grapesjs/countdown-plugin';
+import SidebarContentEditing from './grapesjs/plugins/sidebar-content-editing';
+import CanvasInteractionControl from './grapesjs/plugins/canvas-interaction-control';
+import CustomComponents from './grapesjs/plugins/custom-components';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -114,7 +119,9 @@ document.addEventListener('DOMContentLoaded', () => {
         panels: { defaults: [] },
 
         canvas: {
-            scripts: [],
+            scripts: [
+                'https://code.iconify.design/iconify-icon/2.1.0/iconify-icon.min.js'
+            ],
             styles: [
                 window.editorData.appCssUrl,
                 'https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@300;400;600;700;900&display=swap'
@@ -127,9 +134,22 @@ document.addEventListener('DOMContentLoaded', () => {
             SpacingTool,
             editorOverrides,
             landingParserPlugin,
-            countdownPlugin
+            countdownPlugin,
+            SidebarContentEditing,
+            CustomComponents,
+            CanvasInteractionControl,
+            (editor, opts) => {
+                console.log('--- GRAPESJS-ICONS PLUGIN INITIALIZATION ---(INTERCEPTED)');
+                console.log('Received options:', opts);
+                // Call the original plugin
+                grapesjsIcons(editor, opts);
+            }
         ],
         pluginsOpts: {
+            // Provide BOTH strings to see which one it picks up
+            [grapesjsIcons]: { collections: ['ri', 'mdi', 'uim', 'streamline-emojis'] },
+            'grapesjs-icons': { collections: ['ri', 'mdi', 'uim', 'streamline-emojis'] },
+            mo: { collections: ['ri', 'mdi', 'uim', 'streamline-emojis'] },
             [grapesjsTailwind]: {},
             [grapesjsPresetWebpage]: {
                 modalImportTitle: 'Import Template',
@@ -159,7 +179,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 // Let's stick to registering it and later I might need to manually append a button if Panels are disabled.
             },
             [editorOverrides]: {},
-            [countdownPlugin]: {}
+            [countdownPlugin]: {},
+            [SidebarContentEditing]: {},
+            [CustomComponents]: {},
+            [CanvasInteractionControl]: {},
         }
     });
 
@@ -204,6 +227,63 @@ document.addEventListener('DOMContentLoaded', () => {
             canvasHead.insertAdjacentHTML('beforeend', window.editorData.customHead);
             console.log('Injected custom head scripts/styles into canvas');
         }
+
+        // ── EDITOR CANVAS REVEAL CSS ───────────────────────────────────────────
+        // Force all hidden/collapsed elements to be permanently visible inside
+        // the GrapesJS editor canvas so you can click and edit them directly.
+        // This style tag ONLY lives in the canvas iframe — it has ZERO effect
+        // on the published/live page.
+        //
+        // HOW TO USE:
+        //   Add the CSS class names of your hidden elements to the selector
+        //   list below. Inspect your template in DevTools and look for the
+        //   classes that control visibility (display:none, height:0, etc.).
+        //
+        // ─────────────────────────────────────────────────────────────────────
+        // EXAMPLE selectors — replace / extend with your real class names:
+        //   .accordion-body      → Bootstrap accordion panels
+        //   .collapse            → Bootstrap collapse targets
+        //   .panel-content       → custom panel content
+        //   .card-details        → toggle-card hidden details
+        //   .toggle-body         → custom toggle body
+        //   [data-toggle-target] → data-attribute hidden targets
+        // ─────────────────────────────────────────────────────────────────────
+        (function injectEditorRevealCSS() {
+            const canvasHead = editor.Canvas.getDocument().head;
+            const style = document.createElement('style');
+            style.id = 'gjs-editor-reveal-hidden';
+            style.textContent = `
+                /*
+                 * ============================================================
+                 * GrapesJS Editor-Only: Force-Reveal <details>/<summary> FAQs
+                 * ============================================================
+                 * Targets native HTML <details> accordions. The browser hides
+                 * all children except <summary> unless the 'open' attribute is
+                 * present. This rule forces them permanently visible inside the
+                 * editor so every panel is editable without clicking to open it.
+                 */
+
+                /* Force every <details> to show its content in the editor */
+                details > *:not(summary) {
+                    display: block !important;
+                    visibility: visible !important;
+                    height: auto !important;
+                    max-height: none !important;
+                    overflow: visible !important;
+                    opacity: 1 !important;
+                    transition: none !important;
+                    animation: none !important;
+                    pointer-events: auto !important;
+                }
+
+                /* Also prevent the summary triangle/marker from hiding content */
+                details {
+                    overflow: visible !important;
+                }
+            `;
+            canvasHead.appendChild(style);
+            console.log('[GrapesJS] Editor Reveal CSS injected into canvas.');
+        })();
 
         // FORCE IMAGE DOUBLE-CLICK -> OPEN ASSETS
         const body = editor.Canvas.getBody();

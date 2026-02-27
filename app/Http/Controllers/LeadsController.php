@@ -152,7 +152,7 @@ class LeadsController extends Controller
     // Admin: Update Status
     public function update(Request $request, Lead $lead)
     {
-        if ($lead->landing->workspace->user_id !== Auth::id()) {
+        if ($lead->landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -181,7 +181,7 @@ class LeadsController extends Controller
     // Admin: Get lead details (AJAX)
     public function show(Lead $lead)
     {
-        if ($lead->landing->workspace->user_id !== Auth::id()) {
+        if ($lead->landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -349,7 +349,7 @@ class LeadsController extends Controller
     // Admin: Delete Lead
     public function destroy(Lead $lead)
     {
-        if ($lead->landing->workspace->user_id !== Auth::id()) {
+        if ($lead->landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
         $lead->delete();

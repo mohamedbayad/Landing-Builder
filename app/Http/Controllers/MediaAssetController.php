@@ -105,7 +105,7 @@ class MediaAssetController extends Controller
      */
     public function destroy(MediaAsset $media)
     {
-        if ($media->user_id !== Auth::id()) {
+        if ($media->user_id != Auth::id()) {
             abort(403);
         }
 

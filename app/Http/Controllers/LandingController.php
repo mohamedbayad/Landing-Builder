@@ -32,7 +32,7 @@ class LandingController extends Controller
 
     public function show(Landing $landing)
     {
-        if ($landing->workspace_id !== Auth::user()->workspaces()->first()->id) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
         
@@ -46,7 +46,7 @@ class LandingController extends Controller
     public function edit(Landing $landing)
     {
         // Authorization check (simple MVP check)
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -58,7 +58,7 @@ class LandingController extends Controller
      */
     public function update(Request $request, Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -129,7 +129,7 @@ class LandingController extends Controller
      */
     public function destroy(Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -140,7 +140,7 @@ class LandingController extends Controller
 
     public function setAsMain(Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 
@@ -155,7 +155,7 @@ class LandingController extends Controller
 
     public function publish(Landing $landing)
     {
-        if ($landing->workspace->user_id !== Auth::id()) {
+        if ($landing->workspace->user_id != Auth::id()) {
             abort(403);
         }
 

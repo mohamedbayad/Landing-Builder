@@ -417,10 +417,9 @@
         });
     </script>
 
-    <!-- Session Recording (rrweb) -->
-    <script src="https://cdn.jsdelivr.net/npm/rrweb@latest/dist/rrweb.min.js"></script>
-    <script src="/js/session-recorder.js" data-landing-page-id="{{ $page->id }}"></script>
+    <!-- Session Recording (rrweb injected dynamically by controller) -->
     <script src="/js/countdown.js" defer></script>
+    <script src="/js/analytics.js?v={{ filemtime(public_path('js/analytics.js')) }}" defer></script>
 
     <!-- Settings & WhatsApp Application -->
     @php

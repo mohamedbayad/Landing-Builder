@@ -8,6 +8,12 @@ Route::get('/', function () {
 });
 
 
+Route::get('/debug-rec/{sessionId}', function ($sessionId) {
+    $session = \App\Models\RecordingSession::where('session_id', $sessionId)->with('pages.events')->firstOrFail();
+    $landingPage = $session->landingPage;
+    return view('dashboard.recordings.show', compact('session', 'landingPage'));
+});
+
 Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'index'])
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
@@ -36,19 +42,27 @@ Route::middleware('auth')->group(function () {
     Route::resource('form-endpoints', App\Http\Controllers\FormEndpointController::class)->only(['store', 'destroy']);
     
     // Session Recordings - Admin
-    Route::get('/dashboard/recordings', [App\Http\Controllers\SessionRecordingController::class, 'index'])->name('recordings.index');
-    Route::get('/dashboard/recordings/{recording}/events', [App\Http\Controllers\SessionRecordingController::class, 'show'])->name('recordings.show');
-    Route::delete('/dashboard/recordings/{recording}', [App\Http\Controllers\SessionRecordingController::class, 'destroy'])->name('recordings.destroy');
+    Route::prefix('dashboard')->group(function () {
+        Route::get('/recordings/{landingPageId?}', [\App\Http\Controllers\RecordingDashboardController::class, 'index'])->name('recordings.index');
+        Route::get('/recordings/{landingPageId}/{sessionId}', [\App\Http\Controllers\RecordingDashboardController::class, 'show'])->name('recordings.show');
+        Route::delete('/recordings/{sessionId}', [\App\Http\Controllers\RecordingDashboardController::class, 'destroy'])->name('recordings.destroy');
+    });
+
+    // Custom Domains - Admin
+    Route::prefix('dashboard/domains')->group(function () {
+        Route::get('/', [\App\Http\Controllers\CustomDomainController::class, 'index'])->name('domains.index');
+        Route::post('/', [\App\Http\Controllers\CustomDomainController::class, 'store'])->name('domains.store');
+        Route::get('/{domain}', [\App\Http\Controllers\CustomDomainController::class, 'show'])->name('domains.show');
+        Route::post('/{domain}/verify', [\App\Http\Controllers\CustomDomainController::class, 'verify'])->name('domains.verify');
+        Route::post('/{domain}/assign', [\App\Http\Controllers\CustomDomainController::class, 'assign'])->name('domains.assign');
+        Route::delete('/{domain}', [\App\Http\Controllers\CustomDomainController::class, 'destroy'])->name('domains.destroy');
+    });
 
     // Analytics (New)
     Route::get('/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/data', [App\Http\Controllers\AnalyticsController::class, 'data'])->name('analytics.data');
     
-    // Tracking (Public - Web middleware for Cookies)
-    // Tracking (Public - Web middleware for Cookies)
-    Route::post('/api/track/event', [App\Http\Controllers\AnalyticsTrackerController::class, 'trackEvent'])
-        ->name('analytics.track')
-        ->middleware('throttle:120,1'); // 120 per minute (high traffic)
+    // Tracking route moved to public section below
     // Legacy/Placeholder routes removal or update if needed
     // Route::post('/landings/{landing}/payment/stripe', ...)->name('payment.stripe.create'); // Old
     // Route::post('/landings/{landing}/payment/paypal', ...)->name('payment.paypal.create'); // Old
@@ -110,7 +124,12 @@ require __DIR__.'/auth.php';
     // Countdown Timer API
     Route::get('/l/{landing}/countdown', [App\Http\Controllers\CountdownController::class, 'show'])->name('landings.countdown');
 
-    Route::post('/cart/sync', [App\Http\Controllers\CartController::class, 'sync'])->name('cart.sync');
+    // Tracking (Public - Web middleware for Cookies)
+    Route::post('/api/track/event', [App\Http\Controllers\AnalyticsTrackerController::class, 'trackEvent'])
+        ->name('analytics.track')
+        ->middleware('throttle:120,1'); // 120 per minute (high traffic)
+
+    // Route::post('/cart/sync', [App\Http\Controllers\CartController::class, 'sync'])->name('cart.sync');
 Route::get('/landings/{landing}/checkout', [App\Http\Controllers\PublicLandingController::class, 'checkoutFlow'])->name('landings.checkout');
 Route::get('/', [App\Http\Controllers\PublicLandingController::class, 'home'])->name('public.home');
 Route::get('/{slug}', [App\Http\Controllers\PublicLandingController::class, 'page'])->where('slug', '^[a-zA-Z0-9-_]+$')->name('public.page');

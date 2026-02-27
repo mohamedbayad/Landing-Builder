@@ -13,6 +13,18 @@ class PublicLandingController extends Controller
      */
     public function home()
     {
+        $activeLandingPage = app()->has('active_landing_page') 
+            ? app('active_landing_page') 
+            : null;
+
+        if ($activeLandingPage) {
+            $page = $activeLandingPage->pages()->where('type', 'index')->first() ?? $activeLandingPage->pages()->first();
+            if ($page) {
+                $html = view('landing_page', ['landing' => $activeLandingPage, 'page' => $page])->render();
+                return response($this->injectRecordingSnippet($html, $activeLandingPage, 'landing'));
+            }
+        }
+
         // Find the "Main" landing
         $mainLanding = Landing::where('is_main', true)->where('status', 'published')->first();
 
@@ -27,7 +39,8 @@ class PublicLandingController extends Controller
             abort(404);
         }
 
-        return view('landing_page', ['landing' => $mainLanding, 'page' => $page]);
+        $html = view('landing_page', ['landing' => $mainLanding, 'page' => $page])->render();
+        return response($this->injectRecordingSnippet($html, $mainLanding, 'landing'));
     }
 
     /**
@@ -36,6 +49,38 @@ class PublicLandingController extends Controller
      */
     public function page($slug)
     {
+        $activeLandingPage = app()->has('active_landing_page') 
+            ? app('active_landing_page') 
+            : null;
+
+        if ($activeLandingPage) {
+            $page = $activeLandingPage->pages()->where('slug', $slug)->first();
+            if ($page) {
+                $data = ['landing' => $activeLandingPage, 'page' => $page];
+                if ($page->type === 'checkout') {
+                    $data = array_merge($data, $this->getCheckoutData($activeLandingPage));
+                }
+                
+                // Thank You Page - add layout
+                if ($page->type === 'thankyou') {
+                    $wsSettings = $activeLandingPage->workspace->settings ?? null;
+                    $data['thankyouLayout'] = $wsSettings->thankyou_style ?? 'thankyou_1';
+                    
+                    if (request()->has('lead')) {
+                        $leadId = request()->query('lead');
+                        $lead = \App\Models\Lead::find($leadId);
+                        if ($lead && $lead->landing_id == $activeLandingPage->id) {
+                            $data['lead'] = $lead;
+                        }
+                    }
+                }
+
+                $html = view('landing_page', $data)->render();
+                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+                return response($this->injectRecordingSnippet($html, $activeLandingPage, $pageTypeMapped));
+            }
+        }
+
         // 1. First, try to find a page under the Main Landing
         $mainLanding = Landing::where('is_main', true)->first();
 
@@ -46,7 +91,7 @@ class PublicLandingController extends Controller
             if ($page) {
                 // Check visibility
                 if ($mainLanding->status !== 'published') {
-                    if (!request()->user() || request()->user()->id !== $mainLanding->workspace->user_id) {
+                    if (!request()->user() || request()->user()->id != $mainLanding->workspace->user_id) {
                         abort(404);
                     }
                 }
@@ -72,13 +117,15 @@ class PublicLandingController extends Controller
                     if (request()->has('lead')) {
                         $leadId = request()->query('lead');
                         $lead = \App\Models\Lead::find($leadId);
-                        if ($lead && $lead->landing_id === $mainLanding->id) {
+                        if ($lead && $lead->landing_id == $mainLanding->id) {
                             $data['lead'] = $lead;
                         }
                     }
                 }
 
-                return view('landing_page', $data);
+                $html = view('landing_page', $data)->render();
+                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+                return response($this->injectRecordingSnippet($html, $mainLanding, $pageTypeMapped));
             }
         }
 
@@ -88,7 +135,7 @@ class PublicLandingController extends Controller
         if ($landing) {
             // Check visibility - must be published for public access
             if ($landing->status !== 'published') {
-                if (!request()->user() || request()->user()->id !== $landing->workspace->user_id) {
+                if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
                     abort(404);
                 }
             }
@@ -108,7 +155,9 @@ class PublicLandingController extends Controller
                     $data = array_merge($data, $this->getCheckoutData($landing));
                 }
 
-                return view('landing_page', $data);
+                $html = view('landing_page', $data)->render();
+                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+                return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
             }
         }
 
@@ -118,12 +167,11 @@ class PublicLandingController extends Controller
 
     public function preview(Landing $landing, LandingPage $page)
     {
-        // Authorization check
-        if ($landing->workspace->user_id !== request()->user()->id) {
+        if ($landing->workspace->user_id != request()->user()->id) {
             abort(403);
         }
 
-        if ($page->landing_id !== $landing->id) {
+        if ($page->landing_id != $landing->id) {
             abort(404);
         }
 
@@ -141,13 +189,15 @@ class PublicLandingController extends Controller
             if (request()->has('lead')) {
                 $leadId = request()->query('lead');
                 $lead = \App\Models\Lead::find($leadId);
-                if ($lead && $lead->landing_id === $landing->id) {
+                if ($lead && $lead->landing_id == $landing->id) {
                     $data['lead'] = $lead;
                 }
             }
         }
 
-        return view('landing_page', $data);
+        $html = view('landing_page', $data)->render();
+        $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+        return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
     }
     
     private function getCheckoutData(Landing $landing)
@@ -185,7 +235,7 @@ class PublicLandingController extends Controller
     {
         // Visibility check
         if ($landing->status !== 'published') {
-            if (!request()->user() || request()->user()->id !== $landing->workspace->user_id) {
+            if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
                 abort(404);
             }
         }
@@ -199,7 +249,8 @@ class PublicLandingController extends Controller
         $data = ['landing' => $landing, 'page' => $page];
         $data = array_merge($data, $this->getCheckoutData($landing));
 
-        return view('landing_page', $data);
+        $html = view('landing_page', $data)->render();
+        return response($this->injectRecordingSnippet($html, $landing, 'checkout'));
     }
 
     /**
@@ -215,7 +266,7 @@ class PublicLandingController extends Controller
 
         // Check visibility
         if ($landing->status !== 'published') {
-            if (!request()->user() || request()->user()->id !== $landing->workspace->user_id) {
+            if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
                 abort(404);
             }
         }
@@ -248,12 +299,40 @@ class PublicLandingController extends Controller
             if (request()->has('lead')) {
                 $leadId = request()->query('lead');
                 $lead = \App\Models\Lead::find($leadId);
-                if ($lead && $lead->landing_id === $landing->id) {
+                if ($lead && $lead->landing_id == $landing->id) {
                     $data['lead'] = $lead;
                 }
             }
         }
 
-        return view('landing_page', $data);
+        $html = view('landing_page', $data)->render();
+        $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+        return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
+    }
+
+    private function injectRecordingSnippet(string $html, Landing $landingPage, string $pageType): string
+    {
+        $snippetPath = resource_path('js/recording-snippet.js');
+        if (!file_exists($snippetPath)) {
+            return $html;
+        }
+        
+        $snippet = file_get_contents($snippetPath);
+        
+        $snippet = str_replace([
+            '{{PAGE_TYPE}}',
+            '{{LANDING_PAGE_ID}}',
+            '{{API_BASE_URL}}',
+        ], [
+            $pageType,
+            $landingPage->id,
+            '/api/rec',
+        ], $snippet);
+        
+        $lzScript = '<script src="https://cdn.jsdelivr.net/npm/lz-string@1.5.0/libs/lz-string.min.js"></script>';
+        $injectCode = $lzScript . "\n<script>\n" . $snippet . "\n</script>";
+        
+        // Inject before </body>
+        return str_replace('</body>', $injectCode . '</body>', $html);
     }
 }

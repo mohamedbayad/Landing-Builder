@@ -35,4 +35,8 @@ return [
         ],
     ],
 
+    'licensing' => [
+        'url' => env('LICENSING_SERVER_URL', 'http://localhost:8000/api'),
+    ],
+
 ];

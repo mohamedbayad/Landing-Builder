@@ -1,11 +1,11 @@
-(function() {
+(function () {
     // Config
     const ENDPOINT = '/api/track/event';
     const SCROLL_THRESHOLDS = [25, 50, 75, 90];
-    
+
     let sessionStarted = false;
     let scrollTracked = new Set();
-    
+
     // Helper: Send Event
     function sendEvent(name, data = {}) {
         const payload = {
@@ -33,12 +33,12 @@
 
     // 1. Initial Page View (Handled by Middleware, but we can send metadata if needed)
     // We rely on Middleware for the base 'pageview', but accurate time-on-page requires frontend pings or exit events.
-    
+
     // 2. Click Tracking (CTA)
-    document.addEventListener('click', function(e) {
-        let target = e.target.closest('a, button, .track-cta');
+    document.addEventListener('click', function (e) {
+        let target = e.target.closest('a, button, .track-cta, .cta');
         if (target) {
-            const isCta = target.classList.contains('track-cta') || target.hasAttribute('data-track');
+            const isCta = target.classList.contains('track-cta') || target.classList.contains('cta') || target.hasAttribute('data-track');
             const data = {
                 text: target.innerText?.substring(0, 50),
                 href: target.getAttribute('href'),
@@ -53,7 +53,7 @@
     });
 
     // 3. Form Interactions
-    document.addEventListener('focus', function(e) {
+    document.addEventListener('focus', function (e) {
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
             const form = e.target.closest('form');
             if (form && !form.dataset.trackedStart) {
@@ -64,7 +64,7 @@
     }, true);
 
     // 4. Scroll Depth
-    window.addEventListener('scroll', function() {
+    window.addEventListener('scroll', function () {
         const scrollTop = window.scrollY;
         const docHeight = document.documentElement.scrollHeight - window.innerHeight;
         const scrollPercent = (scrollTop / docHeight) * 100;

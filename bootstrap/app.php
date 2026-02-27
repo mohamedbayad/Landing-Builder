@@ -16,6 +16,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\TrackPageVisit::class,
+            \App\Http\Middleware\DetectCustomDomain::class,
         ]);
 
         $middleware->alias([
@@ -27,11 +28,17 @@ return Application::configure(basePath: dirname(__DIR__))
         // CRITICAL: Exclude session recording routes from string manipulation
         // These middleware can corrupt or truncate large JSON payloads
         $middleware->trimStrings(except: [
-            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*'),
+            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*', 'api/rec', 'api/rec/*'),
         ]);
         
         $middleware->convertEmptyStringsToNull(except: [
-            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*'),
+            fn (Request $request) => $request->is('api/record-session', 'api/record-session/*', 'api/rec', 'api/rec/*'),
+        ]);
+
+        $middleware->validateCsrfTokens(except: [
+            'api/rec/*',
+            'api/record-session/*',
+            'api/track/*'
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
