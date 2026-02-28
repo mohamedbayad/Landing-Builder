@@ -77,6 +77,125 @@
                  class="space-y-8"
                  style="display: none;">
 
+                <!-- 0. Real-time Overview Module -->
+                <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+                    <!-- Left Card: Map (lg:col-span-2) -->
+                    <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                                Active users by Country
+                                <span class="relative flex h-2.5 w-2.5 ml-1">
+                                  <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                  <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                                </span>
+                            </h3>
+                            <button class="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center gap-1">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div class="flex flex-col md:flex-row flex-grow gap-6">
+                            <!-- Map Container -->
+                            <div class="w-full md:w-2/3 min-h-[300px] relative flex items-center justify-center" id="realtime-map-container" wire:ignore>
+                                <!-- Map SVG injected by D3 -->
+                            </div>
+                            
+                            <!-- Internal Country List -->
+                            <div class="w-full md:w-1/3 flex flex-col border-l border-gray-100 dark:border-gray-700 pl-0 md:pl-6">
+                                <div class="flex justify-between text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-widest border-b border-gray-100 dark:border-gray-700 pb-2 mb-3">
+                                    <span>Country</span>
+                                    <span>Active Users</span>
+                                </div>
+                                <div class="space-y-4 flex-grow overflow-y-auto max-h-[300px] custom-scrollbar pr-2">
+                                    <template x-for="c in realtimeData.countries.slice(0, 6)" :key="c.country">
+                                        <div>
+                                            <div class="flex justify-between text-sm py-1">
+                                                <span class="font-medium text-gray-700 dark:text-gray-200 truncate pr-2" x-text="c.country"></span>
+                                                <span class="font-bold text-gray-900 dark:text-white" x-text="c.count"></span>
+                                            </div>
+                                            <!-- Blue bar -->
+                                            <div class="w-full bg-transparent h-0.5 mt-0.5">
+                                                <div class="bg-blue-600 h-0.5" :style="'width: ' + (realtimeData.countries[0] ? (c.count / realtimeData.countries[0].count * 100) : 0) + '%'"></div>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <template x-if="realtimeData.countries.length === 0">
+                                        <div class="text-sm text-gray-400 py-4 text-center">No active users</div>
+                                    </template>
+                                </div>
+                                <div class="pt-3 mt-auto text-right">
+                                    <button class="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center justify-end w-full gap-1">
+                                        View countries <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right Card: Ticker (lg:col-span-1) -->
+                    <div class="lg:col-span-1 bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 p-6 flex flex-col">
+                        <div class="flex justify-between items-start border-b border-gray-100 dark:border-gray-700 pb-2 mb-4 relative">
+                            <h3 class="text-[11px] font-bold text-gray-500 tracking-widest uppercase">
+                                Active users in last 30 minutes
+                            </h3>
+                            <button class="text-emerald-600 bg-emerald-50 rounded-full p-0.5 absolute right-0 top-0">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>
+                            </button>
+                        </div>
+                        
+                        <div class="text-[2.75rem] leading-none font-semibold text-gray-900 dark:text-white tracking-tight mb-8">
+                            <span x-text="realtimeData.total">0</span>
+                        </div>
+                        
+                        <h3 class="text-[11px] font-bold text-gray-500 tracking-widest uppercase mb-4">
+                            Active users per minute
+                        </h3>
+                        
+                        <!-- Minute Bar Chart -->
+                        <div class="flex items-end h-24 gap-[2px] w-full border-b border-gray-300 dark:border-gray-600 pb-0 mb-6 relative">
+                            <template x-for="min in realtimeData.minutes" :key="min.time">
+                                <div class="flex-1 bg-blue-100 hover:bg-blue-200 dark:bg-gray-700 dark:hover:bg-gray-600 transition-colors cursor-pointer group relative h-full flex flex-col justify-end">
+                                    <div class="w-full bg-blue-600" 
+                                         :style="'height: ' + (Math.max(...realtimeData.minutes.map(m=>m.count)) > 0 && min.count > 0 ? Math.max((min.count / Math.max(...realtimeData.minutes.map(m=>m.count))) * 100, 2) : 0) + '%'">
+                                    </div>
+                                    <!-- Simple Tooltip -->
+                                    <div class="absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block bg-gray-900 text-white text-xs px-2 py-1 rounded shadow-lg whitespace-nowrap z-50">
+                                        <span x-text="min.count"></span> users
+                                    </div>
+                                </div>
+                            </template>
+                        </div>
+
+                        <!-- Top Countries List -->
+                        <div class="flex justify-between text-[11px] font-bold text-gray-500 tracking-widest uppercase border-b border-gray-200 dark:border-gray-700 pb-2 mb-3">
+                            <span>Top Countries</span>
+                            <span>Active Users</span>
+                        </div>
+                        <div class="space-y-3 flex-grow overflow-y-auto max-h-[160px] custom-scrollbar">
+                            <template x-for="c in realtimeData.countries.slice(0, 5)" :key="c.country">
+                                <div>
+                                    <div class="flex justify-between text-[13px] py-0.5 relative z-10">
+                                        <span class="text-gray-600 dark:text-gray-300 truncate pr-2" x-text="c.country"></span>
+                                        <span class="text-gray-900 dark:text-white text-right" x-text="c.count"></span>
+                                    </div>
+                                    <!-- Subtle underbar like in screenshot -->
+                                    <div class="w-full h-px mt-0.5">
+                                        <div class="bg-blue-600 h-full" :style="'width: ' + (realtimeData.countries[0] ? (c.count / realtimeData.countries[0].count * 100) : 0) + '%'"></div>
+                                    </div>
+                                </div>
+                            </template>
+                            <template x-if="realtimeData.countries.length === 0">
+                                <div class="text-xs text-gray-400 py-2">No data yet.</div>
+                            </template>
+                        </div>
+                        <div class="pt-3 mt-auto text-right">
+                            <button class="text-sm font-medium text-blue-600 hover:text-blue-700 flex items-center justify-end w-full gap-1">
+                                View real time <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 1. KPI Cards Row -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                     <!-- Sessions -->
@@ -199,6 +318,33 @@
                                             <span x-show="index === 0">Starting Point</span>
                                             <span x-text="data.funnel[0].value > 0 ? Math.round(step.value / data.funnel[0].value * 100) + '% of Total' : '0%'"></span>
                                         </div>
+
+                                        <!-- CTA Clicks Breakdown (shown under the CTA Clicks step) -->
+                                        <template x-if="step.label === 'CTA Clicks' && data.clicks_breakdown && data.clicks_breakdown.length > 0">
+                                            <div class="mt-3 ml-4 pl-3 border-l-2 border-indigo-200 dark:border-indigo-800 space-y-2">
+                                                <div class="flex items-center justify-between mb-1">
+                                                    <span class="text-[11px] font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Click Breakdown</span>
+                                                    <span class="text-[11px] text-gray-400" x-text="data.clicks_breakdown.length + ' labels'"></span>
+                                                </div>
+                                                <template x-for="(item, bi) in data.clicks_breakdown" :key="item.label">
+                                                    <div class="group/item">
+                                                        <div class="flex justify-between items-center text-xs mb-0.5">
+                                                            <span class="text-gray-600 dark:text-gray-300 font-medium truncate max-w-[160px]" x-text="item.label" :title="item.label"></span>
+                                                            <div class="flex items-center gap-2">
+                                                                <span class="text-gray-900 dark:text-white font-bold" x-text="item.clicks"></span>
+                                                                <span class="text-gray-400 text-[10px] w-10 text-right" x-text="item.percentage + '%'"></span>
+                                                            </div>
+                                                        </div>
+                                                        <div class="w-full bg-gray-100 dark:bg-gray-700 rounded-full h-1.5 overflow-hidden">
+                                                            <div class="h-1.5 rounded-full transition-all duration-700 ease-out" 
+                                                                 :class="bi === 0 ? 'bg-indigo-500' : bi === 1 ? 'bg-blue-400' : 'bg-sky-300'"
+                                                                 :style="'width: ' + item.percentage + '%'">
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
                                     </div>
                                 </template>
                             </div>
@@ -342,8 +488,10 @@
         </div>
     </div>
 
-    <!-- Chart.js -->
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- D3.js & TopoJSON -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <!-- Chart.js loaded via Vite/node_modules -->
 
     <script>
         function analyticsDashboard() {
@@ -356,6 +504,7 @@
                 data: {
                     kpi: { has_data: false, sessions: 0, uniques: 0, leads: 0, conversion_rate: 0, bounce_rate: 0, avg_duration: 0 },
                     funnel: [{label: 'Sessions', value: 0}, {label: 'CTA Clicks', value: 0}, {label: 'Form', value: 0}, {label: 'Leads', value: 0}],
+                    clicks_breakdown: [],
                     landing_performance: [],
                     breakdowns: {
                         sources_pct: {},
@@ -365,10 +514,36 @@
                         top_campaigns: []
                     }
                 },
+                realtimeData: {
+                    total: 0,
+                    countries: [],
+                    minutes: Array.from({length: 30}, (_, i) => ({ time: i, count: 0 }))
+                },
+                realtimePoll: null,
                 charts: {},
+                mapState: { rendered: false, svg: null, worldData: null, path: null },
 
                 init() {
                     this.fetchData();
+                    this.fetchRealtime();
+                    
+                    // Poll Real-time data every 30s
+                    this.realtimePoll = setInterval(() => {
+                        this.fetchRealtime();
+                    }, 30000);
+
+                    this.initD3Map();
+                },
+
+                fetchRealtime() {
+                    const params = new URLSearchParams({ landing_id: this.filters.landing_id });
+                    fetch(`{{ route('analytics.realtime') }}?${params}`)
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.error) return;
+                            this.realtimeData = data;
+                            this.updateD3Map(data.countries);
+                        });
                 },
 
                 fetchData() {
@@ -394,6 +569,7 @@
                     this.filters.landing_id = '';
                     this.filters.range = '30d';
                     this.fetchData();
+                    this.fetchRealtime();
                 },
 
                 formatNumber(num) {
@@ -503,6 +679,87 @@
                             ...options
                         }
                     });
+                },
+
+                // D3 Map Logic
+                async initD3Map() {
+                    if (this.mapState.rendered) return;
+                    this.mapState.rendered = true;
+
+                    const width = 800;
+                    const height = 450;
+                    
+                    const container = d3.select("#realtime-map-container");
+                    if(container.empty()) return;
+
+                    this.mapState.svg = container
+                        .append("svg")
+                        .attr("viewBox", `0 0 ${width} ${height}`)
+                        .style("width", "100%")
+                        .style("height", "100%")
+                        .style("max-height", "400px");
+
+                    const projection = d3.geoMercator()
+                        .scale(130)
+                        .translate([width / 2, height / 1.5]);
+
+                    this.mapState.path = d3.geoPath().projection(projection);
+
+                    try {
+                        const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
+                        this.mapState.worldData = await response.json();
+                        
+                        this.mapState.svg.append("g")
+                            .attr("class", "countries-group")
+                            .selectAll("path")
+                            .data(topojson.feature(this.mapState.worldData, this.mapState.worldData.objects.countries).features)
+                            .enter().append("path")
+                            .attr("d", this.mapState.path)
+                            .attr("fill", "#e2e8f0") // Tailwind slate-200 base
+                            .attr("stroke", "#ffffff")
+                            .attr("stroke-width", 0.5)
+                            .attr("class", "country-path");
+                            
+                        // If realtime data came before map loaded
+                        if (this.realtimeData.countries.length > 0) {
+                            this.updateD3Map(this.realtimeData.countries);
+                        }
+                    } catch (e) {
+                        console.error("Map loading error", e);
+                    }
+                },
+
+                updateD3Map(countriesData) {
+                    if (!this.mapState.svg || !this.mapState.worldData) return;
+                    
+                    const countsDict = {};
+                    let maxCount = 0;
+                    countriesData.forEach(c => {
+                        countsDict[c.country] = c.count;
+                        if (c.count > maxCount) maxCount = c.count;
+                    });
+
+                    // Define colors
+                    const emptyColor = document.documentElement.classList.contains('dark') ? '#374151' : '#e2e8f0'; // slate-200 / gray-700
+                    const activeColorMin = '#93c5fd'; // blue-300
+                    const activeColorMax = '#1d4ed8'; // blue-700
+
+                    const colorScale = d3.scaleLinear()
+                        .domain([1, Math.max(maxCount, 2)]) // ensure gradient handles small numbers
+                        .range([activeColorMin, activeColorMax]);
+
+                    this.mapState.svg.selectAll(".country-path")
+                        .transition()
+                        .duration(700)
+                        .attr("fill", function(d) {
+                            let name = d.properties.name;
+                            // Basic mapping adjustments if Topojson name != IP-API name
+                            if (name === 'United States of America') name = 'United States';
+                            if (name === 'United Kingdom') name = 'United Kingdom';
+                            
+                            const count = countsDict[name] || 0;
+                            return count > 0 ? colorScale(count) : emptyColor;
+                        });
                 }
             }
         }

@@ -18,6 +18,15 @@ Route::get('/dashboard', [App\Http\Controllers\DashboardController::class, 'inde
     ->middleware(['auth', 'verified'])
     ->name('dashboard');
 
+// Who's Online
+Route::get('/dashboard/online-users', [App\Http\Controllers\OnlineUsersController::class, 'index'])
+    ->middleware(['auth', 'verified'])
+    ->name('online-users.index');
+
+Route::get('/api/online-users/stats', [App\Http\Controllers\OnlineUsersController::class, 'api'])
+    ->middleware(['auth'])
+    ->name('online-users.api');
+
 Route::middleware('auth')->group(function () {
     Route::middleware('check.license')->group(function () {
         Route::get('/templates', [App\Http\Controllers\TemplateController::class, 'index'])
@@ -61,6 +70,8 @@ Route::middleware('auth')->group(function () {
     // Analytics (New)
     Route::get('/analytics', [App\Http\Controllers\AnalyticsController::class, 'index'])->name('analytics.index');
     Route::get('/analytics/data', [App\Http\Controllers\AnalyticsController::class, 'data'])->name('analytics.data');
+    Route::get('/analytics/realtime', [App\Http\Controllers\AnalyticsController::class, 'realtime'])->name('analytics.realtime');
+    Route::get('/analytics/clicks-breakdown', [App\Http\Controllers\AnalyticsController::class, 'clicksBreakdown'])->name('analytics.clicks-breakdown');
     
     // Tracking route moved to public section below
     // Legacy/Placeholder routes removal or update if needed
@@ -128,6 +139,11 @@ require __DIR__.'/auth.php';
     Route::post('/api/track/event', [App\Http\Controllers\AnalyticsTrackerController::class, 'trackEvent'])
         ->name('analytics.track')
         ->middleware('throttle:120,1'); // 120 per minute (high traffic)
+
+    // CTA Click Tracking (Public - Dedicated endpoint)
+    Route::post('/analytics/track-click', [App\Http\Controllers\AnalyticsController::class, 'trackClick'])
+        ->name('analytics.track-click')
+        ->middleware('throttle:120,1');
 
     // Route::post('/cart/sync', [App\Http\Controllers\CartController::class, 'sync'])->name('cart.sync');
 Route::get('/landings/{landing}/checkout', [App\Http\Controllers\PublicLandingController::class, 'checkoutFlow'])->name('landings.checkout');

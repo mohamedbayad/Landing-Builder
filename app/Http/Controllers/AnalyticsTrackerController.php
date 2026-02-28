@@ -24,6 +24,9 @@ class AnalyticsTrackerController extends Controller
             'event_name' => 'required|string',
             'event_data' => 'nullable|array',
             'url' => 'required|url',
+            'element_label' => 'nullable|string|max:255',
+            'element_type' => 'nullable|string|max:50',
+            'element_position' => 'nullable|string|max:100',
         ]);
 
         // Get Session ID from Cookie
@@ -38,7 +41,10 @@ class AnalyticsTrackerController extends Controller
             $sessionId, 
             $validated['event_name'], 
             $validated['event_data'] ?? [],
-            parse_url($validated['url'], PHP_URL_PATH)
+            parse_url($validated['url'], PHP_URL_PATH),
+            $validated['element_label'] ?? null,
+            $validated['element_type'] ?? null,
+            $validated['element_position'] ?? null
         );
 
         return response()->json(['status' => 'ok']);

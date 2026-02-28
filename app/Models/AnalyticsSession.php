@@ -32,4 +32,9 @@ class AnalyticsSession extends Model
     {
         return $this->hasMany(AnalyticsEvent::class, 'session_id_fk');
     }
+
+    public function scopeActive($query, $minutes = 5)
+    {
+        return $query->where('last_activity_at', '>=', now()->subMinutes($minutes));
+    }
 }

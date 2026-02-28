@@ -8,6 +8,8 @@ use App\Models\Lead;
 use App\Models\Form;
 use App\Models\LandingPage;
 use App\Models\AnalyticsEvent; // For checkout events if needed
+use App\Models\AnalyticsSession;
+use App\Models\User;
 use App\Services\AnalyticsService;
 use Carbon\Carbon;
 
@@ -115,14 +117,55 @@ class DashboardController extends Controller
             ->with('landing')
             ->get();
 
+        // ===== LIVE LANDING PAGE VISITORS =====
+        $onlineUsersCount = AnalyticsSession::active()
+            ->whereIn('landing_id', $allLandingIds)
+            ->count();
+            
+        $onlineUsers = AnalyticsSession::active()
+            ->whereIn('landing_id', $allLandingIds)
+            ->selectRaw('COALESCE(country, "Unknown") as country, COALESCE(city, "Unknown") as city, count(*) as count')
+            ->groupBy('country', 'city')
+            ->orderByDesc('count')
+            ->get();
+
         return view('dashboard', compact(
             'totalVisits', 'totalLeads', 'totalPages', 'checkoutVisits',
             'conversionRate', 'visitsChange', 'leadsChange', 'checkoutsChange',
             'trafficSources', 'deviceDistribution',
             'chartLabels', 'visitsData', 'leadsData',
             'topLandings', 'recentActivity',
-            'landings', 'recentOrders', 'recentForms'
+            'landings', 'recentOrders', 'recentForms',
+            'onlineUsersCount', 'onlineUsers'
         ));
+    }
+
+    public function getOnlineUsers()
+    {
+        $user = Auth::user();
+        $workspace = $user->workspaces()->first();
+
+        if (!$workspace) {
+            return response()->json(['count' => 0, 'locations' => []]);
+        }
+
+        $allLandingIds = $workspace->landings()->pluck('id')->toArray();
+
+        $onlineUsersCount = AnalyticsSession::active()
+            ->whereIn('landing_id', $allLandingIds)
+            ->count();
+            
+        $onlineUsers = AnalyticsSession::active()
+            ->whereIn('landing_id', $allLandingIds)
+            ->selectRaw('COALESCE(country, "Unknown") as country, COALESCE(city, "Unknown") as city, count(*) as count')
+            ->groupBy('country', 'city')
+            ->orderByDesc('count')
+            ->get();
+
+        return response()->json([
+            'count' => $onlineUsersCount,
+            'locations' => $onlineUsers
+        ]);
     }
 
     private function getEmptyDashboardData()
@@ -135,6 +178,7 @@ class DashboardController extends Controller
             'chartLabels' => [], 'visitsData' => [], 'leadsData' => [],
             'topLandings' => collect(), 'recentActivity' => collect(),
             'landings' => collect(), 'recentOrders' => collect(), 'recentForms' => collect(),
+            'onlineUsersCount' => 0, 'onlineUsers' => collect(),
         ];
     }
 

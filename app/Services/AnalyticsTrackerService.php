@@ -37,7 +37,7 @@ class AnalyticsTrackerService
         ];
     }
 
-    public function logEvent($sessionOrId, $eventName, $data = [], $urlPath = null)
+    public function logEvent($sessionOrId, $eventName, $data = [], $urlPath = null, $elementLabel = null, $elementType = null, $elementPosition = null)
     {
         $session = $sessionOrId instanceof AnalyticsSession ? $sessionOrId : AnalyticsSession::where('session_id', $sessionOrId)->first();
         
@@ -51,6 +51,9 @@ class AnalyticsTrackerService
         $event->event_name = $eventName;
         $event->event_data = $data;
         $event->url_path = $urlPath;
+        $event->element_label = $elementLabel;
+        $event->element_type = $elementType;
+        $event->element_position = $elementPosition;
         $event->save();
 
         // Update Session Activity
@@ -138,6 +141,17 @@ class AnalyticsTrackerService
             // Device Info
             $session->device_type = $this->determineDeviceType($request->header('User-Agent'));
             // Browser/OS detection could go here (using a lib or simple regex)
+
+            // Geolocation
+            $ip = $request->ip();
+            if ($position = \Stevebauman\Location\Facades\Location::get($ip)) {
+                $session->country = $position->countryName;
+                $session->city = $position->cityName;
+            } elseif (in_array($ip, ['127.0.0.1', '::1']) || str_starts_with($ip, '192.168.')) {
+                // Fallback for local development so map still renders
+                $session->country = 'Morocco';
+                $session->city = 'Casablanca';
+            }
         }
 
         $session->last_activity_at = now();

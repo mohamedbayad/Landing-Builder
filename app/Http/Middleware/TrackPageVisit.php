@@ -74,18 +74,32 @@ class TrackPageVisit
 
     private function shouldExclude(Request $request): bool
     {
-        $path = $request->path();
-        
-        if ($request->is('api/*', 'dashboard*', 'analytics*', 'telescope*', '_debugbar*', 'sanctum/*', 'storage/*', 'build/*')) {
-            return true;
-        }
-        
-        $extensions = ['css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'svg', 'ico', 'woff', 'woff2', 'ttf', 'map', 'json'];
-        $extension = pathinfo($path, PATHINFO_EXTENSION);
-        if (in_array(strtolower($extension), $extensions)) {
+        // Only track GET requests for pageviews
+        if (!$request->isMethod('GET')) {
             return true;
         }
 
-        return false;
+        // Exclude authenticated admins/users from being tracked as public visitors
+        if (\Illuminate\Support\Facades\Auth::check()) {
+            return true;
+        }
+
+        // The specific route names that represent public-facing pages we want to track
+        $publicRoutes = [
+            'public.home',
+            'public.page',
+            'public.landing.page',
+            'landings.checkout'
+        ];
+
+        $routeName = $request->route() ? $request->route()->getName() : null;
+
+        if ($routeName && in_array($routeName, $publicRoutes)) {
+            // It's a public landing page. Don't exclude.
+            return false;
+        }
+
+        // Exclude everything else (dashboard, editor, preview, API, etc.)
+        return true;
     }
 }

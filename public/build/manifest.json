@@ -1,6 +1,10 @@
 {
+  "_auto-sRkgK8jz.js": {
+    "file": "assets/auto-sRkgK8jz.js",
+    "name": "auto"
+  },
   "resources/css/app.css": {
-    "file": "assets/app-D1XfM-Ls.css",
+    "file": "assets/app-VH-TndXC.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -9,16 +13,22 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-CkYmLS2m.js",
+    "file": "assets/app-B1BD8iif.js",
     "name": "app",
     "src": "resources/js/app.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_auto-sRkgK8jz.js"
+    ]
   },
   "resources/js/dashboard.js": {
-    "file": "assets/dashboard-Bk5fdvTR.js",
+    "file": "assets/dashboard-BFb9DNWV.js",
     "name": "dashboard",
     "src": "resources/js/dashboard.js",
-    "isEntry": true
+    "isEntry": true,
+    "imports": [
+      "_auto-sRkgK8jz.js"
+    ]
   },
   "resources/js/editor.js": {
     "file": "assets/editor-hbkzI-Gi.js",
@@ -28,5 +38,11 @@
     "css": [
       "assets/editor-CaWNBlQ-.css"
     ]
+  },
+  "resources/js/online-users.js": {
+    "file": "assets/online-users-D8HHxsnv.js",
+    "name": "online-users",
+    "src": "resources/js/online-users.js",
+    "isEntry": true
   }
 }

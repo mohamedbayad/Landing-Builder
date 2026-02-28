@@ -212,6 +212,89 @@
                 </div>
             </div>
 
+            <!-- Who's Online Feature -->
+            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8" id="online-users-section">
+                <!-- Total Online Card -->
+                <div class="bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
+                    <div class="p-6 flex flex-col items-center justify-center h-full min-h-[200px]">
+                        <div class="relative inline-flex mb-4">
+                            <span class="flex h-3 w-3 absolute top-0 right-0 -mr-0.5 -mt-0.5">
+                                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                                <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500"></span>
+                            </span>
+                            <div class="p-4 rounded-full bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400">
+                                <svg class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                            </div>
+                        </div>
+                        <h3 class="text-4xl font-bold text-gray-900 dark:text-white" id="online-users-count">{{ $onlineUsersCount }}</h3>
+                        <p class="text-sm font-medium text-gray-500 dark:text-gray-400 mt-2 uppercase tracking-wide">Live Visitors</p>
+                    </div>
+                </div>
+
+                <!-- Active Locations Breakdown -->
+                <div class="lg:col-span-2 bg-white dark:bg-gray-800 overflow-hidden shadow-sm rounded-xl border border-gray-100 dark:border-gray-700">
+                    <div class="p-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Active Locations</h3>
+                            <div class="flex items-center gap-2">
+                                <span class="text-xs text-gray-400 dark:text-gray-500">Auto-refreshes in <span id="refresh-countdown">60</span>s</span>
+                                <button onclick="fetchOnlineUsers(true)" id="manual-refresh-btn" class="text-xs p-1.5 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Refresh Now">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="overflow-y-auto max-h-56 pr-2 custom-scrollbar" id="online-users-list">
+                            @if($onlineUsers->isEmpty())
+                                <div class="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+                                    <svg class="w-10 h-10 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                    </svg>
+                                    <p class="text-sm font-medium">No active visitors found</p>
+                                    <p class="text-xs mt-1">Waiting for visitors to connect...</p>
+                                </div>
+                            @else
+                                <ul class="space-y-3">
+                                    @foreach($onlineUsers as $loc)
+                                        <li class="flex items-center justify-between p-3.5 rounded-xl border border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            <div class="flex items-center gap-4">
+                                                <div class="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-100 dark:border-indigo-800/50">
+                                                    {{ substr($loc->country === 'Unknown' ? 'UN' : $loc->country, 0, 2) }}
+                                                </div>
+                                                <div>
+                                                    <p class="text-sm font-semibold text-gray-900 dark:text-white">{{ $loc->country === 'Unknown' ? 'Unknown Country' : $loc->country }}</p>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                                                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                        </svg>
+                                                        {{ $loc->city === 'Unknown' ? 'Unknown City' : $loc->city }}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <div class="flex flex-col items-end">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-24 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden hidden sm:block">
+                                                        <div class="h-full bg-emerald-500 rounded-full" style="width: {{ ($loc->count / max($onlineUsersCount, 1)) * 100 }}%"></div>
+                                                    </div>
+                                                    <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                        {{ $loc->count }} {{ Str::plural('Visitor', $loc->count) }}
+                                                    </span>
+                                                </div>
+                                                <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 mt-1.5">{{ round(($loc->count / max($onlineUsersCount, 1)) * 100) }}% of total</span>
+                                            </div>
+                                        </li>
+                                    @endforeach
+                                </ul>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Top Performing Landings & Recent Activity -->
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
                 <!-- Top Performing Landings Table -->
@@ -426,6 +509,109 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Auto-refresh script for Online Users Widget -->
+            <script>
+                let secondsLeft = 60;
+                
+                function resetCountdown() {
+                    secondsLeft = 60;
+                    const countdownEl = document.getElementById('refresh-countdown');
+                    if (countdownEl) countdownEl.textContent = secondsLeft;
+                }
+
+                function fetchOnlineUsers(manual = false) {
+                    if (manual) {
+                        const btn = document.getElementById('manual-refresh-btn');
+                        if (btn) {
+                            btn.innerHTML = `<svg class="w-4 h-4 animate-spin text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+                            setTimeout(() => {
+                                btn.innerHTML = `<svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>`;
+                            }, 500);
+                        }
+                    }
+
+                    fetch('{{ route("online-users.api") }}')
+                        .then(response => response.json())
+                        .then(data => {
+                            const countEl = document.getElementById('online-users-count');
+                            if (countEl) countEl.textContent = data.count;
+
+                            const listEl = document.getElementById('online-users-list');
+                            if (listEl) {
+                                if (data.locations.length === 0) {
+                                    listEl.innerHTML = `
+                                        <div class="flex flex-col items-center justify-center py-8 text-gray-500 dark:text-gray-400">
+                                            <svg class="w-10 h-10 mb-3 opacity-50" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                            </svg>
+                                            <p class="text-sm font-medium">No active visitors found</p>
+                                            <p class="text-xs mt-1">Waiting for visitors to connect...</p>
+                                        </div>
+                                    `;
+                                } else {
+                                    let html = '<ul class="space-y-3">';
+                                    data.locations.forEach(loc => {
+                                        const country = loc.country === 'Unknown' ? 'Unknown Country' : loc.country;
+                                        const city = loc.city === 'Unknown' ? 'Unknown City' : loc.city;
+                                        const initial = loc.country === 'Unknown' ? 'UN' : loc.country.substring(0, 2);
+                                        const plural = loc.count === 1 ? 'Visitor' : 'Visitors';
+                                        const maxCount = Math.max(data.count, 1);
+                                        const pct = Math.round((loc.count / maxCount) * 100);
+
+                                        html += `
+                                            <li class="flex items-center justify-between p-3.5 rounded-xl border border-gray-100 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/50 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                                <div class="flex items-center gap-4">
+                                                    <div class="w-10 h-10 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-sm border border-indigo-100 dark:border-indigo-800/50">
+                                                        ${initial}
+                                                    </div>
+                                                    <div>
+                                                        <p class="text-sm font-semibold text-gray-900 dark:text-white">${country}</p>
+                                                        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5 flex items-center gap-1">
+                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                                            </svg>
+                                                            ${city}
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                                <div class="flex flex-col items-end">
+                                                    <div class="flex items-center gap-2">
+                                                        <div class="w-24 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden hidden sm:block">
+                                                            <div class="h-full bg-emerald-500 rounded-full" style="width: ${pct}%"></div>
+                                                        </div>
+                                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                                            ${loc.count} ${plural}
+                                                        </span>
+                                                    </div>
+                                                    <span class="text-[11px] font-medium text-gray-400 dark:text-gray-500 mt-1.5">${pct}% of total</span>
+                                                </div>
+                                            </li>
+                                        `;
+                                    });
+                                    html += '</ul>';
+                                    listEl.innerHTML = html;
+                                }
+                            }
+                            resetCountdown();
+                        });
+                }
+
+                document.addEventListener('DOMContentLoaded', function() {
+                    const countdownEl = document.getElementById('refresh-countdown');
+                    if (countdownEl) {
+                        setInterval(() => {
+                            secondsLeft--;
+                            if (secondsLeft <= 0) {
+                                fetchOnlineUsers(false);
+                            } else {
+                                countdownEl.textContent = secondsLeft;
+                            }
+                        }, 1000);
+                    }
+                });
+            </script>
 
             <!-- Data for JS -->
             <script>

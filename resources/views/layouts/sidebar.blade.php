@@ -55,6 +55,14 @@
                 <span class="mx-3">Analytics</span>
             </a>
 
+            <!-- Who's Online -->
+            <a class="flex items-center px-4 py-2.5 text-sm font-medium transition-all duration-200 transform rounded-lg group {{ request()->routeIs('online-users.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-800 dark:text-indigo-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200' }}" href="{{ route('online-users.index') }}">
+                <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('online-users.*') ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M13 12a1 1 0 11-2 0 1 1 0 012 0z" />
+                </svg>
+                <span class="mx-3">Who's Online</span>
+            </a>
+
             <!-- Leads (Sales) -->
             <a class="flex items-center px-4 py-2.5 text-sm font-medium transition-all duration-200 transform rounded-lg group {{ request()->routeIs('leads.index') ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-800 dark:text-indigo-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200' }}" href="{{ route('leads.index') }}">
                 <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('leads.index') ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">

@@ -298,4 +298,33 @@ class AnalyticsService
             ];
         });
     }
+
+    public function getClickBreakdown($landingIds, $start, $end)
+    {
+        // Get total CTA clicks
+        $totalClicks = AnalyticsEvent::whereIn('landing_id', $landingIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->where('event_name', 'cta_click')
+            ->count();
+
+        // Group by element_label, falling back to event_data text for older records
+        $breakdown = AnalyticsEvent::whereIn('landing_id', $landingIds)
+            ->whereBetween('created_at', [$start, $end])
+            ->where('event_name', 'cta_click')
+            ->selectRaw("COALESCE(element_label, JSON_UNQUOTE(JSON_EXTRACT(event_data, '$.text')), 'unknown') as label")
+            ->selectRaw('count(*) as clicks')
+            ->groupBy('label')
+            ->orderByDesc('clicks')
+            ->limit(20)
+            ->get();
+
+        return $breakdown->map(function ($item) use ($totalClicks) {
+            return [
+                'label' => $item->label,
+                'clicks' => $item->clicks,
+                'percentage' => $totalClicks > 0 ? round(($item->clicks / $totalClicks) * 100, 1) : 0,
+            ];
+        });
+    }
 }
+
