@@ -5,7 +5,6 @@ namespace App\Http\Middleware;
 use Closure;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Stevebauman\Location\Facades\Location;
 
 class TrackUserActivity
 {
@@ -24,12 +23,18 @@ class TrackUserActivity
             // Update last_seen_at
             $user->last_seen_at = now();
 
-            // Try to set location if it's missing or if last seen was > 1 hour ago (to limit API calls if any)
-            // But since it's a local database lookup (MaxMind), it's fast. Let's just do it if missing.
+            // Try to set location if it's missing
             if (empty($user->country) || empty($user->city)) {
-                if ($position = Location::get($request->ip())) {
-                    $user->country = $position->countryName;
-                    $user->city = $position->cityName;
+                try {
+                    if (class_exists(\Stevebauman\Location\Facades\Location::class)) {
+                        $position = \Stevebauman\Location\Facades\Location::get($request->ip());
+                        if ($position) {
+                            $user->country = $position->countryName;
+                            $user->city = $position->cityName;
+                        }
+                    }
+                } catch (\Throwable $e) {
+                    // Location package not available — skip silently
                 }
             }
             
