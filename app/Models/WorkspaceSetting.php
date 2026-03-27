@@ -41,6 +41,11 @@ class WorkspaceSetting extends Model
         'license_key',
         'license_status',
         'license_data',
+        // AI Settings
+        'ai_provider',
+        'ai_model',
+        'ai_api_key',
+        'ai_role_assignments',
     ];
 
     protected $casts = [
@@ -51,6 +56,7 @@ class WorkspaceSetting extends Model
         'whatsapp_redirect_enabled' => 'boolean',
         'whatsapp_open_new_tab' => 'boolean',
         'license_data' => 'array',
+        'ai_role_assignments' => 'array',
     ];
 
     public function workspace()

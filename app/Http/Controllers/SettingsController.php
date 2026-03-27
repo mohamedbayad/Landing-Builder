@@ -47,6 +47,8 @@ class SettingsController extends Controller
                 
                 // Cache the token for middleware usage
                 Cache::put('license_token', $result['token'], now()->addDays(30)); 
+                // Also cache the verified status so realtime middleware doesn't need to call server immediately
+                Cache::put('license_verified_status', 'active', now()->addMinutes(5));
 
                 return redirect()->route('settings.index')->with('status', 'license-activated');
             } else {
@@ -70,11 +72,15 @@ class SettingsController extends Controller
                 'license_data' => null,
             ]);
             Cache::forget('license_token');
+            Cache::forget('license_verified_status');
             return redirect()->route('settings.index')->with('status', 'license-removed');
         }
 
         // Basic Workspace Fields (Payment, Currency)
+        $activeTab = 'theme';
+
         if ($request->has('currency')) {
+            $activeTab = 'payment';
             $validatedWorkspace = $request->validate([
                 'currency' => 'required|string|size:3',
                 'stripe_publishable_key' => 'nullable|string',
@@ -87,6 +93,7 @@ class SettingsController extends Controller
 
         // Theme Settings
         if ($request->has('dashboard_direction')) {
+            $activeTab = 'theme';
             $validatedTheme = $request->validate([
                 'dashboard_direction' => 'required|in:ltr,rtl',
                 'dashboard_primary_color' => 'nullable|string',
@@ -109,6 +116,7 @@ class SettingsController extends Controller
 
         // WhatsApp Settings
         if ($request->has('whatsapp_phone_check')) { // specific hidden input to detect tab
+            $activeTab = 'whatsapp';
              $validatedWA = $request->validate([
                 'whatsapp_enabled' => 'nullable|in:1,0,on,off',
                 'whatsapp_phone' => 'nullable|string',
@@ -125,6 +133,25 @@ class SettingsController extends Controller
             $settings->update($validatedWA);
         }
 
-        return redirect()->route('settings.index')->with('status', 'settings-updated');
+        // AI Settings
+        if ($request->has('ai_provider')) {
+            $activeTab = 'ai_settings';
+            $validatedAI = $request->validate([
+                'ai_provider' => 'required|string',
+                'ai_api_key' => 'nullable|string',
+                'ai_model' => 'nullable|string',
+            ]);
+
+            if (empty($validatedAI['ai_model'])) {
+                unset($validatedAI['ai_model']);
+            }
+            if (empty($validatedAI['ai_api_key'])) {
+                unset($validatedAI['ai_api_key']);
+            }
+
+            $settings->update($validatedAI);
+        }
+
+        return redirect()->route('settings.index')->with(['status' => 'settings-updated', 'activeTab' => $activeTab]);
     }
 }

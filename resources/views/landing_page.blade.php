@@ -7,8 +7,6 @@
     
     <!-- Scripts & Styles -->
     @vite(['resources/css/app.css', 'resources/js/app.js'])
-    <!-- Scripts & Styles -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
     <script src="/js/tailwind.js"></script>
     {{-- Tailwind Config moved to external file or local script --}}
     

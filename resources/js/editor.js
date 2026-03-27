@@ -228,6 +228,36 @@ document.addEventListener('DOMContentLoaded', () => {
             console.log('Injected custom head scripts/styles into canvas');
         }
 
+        // INJECT BODY SCRIPTS (Template JS - animations, interactions, etc.)
+        const jsContainer = document.getElementById('gjs-js');
+        if (jsContainer && jsContainer.textContent.trim().length > 0) {
+            const canvasDoc = editor.Canvas.getDocument();
+            const canvasBody = canvasDoc.body;
+            // Content was HTML-escaped via e() in blade, decode it
+            const rawJs = jsContainer.textContent;
+            
+            // Parse script tags from the decoded content
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = rawJs;
+            const scriptTags = tempDiv.querySelectorAll('script');
+            
+            if (scriptTags.length > 0) {
+                scriptTags.forEach(origScript => {
+                    const newScript = canvasDoc.createElement('script');
+                    // Copy all attributes (src, type, defer, etc.)
+                    Array.from(origScript.attributes).forEach(attr => {
+                        newScript.setAttribute(attr.name, attr.value);
+                    });
+                    // Copy inline content if any
+                    if (origScript.textContent) {
+                        newScript.textContent = origScript.textContent;
+                    }
+                    canvasBody.appendChild(newScript);
+                });
+                console.log('Injected', scriptTags.length, 'body scripts into canvas');
+            }
+        }
+
         // ── EDITOR CANVAS REVEAL CSS ───────────────────────────────────────────
         // Force all hidden/collapsed elements to be permanently visible inside
         // the GrapesJS editor canvas so you can click and edit them directly.

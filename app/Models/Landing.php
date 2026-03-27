@@ -32,6 +32,11 @@ class Landing extends Model
         'countdown_end_at',
         'countdown_duration_minutes',
         'countdown_started_at',
+        'content_type',
+        'source',
+        'is_template',
+        'category',
+        'visibility',
     ];
 
     protected $casts = [
@@ -46,6 +51,7 @@ class Landing extends Model
         'countdown_started_at' => 'datetime',
         'countdown_duration_minutes' => 'integer',
         'imported_at' => 'datetime',
+        'is_template' => 'boolean',
     ];
 
     protected static function boot()

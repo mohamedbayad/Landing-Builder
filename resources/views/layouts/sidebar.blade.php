@@ -35,6 +35,14 @@
                 <span class="mx-3">Templates</span>
             </a>
 
+            <!-- AI Generator -->
+            <a class="flex items-center px-4 py-2.5 text-sm font-medium transition-all duration-200 transform rounded-lg group {{ request()->routeIs('ai-generator.*') ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-800 dark:text-indigo-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200' }}" href="{{ route('ai-generator.index') }}">
+                <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('ai-generator.*') ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span class="mx-3">AI Studio</span>
+            </a>
+
             <!-- Media Library -->
             <a class="flex items-center px-4 py-2.5 text-sm font-medium transition-all duration-200 transform rounded-lg group {{ request()->routeIs('media.index') ? 'bg-indigo-50 text-indigo-700 dark:bg-gray-800 dark:text-indigo-400' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900 dark:text-gray-400 dark:hover:bg-gray-800 dark:hover:text-gray-200' }}" href="{{ route('media.index') }}">
                 <svg class="w-5 h-5 flex-shrink-0 {{ request()->routeIs('media.index') ? 'text-indigo-600 dark:text-indigo-400' : 'text-gray-400 group-hover:text-gray-500 dark:text-gray-500 dark:group-hover:text-gray-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor">

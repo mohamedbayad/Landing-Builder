@@ -5,7 +5,7 @@
         </h2>
     </x-slot>
 
-    <div class="py-12" x-data="{ tab: 'theme' }">
+    <div class="py-12" x-data="{ tab: '{{ session('activeTab', 'theme') }}' }">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
             
             <!-- Tabs Navigation -->
@@ -18,6 +18,9 @@
                 </button>
                 <button @click="tab = 'whatsapp'" :class="{ 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white': tab === 'whatsapp', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'whatsapp' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     WhatsApp Automation
+                </button>
+                <button @click="tab = 'ai_settings'" :class="{ 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white': tab === 'ai_settings', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'ai_settings' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                    AI Settings
                 </button>
                 <button @click="tab = 'license'" :class="{ 'bg-white dark:bg-gray-600 shadow text-gray-900 dark:text-white': tab === 'license', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'license' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     License
@@ -481,6 +484,195 @@
                                 <button type="submit" class="px-6 py-2.5 bg-green-600 rounded-lg text-white font-semibold hover:bg-green-700 shadow-lg">Save WhatsApp Settings</button>
                             </div>
                         </form>
+                    </div>
+
+                    <!-- TAB: AI SETTINGS (Role-Based Multi-Provider) -->
+                    <div x-show="tab === 'ai_settings'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
+                        <div class="mb-6 flex justify-between items-end">
+                            <div>
+                                <h3 class="text-xl font-bold text-gray-900 dark:text-white">AI Configuration</h3>
+                                <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Configure multiple AI providers and assign specific models to specific tasks.</p>
+                            </div>
+                        </div>
+
+                        <!-- Add New Provider Form -->
+                        <div class="bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-8" x-data="{ openForm: false }">
+                            <button @click="openForm = !openForm" type="button" class="flex items-center text-sm font-semibold text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300">
+                                <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                                Add New AI Provider
+                            </button>
+
+                            <div x-show="openForm" style="display: none;" class="mt-6 pt-6 border-t border-gray-200 dark:border-gray-700">
+                                <form method="POST" action="{{ route('settings.ai.providers.store') }}">
+                                    @csrf
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Internal Name <span class="text-red-500">*</span></label>
+                                            <input type="text" name="name" required placeholder="e.g., My Team OpenAI Key" class="block w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider Type <span class="text-red-500">*</span></label>
+                                            <select name="provider" required class="block w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                                <option value="openai">OpenAI</option>
+                                                <option value="anthropic">Anthropic (Claude)</option>
+                                                <option value="gemini">Google Gemini</option>
+                                                <option value="custom">Custom / Ollama</option>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key <span class="text-red-500">*</span></label>
+                                            <input type="password" name="api_key" required placeholder="sk-..." class="block w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Base URL (Optional)</label>
+                                            <input type="url" name="base_url" placeholder="https://..." class="block w-full rounded-lg border-gray-300 dark:bg-gray-700 dark:border-gray-600 dark:text-white shadow-sm focus:border-indigo-500 focus:ring-indigo-500">
+                                        </div>
+                                    </div>
+                                    <div class="mt-4 flex justify-end">
+                                        <button type="button" @click="openForm = false" class="mr-3 px-4 py-2 text-sm text-gray-700 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white">Cancel</button>
+                                        <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm font-medium">Save Provider</button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+
+                        <!-- List of Providers and Models -->
+                        <div class="space-y-8">
+                            @php
+                                $providers = \App\Models\AiProvider::where('workspace_id', $workspace->id)->with('models')->get();
+                                $assignments = $workspace->settings->ai_role_assignments ?? [];
+                                $roles = [
+                                    'text_generation' => ['label' => 'Text Generation (Copy, Ideas)', 'json_key' => 'text_generation'],
+                                    'image_generation' => ['label' => 'Image Generation (DALL-E, etc)', 'json_key' => 'image_generation'],
+                                    'vision' => ['label' => 'Vision (Image Analysis)', 'json_key' => 'vision_analysis'],
+                                    'embeddings' => ['label' => 'Embeddings (Search)', 'json_key' => 'embeddings'],
+                                    'audio' => ['label' => 'Audio (TTS, Whisper)', 'json_key' => 'audio']
+                                ];
+                            @endphp
+
+                            @if($providers->isEmpty())
+                                <div class="text-center py-10 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                    <svg class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
+                                    </svg>
+                                    <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No AI Providers configured</h3>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a provider (like OpenAI or Anthropic).</p>
+                                </div>
+                            @else
+                                <form method="POST" action="{{ route('settings.ai.models.roles.update') }}">
+                                    @csrf
+                                    
+                                    @foreach($providers as $provider)
+                                        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg overflow-hidden mb-6">
+                                            <!-- Provider Header -->
+                                            <div class="px-6 py-4 bg-gray-50 dark:bg-gray-900/50 flex items-center justify-between border-b border-gray-200 dark:border-gray-700">
+                                                <div>
+                                                    <h4 class="text-lg font-bold text-gray-900 dark:text-white flex items-center">
+                                                        {{ $provider->name }}
+                                                        <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                                                            {{ ucfirst($provider->provider) }}
+                                                        </span>
+                                                    </h4>
+                                                    <p class="text-xs text-gray-500 mt-1 font-mono hover:text-gray-700 cursor-help" title="API Key ending in {{ substr($provider->api_key, -4) }}">
+                                                        sk-••••••••••••{{ substr($provider->api_key, -4) }}
+                                                    </p>
+                                                </div>
+                                                <div class="flex items-center space-x-3">
+                                                    <!-- Load Models Button -->
+                                                    <button type="button" onclick="event.preventDefault(); document.getElementById('load-models-{{ $provider->id }}').submit();" class="text-sm bg-gray-200 hover:bg-gray-300 dark:bg-gray-700 dark:hover:bg-gray-600 text-gray-800 dark:text-white px-3 py-1.5 rounded transition">
+                                                        Load / Refresh Models
+                                                    </button>
+                                                    
+                                                    <!-- Delete Provider -->
+                                                    <button type="button" onclick="if(confirm('Are you sure you want to delete this provider?')) { document.getElementById('delete-provider-{{ $provider->id }}').submit(); }" class="text-red-500 hover:text-red-700 p-1">
+                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
+                                                    </button>
+                                                </div>
+                                            </div>
+ 
+                                            <!-- Models Table -->
+                                            <div class="p-0">
+                                                @if($provider->models->isEmpty())
+                                                    <div class="p-6 text-center text-sm text-gray-500 dark:text-gray-400">
+                                                        No models loaded yet. Click "Load / Refresh Models" to fetch them from the provider.
+                                                    </div>
+                                                @else
+                                                    <div class="overflow-x-auto">
+                                                        <table class="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                                                            <thead class="bg-gray-50 dark:bg-gray-900/50">
+                                                                <tr>
+                                                                    <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Model Name</th>
+                                                                    <th scope="col" class="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Capabilities</th>
+                                                                    <th scope="col" class="px-6 py-3 text-right text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Assign Role</th>
+                                                                </tr>
+                                                            </thead>
+                                                            <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+                                                                @foreach($provider->models->sortBy('name') as $model)
+                                                                    <tr>
+                                                                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                                                                            {{ $model->name }}
+                                                                        </td>
+                                                                        <td class="px-6 py-4 whitespace-nowrap text-center text-sm text-gray-500 dark:text-gray-400">
+                                                                            <div class="flex justify-center space-x-1">
+                                                                                @if($model->supports_text_generation)<span title="Text" class="px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700">T</span>@endif
+                                                                                @if($model->supports_image_generation)<span title="Image" class="px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700">Img</span>@endif
+                                                                                @if($model->supports_vision)<span title="Vision" class="px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700">👁️</span>@endif
+                                                                                @if($model->supports_embeddings)<span title="Embeddings" class="px-2 py-0.5 rounded text-xs bg-gray-100 dark:bg-gray-700">Emb</span>@endif
+                                                                            </div>
+                                                                        </td>
+                                                                        <td class="px-6 py-4 whitespace-nowrap text-right text-sm">
+                                                                            <div class="flex flex-col items-end space-y-2">
+                                                                                @foreach($roles as $roleKey => $roleData)
+                                                                                    @php
+                                                                                        $supportsField = 'supports_' . $roleKey;
+                                                                                        $jsonKey = $roleData['json_key'];
+                                                                                        $isChecked = false;
+                                                                                        
+                                                                                        if (isset($assignments[$jsonKey])) {
+                                                                                            $isChecked = ($assignments[$jsonKey]['model'] === $model->name && ($assignments[$jsonKey]['provider_id'] ?? null) == $model->ai_provider_id);
+                                                                                        } else {
+                                                                                            $isDefaultField = 'is_default_' . $roleKey;
+                                                                                            $isChecked = $model->$isDefaultField;
+                                                                                        }
+                                                                                    @endphp
+                                                                                    
+                                                                                    @if($model->$supportsField)
+                                                                                        <label class="inline-flex items-center cursor-pointer">
+                                                                                            <span class="mr-3 text-xs text-gray-600 dark:text-gray-400">{{ $roleData['label'] }}</span>
+                                                                                            <input type="radio" name="roles[{{ $roleKey }}]" value="{{ $model->id }}" class="form-radio h-4 w-4 text-indigo-600 border-gray-300 focus:ring-indigo-500" {{ $isChecked ? 'checked' : '' }}>
+                                                                                        </label>
+                                                                                    @endif
+                                                                                @endforeach
+                                                                            </div>
+                                                                        </td>
+                                                                    </tr>
+                                                                @endforeach
+                                                            </tbody>
+                                                        </table>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                    
+                                    <div class="mt-8 flex justify-end">
+                                        <button type="submit" class="px-6 py-2.5 bg-indigo-600 rounded-lg text-white font-semibold hover:bg-indigo-700 shadow-lg">Save Role Assignments</button>
+                                    </div>
+                                    
+                                </form>
+                            @endif
+                        </div>
+
+                        <!-- Hidden distinct forms for loading/deleting without wrapping the massive tables -->
+                        @foreach($providers as $provider)
+                            <form id="load-models-{{ $provider->id }}" action="{{ route('settings.ai.providers.load-models', $provider->id) }}" method="POST" class="hidden">
+                                @csrf
+                            </form>
+                            <form id="delete-provider-{{ $provider->id }}" action="{{ route('settings.ai.providers.destroy', $provider->id) }}" method="POST" class="hidden">
+                                @csrf
+                                @method('DELETE')
+                            </form>
+                        @endforeach
                     </div>
 
                     <!-- TAB: LICENSE -->

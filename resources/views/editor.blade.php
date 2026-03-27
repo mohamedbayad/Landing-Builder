@@ -139,6 +139,7 @@
         {!! $page->html !!}
     </div>
     <div id="gjs-css" style="display:none">{!! $page->css !!}</div>
+    <div id="gjs-js" style="display:none">{!! e($page->js ?? '') !!}</div>
 
     <script>
         window.editorData = {

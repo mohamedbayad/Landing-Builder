@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Str;
 
 use App\Models\Workspace;
+use App\Models\Template;
+use App\Models\TemplatePage;
+use Illuminate\Support\Facades\Log;
 
 class LandingController extends Controller
 {
@@ -159,9 +162,72 @@ class LandingController extends Controller
             abort(403);
         }
 
-        $landing->update(['status' => 'published', 'published_at' => now()]);
+        // Guard rails: publishing a landing should never mark it as a template
+        $landing->update([
+            'status' => 'published',
+            'published_at' => now(),
+            'content_type' => 'landing',
+            'source' => $landing->source ?: 'manual',
+            'is_template' => false,
+            'visibility' => 'public',
+        ]);
+
+        Log::info('Landing published', [
+            'landing_id' => $landing->id,
+            'name' => $landing->name,
+            'template_id' => $landing->template_id,
+            'content_type' => $landing->content_type,
+            'source' => $landing->source,
+            'is_template' => (bool) $landing->is_template,
+            'status' => $landing->status,
+            'visibility' => $landing->visibility,
+            'reason' => 'publish_landing_action',
+        ]);
 
         return redirect()->back()->with('status', 'Landing published successfully!');
+    }
+
+    /**
+     * Explicit conversion action. Templates are created only here.
+     */
+    public function saveAsTemplate(Landing $landing)
+    {
+        if ($landing->workspace->user_id != Auth::id()) {
+            abort(403);
+        }
+
+        $landing->load('pages');
+        if ($landing->pages->isEmpty()) {
+            return redirect()->back()->with('error', 'Cannot create a template from an empty landing.');
+        }
+
+        $template = Template::create([
+            'name' => $landing->name . ' Template',
+            'description' => 'Saved from landing #' . $landing->id,
+            'is_active' => true,
+        ]);
+
+        foreach ($landing->pages as $page) {
+            TemplatePage::create([
+                'template_id' => $template->id,
+                'type' => $page->type,
+                'name' => $page->name,
+                'slug' => $page->slug,
+                'html' => $page->html,
+                'css' => $page->css,
+                'js' => $page->js,
+                'grapesjs_json' => $page->grapesjs_json,
+            ]);
+        }
+
+        Log::info('Landing converted to template', [
+            'landing_id' => $landing->id,
+            'template_id' => $template->id,
+            'pages_copied' => $landing->pages->count(),
+            'source' => 'explicit_save_as_template',
+        ]);
+
+        return redirect()->route('templates.index')->with('status', 'Template saved successfully.');
     }
 
     public function syncCart(Request $request)

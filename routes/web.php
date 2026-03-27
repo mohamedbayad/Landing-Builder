@@ -81,6 +81,15 @@ Route::middleware('auth')->group(function () {
     // Global Settings
     Route::get('/settings', [App\Http\Controllers\SettingsController::class, 'index'])->name('settings.index');
     Route::put('/settings', [App\Http\Controllers\SettingsController::class, 'update'])->name('settings.update');
+    Route::post('/settings/ai/test-connection', [App\Http\Controllers\API\AISettingsController::class, 'testConnection'])->name('settings.ai.test-connection');
+
+    // Advanced Role-Based AI Configuration
+    Route::prefix('settings/ai')->name('settings.ai.')->group(function () {
+        Route::post('/providers', [App\Http\Controllers\Settings\AiConfigurationController::class, 'storeProvider'])->name('providers.store');
+        Route::delete('/providers/{provider}', [App\Http\Controllers\Settings\AiConfigurationController::class, 'destroyProvider'])->name('providers.destroy');
+        Route::post('/providers/{provider}/load-models', [App\Http\Controllers\Settings\AiConfigurationController::class, 'loadModels'])->name('providers.load-models');
+        Route::post('/models/roles', [App\Http\Controllers\Settings\AiConfigurationController::class, 'updateModelRoles'])->name('models.roles.update');
+    });
 
 
     Route::get('/landings/{landing}/pages/{page}/edit', [App\Http\Controllers\LandingPageController::class, 'edit'])->name('landings.pages.edit');
@@ -127,6 +136,16 @@ Route::middleware('auth')->group(function () {
         ->name('media.store')
         ->middleware('throttle:30,1'); // Limit uploads
     Route::delete('/api/media/{media}', [App\Http\Controllers\MediaAssetController::class, 'destroy'])->name('media.destroy');
+
+    // AI Landing Page Generator
+    Route::get('/ai-generator', [\App\Http\Controllers\AILandingPageController::class, 'index'])->name('ai-generator.index');
+    Route::post('/ai-generator/generate', [\App\Http\Controllers\AILandingPageController::class, 'generate'])->name('ai-generator.generate');
+    Route::post('/ai-generator/publish', [\App\Http\Controllers\AILandingPageController::class, 'publish'])->name('ai-generator.publish');
+    Route::post('/ai-generator/regenerate', [\App\Http\Controllers\AILandingPageController::class, 'regenerate'])->name('ai-generator.regenerate');
+    Route::post('/ai-generator/regenerate-element', [\App\Http\Controllers\AILandingPageController::class, 'regenerateElement'])->name('ai-generator.regenerate-element');
+
+    // Explicit action: a landing can be converted into a template only via this endpoint
+    Route::post('/landings/{landing}/save-as-template', [App\Http\Controllers\LandingController::class, 'saveAsTemplate'])->name('landings.save-as-template');
 });
 
 require __DIR__.'/auth.php';

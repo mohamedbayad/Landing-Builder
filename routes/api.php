@@ -21,3 +21,12 @@ Route::prefix('rec')->group(function () {
 // Old Session Recording API
 Route::post('/record-session', [App\Http\Controllers\Api\SessionController::class, 'store']);
 Route::patch('/record-session/{sessionId}', [App\Http\Controllers\Api\SessionController::class, 'append']);
+
+// AI Orchestration API
+Route::prefix('ai')->group(function () {
+    Route::post('/analyze-product', [App\Http\Controllers\LandingPageAiController::class, 'analyzeProduct']);
+    Route::post('/research-product', [App\Http\Controllers\LandingPageAiController::class, 'researchProduct']);
+    Route::post('/analyze-and-generate', [App\Http\Controllers\LandingPageAiController::class, 'analyzeAndGenerate']);
+    Route::get('/generation-status/{uuid}', [App\Http\Controllers\LandingPageAiController::class, 'checkStatus']);
+    Route::get('/health', [App\Http\Controllers\LandingPageAiController::class, 'health']);
+});

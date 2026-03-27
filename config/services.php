@@ -39,4 +39,20 @@ return [
         'url' => env('LICENSING_SERVER_URL', 'http://localhost:8000/api'),
     ],
 
+    'ai' => [
+        'provider' => env('AI_PROVIDER'), // e.g., 'openai', 'anthropic', 'gemini'
+        'model' => env('AI_MODEL'), // e.g., 'gpt-4o', 'claude-3-5-sonnet'
+        'key' => env('AI_API_KEY'),
+    ],
+
+    'gemini' => [
+        'key' => env('GEMINI_API_KEY'),
+        'model' => env('GEMINI_MODEL', 'gemini-2.0-flash'),
+    ],
+
+    'ollama' => [
+        'base_url' => env('OLLAMA_BASE_URL', 'http://34.52.221.25:11434'),
+        'model' => env('OLLAMA_MODEL', 'llama3'),
+    ],
+
 ];

@@ -9,21 +9,68 @@ use App\Models\TemplatePage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Log;
 
 use ZipArchive;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\File;
-use App\Services\LicenseService; // Added for remote fetching
+use App\Services\LicenseService;
 
 class TemplateController extends Controller
 {
     public function index(Request $request, LicenseService $licenseService)
     {
-        $remoteTemplates = $licenseService->getTemplates();
-        
-        $templates = collect($remoteTemplates)->map(function ($t) {
+        $remoteTemplates = collect($licenseService->getTemplates());
+        $excluded = [];
+
+        $filteredRemote = $remoteTemplates->filter(function ($template) use (&$excluded) {
+            $reason = null;
+            $include = $this->isRealTemplateRecord($template, $reason);
+            if (!$include) {
+                $excluded[] = [
+                    'id' => $this->extractTemplateField($template, 'id'),
+                    'reason' => $reason,
+                    'type' => $this->extractTemplateField($template, 'type'),
+                    'source' => $this->extractTemplateField($template, 'source'),
+                    'is_template' => $this->extractTemplateField($template, 'is_template'),
+                    'category' => $this->extractTemplateField($template, 'category'),
+                    'status' => $this->extractTemplateField($template, 'status'),
+                    'visibility' => $this->extractTemplateField($template, 'visibility'),
+                ];
+            }
+            return $include;
+        })->map(function ($t) {
+            $t = (array) $t;
+            $t['id'] = 'remote-' . ($t['id'] ?? '');
+            $t['import_source'] = 'remote';
             return (object) $t;
-        });
+        })->values();
+
+        $localTemplates = Template::query()
+            ->where('is_active', true)
+            ->withCount('pages')
+            ->latest()
+            ->get()
+            ->map(function (Template $template) {
+                return (object) [
+                    'id' => 'local-' . $template->id,
+                    'import_source' => 'local',
+                    'name' => $template->name,
+                    'description' => $template->description,
+                    'thumbnail_url' => $template->preview_image_path ? Storage::url($template->preview_image_path) : null,
+                ];
+            });
+
+        $templates = $localTemplates->concat($filteredRemote)->values();
+
+        Log::info('Templates query executed', [
+            'local_count' => $localTemplates->count(),
+            'remote_raw_count' => $remoteTemplates->count(),
+            'remote_filtered_count' => $filteredRemote->count(),
+            'excluded_count' => count($excluded),
+            'excluded_samples' => array_slice($excluded, 0, 10),
+            'reason' => 'templates_index_filters_applied',
+        ]);
 
         return view('templates.index', compact('templates'));
     }
@@ -36,16 +83,38 @@ class TemplateController extends Controller
 
     public function import(Request $request, $id, LicenseService $licenseService)
     {
-        \Illuminate\Support\Facades\Log::info("Importing template ID: $id");
+        set_time_limit(0); // Prevent timeout for large templates
+        ini_set('memory_limit', '512M');
+        
+        Log::info("Starting template import for ID: $id");
+
+        $id = (string) $id;
+
+        if (str_starts_with($id, 'local-')) {
+            $localId = (int) str_replace('local-', '', $id);
+            return $this->importLocalTemplate($localId);
+        }
+
+        $remoteId = str_starts_with($id, 'remote-')
+            ? str_replace('remote-', '', $id)
+            : $id;
 
         // 1. Fetch Template Data
         $templates = $licenseService->getTemplates();
-        \Illuminate\Support\Facades\Log::info("Fetched templates count: " . count($templates));
+        Log::info("Fetched templates count: " . count($templates));
 
-        $templateData = collect($templates)->firstWhere('id', $id);
+        $templateData = collect($templates)->firstWhere('id', $remoteId);
+
+        if ($templateData && !$this->isRealTemplateRecord($templateData, $reason)) {
+            Log::warning('Template import blocked by filter', [
+                'template_id' => $remoteId,
+                'reason' => $reason,
+            ]);
+            return redirect()->route('templates.index')->with('error', 'This record is not a valid template.');
+        }
 
         if (!$templateData) {
-            \Illuminate\Support\Facades\Log::error("Template $id not found in fetched data.");
+            Log::error("Template $remoteId not found in fetched data.");
             return redirect()->route('templates.index')->with('error', 'Template not found or access denied.');
         }
 
@@ -64,7 +133,7 @@ class TemplateController extends Controller
 
         $landing = Landing::create([
             'workspace_id' => $workspace->id,
-            'template_id' => null, // Remote ID not stored in local DB foreign key
+            'template_id' => null,
             'name' => $landingName,
             'slug' => $slug,
             'status' => 'draft',
@@ -72,7 +141,7 @@ class TemplateController extends Controller
         ]);
 
         // 3. Process Content (From JSON)
-        $structure = $template->structure; // format: ['html' => ..., 'css' => ...]
+        $structure = $template->structure;
         if (is_string($structure)) {
              $structure = json_decode($structure, true);
         }
@@ -81,14 +150,27 @@ class TemplateController extends Controller
         $css = $structure['css'] ?? '';
         $js = $structure['js'] ?? '';
 
-        // NEW: Process Remote Assets (Download & Index)
-        $processed = $this->processRemoteAssets($html, $landing);
-        $html = $processed['html'];
+        // Standardize base storage path for all assets
+        $baseStoragePath = "landings/{$landing->uuid}/assets";
+        $fullStoragePath = storage_path("app/public/{$baseStoragePath}");
+        if (!File::exists($fullStoragePath)) {
+            File::makeDirectory($fullStoragePath, 0755, true);
+        }
 
-        // NEW: Process Head Assets (CSS/JS)
+        // Process Remote Assets (Download & Index) — handles ALL resource types + importmaps
+        $processed = $this->processRemoteAssets($html, $landing, $fullStoragePath, $baseStoragePath);
+        $html = $processed['html'];
+        $extractedJs = $processed['body_scripts'] ?? '';
+
+        // Merge extracted body scripts with any existing JS
+        if (!empty($extractedJs)) {
+            $js = $js . "\n" . $extractedJs;
+        }
+
+        // Process Head Assets (CSS/JS from custom_head)
         $customHead = $structure['custom_head'] ?? '';
         if (!empty($customHead)) {
-            $processedHead = $this->processHeadAssets($customHead, $landing);
+            $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath);
             
             // Save to Settings
             $landing->settings()->updateOrCreate(
@@ -115,139 +197,298 @@ class TemplateController extends Controller
         return redirect()->route('landings.show', $landing)->with('success', 'Template imported successfully.');
     }
 
-    protected function processRemoteAssets($html, Landing $landing)
+    protected function importLocalTemplate(int $templateId)
     {
-        if (empty($html)) return ['html' => ''];
+        $template = Template::with('pages')->find($templateId);
+        if (!$template || !$template->is_active) {
+            return redirect()->route('templates.index')->with('error', 'Template not found.');
+        }
 
-        // Aggressively remove SCRIPT tags from Body HTML to avoid duplication (since we moved them to Head)
-        // This regex removes ALL script tags.
-        $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html);
+        $user = Auth::user();
+        $workspace = $user->workspaces()->first();
+        if (!$workspace) {
+            $workspace = $user->workspaces()->create(['name' => 'My Workspace']);
+        }
+
+        $landingName = $template->name . ' - Copy';
+        $slug = Str::slug($landingName) . '-' . Str::random(6);
+
+        $landing = Landing::create([
+            'workspace_id' => $workspace->id,
+            'template_id' => $template->id,
+            'name' => $landingName,
+            'slug' => $slug,
+            'status' => 'draft',
+            'uuid' => (string) Str::uuid(),
+            'content_type' => 'landing',
+            'source' => 'template',
+            'is_template' => false,
+            'category' => 'imported',
+            'visibility' => 'private',
+        ]);
+
+        foreach ($template->pages as $page) {
+            LandingPage::create([
+                'landing_id' => $landing->id,
+                'type' => $page->type,
+                'name' => $page->name,
+                'slug' => $page->slug,
+                'status' => 'draft',
+                'html' => $page->html,
+                'css' => $page->css,
+                'js' => $page->js,
+                'grapesjs_json' => $page->grapesjs_json,
+            ]);
+        }
+
+        Log::info('Local template imported as landing', [
+            'template_id' => $template->id,
+            'landing_id' => $landing->id,
+            'reason' => 'explicit_template_import',
+        ]);
+
+        return redirect()->route('landings.show', $landing)->with('success', 'Template imported successfully.');
+    }
+
+    private function isRealTemplateRecord($template, ?string &$reason = null): bool
+    {
+        $type = strtolower((string) ($this->extractTemplateField($template, 'type', 'template') ?? 'template'));
+        $source = strtolower((string) ($this->extractTemplateField($template, 'source', '') ?? ''));
+        $category = strtolower((string) ($this->extractTemplateField($template, 'category', '') ?? ''));
+        $isTemplate = $this->extractTemplateField($template, 'is_template', null);
+        $status = strtolower((string) ($this->extractTemplateField($template, 'status', '') ?? ''));
+
+        if ($type !== '' && $type !== 'template') {
+            $reason = "type={$type}";
+            return false;
+        }
+
+        if (is_bool($isTemplate) && $isTemplate === false) {
+            $reason = "is_template=false";
+            return false;
+        }
+
+        if (in_array($source, ['ai', 'generated', 'landing'], true)) {
+            $reason = "source={$source}";
+            return false;
+        }
+
+        if (in_array($category, ['ai', 'generated', 'landing'], true)) {
+            $reason = "category={$category}";
+            return false;
+        }
+
+        if (in_array($status, ['draft', 'published'], true) && $type !== 'template') {
+            $reason = "landing_status={$status}";
+            return false;
+        }
+
+        return true;
+    }
+
+    private function extractTemplateField($template, string $field, $default = null)
+    {
+        if (is_array($template)) {
+            return $template[$field] ?? $default;
+        }
+        if (is_object($template)) {
+            return $template->{$field} ?? $default;
+        }
+        return $default;
+    }
+
+    /**
+     * Process ALL remote assets in body HTML.
+     */
+    protected function processRemoteAssets($html, Landing $landing, $fullStoragePath, $baseStoragePath)
+    {
+        if (empty($html)) return ['html' => '', 'body_scripts' => ''];
+
+        // Security: Remove inline event handlers
         $html = preg_replace('/\s+on[a-z]+\s*=\s*(?:".*?"|\'.*?\'|[^\s>]+)/i', '', $html);
 
+        // === Phase 1: Extract & Rewrite <script> tags ===
+        $extractedScripts = [];
+        $html = preg_replace_callback('/<script\b([^>]*)>(.*?)<\/script>/is', function($match) use (&$extractedScripts, $fullStoragePath, $baseStoragePath, $landing) {
+            $attrs = $match[1];
+            $content = $match[2];
+            
+            // 1. Check for importmap (modern templates)
+            if (preg_match('/type\s*=\s*["\']importmap["\']/i', $attrs)) {
+                Log::info("Found importmap, processing URLs...");
+                $importmap = json_decode($content, true);
+                if ($importmap && isset($importmap['imports'])) {
+                    foreach ($importmap['imports'] as $key => $src) {
+                        if (preg_match('/^https?:\/\//', $src)) {
+                            $localUrl = $this->downloadAndStore($src, $fullStoragePath, $baseStoragePath, $landing);
+                            if ($localUrl) $importmap['imports'][$key] = $localUrl;
+                        }
+                    }
+                    $content = json_encode($importmap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+                }
+                $extractedScripts[] = "<script type=\"importmap\">{$content}</script>";
+                return '';
+            }
+
+            // 2. Check for External Scripts
+            if (preg_match('/\bsrc\s*=\s*["\']([^"\']+)["\']/i', $attrs, $srcMatch)) {
+                $src = $srcMatch[1];
+                if (preg_match('/^https?:\/\//', $src)) {
+                    $localUrl = $this->downloadAndStore($src, $fullStoragePath, $baseStoragePath, $landing);
+                    if ($localUrl) {
+                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $localUrl . '"', $attrs);
+                    }
+                }
+                $extractedScripts[] = "<script{$attrs}></script>";
+                return '';
+            } 
+            
+            // 3. Check for Inline Module Scripts (import ... from)
+            if (preg_match('/type=["\']module["\']/i', $attrs) && trim($content)) {
+                // Rewrite inline imports
+                $content = preg_replace_callback('/import\s+.*?\s+from\s+["\'](https?:\/\/[^"\']+)["\']/is', function($imatch) use ($fullStoragePath, $baseStoragePath, $landing) {
+                    $localUrl = $this->downloadAndStore($imatch[1], $fullStoragePath, $baseStoragePath, $landing);
+                    return $localUrl ? str_replace($imatch[1], $localUrl, $imatch[0]) : $imatch[0];
+                }, $content);
+            }
+
+            // Preserve inline scripts
+            if (trim($content)) {
+                $extractedScripts[] = "<script{$attrs}>{$content}</script>";
+            }
+            
+            return '';
+        }, $html);
+
+        // === Phase 2: DOM Processing ===
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
         $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
 
-        $images = $dom->getElementsByTagName('img');
-        $baseStoragePath = "landings/{$landing->uuid}"; // Relative to public disk root
-        $fullStoragePath = storage_path("app/public/{$baseStoragePath}");
-
-        if (!File::exists($fullStoragePath)) {
-            File::makeDirectory($fullStoragePath, 0755, true);
+        // Process <link rel="stylesheet">
+        foreach (iterator_to_array($dom->getElementsByTagName('link')) as $link) {
+            $rel = $link->getAttribute('rel');
+            $href = $link->getAttribute('href');
+            if (($rel === 'stylesheet' || $rel === 'preload') && $href && preg_match('/^https?:\/\//', $href)) {
+                $localUrl = $this->downloadAndStore($href, $fullStoragePath, $baseStoragePath, $landing, $rel === 'stylesheet');
+                if ($localUrl) $link->setAttribute('href', $localUrl);
+            }
         }
 
-        foreach ($images as $img) {
-            $src = $img->getAttribute('src');
-            
-            // Only process remote URLs (http/https)
-            if (preg_match('/^https?:\/\//', $src)) {
-                try {
-                    // Generate a filename
-                    $extension = pathinfo(parse_url($src, PHP_URL_PATH), PATHINFO_EXTENSION);
-                    if (!$extension) $extension = 'png'; // Fallback
-                    // Clean query params if any
-                    $extension = explode('?', $extension)[0];
-                    
-                    $filename = 'imported_' . uniqid() . '.' . $extension;
-                    $relativePath = "{$baseStoragePath}/{$filename}";
-                    
-                    // Download Content
-                    $content = @file_get_contents($src);
-                    
-                    if ($content !== false) {
-                        // Save to Storage
-                        Storage::disk('public')->put($relativePath, $content);
-                        
-                        // Create MediaAsset
-                        $size = strlen($content);
-                        list($width, $height) = @getimagesizefromstring($content);
-                        $mime = 'image/' . ($extension === 'jpg' ? 'jpeg' : $extension); // Rough guess
-                        
-                        \App\Models\MediaAsset::create([
-                            'landing_id' => $landing->id,
-                            'user_id' => Auth::id(),
-                            'filename' => $filename,
-                            'disk' => 'public',
-                            'relative_path' => $relativePath,
-                            'mime_type' => $mime,
-                            'size' => $size,
-                            'width' => $width,
-                            'height' => $height,
-                            'source' => 'import',
-                        ]);
-
-                        // Rewrite SRC to local URL
-                        $newSrc = Storage::url($relativePath);
-                        $img->setAttribute('src', $newSrc);
-                    }
-                } catch (\Exception $e) {
-                    \Illuminate\Support\Facades\Log::warning("Failed to download asset: $src - " . $e->getMessage());
+        // Process <img> Tags
+        foreach (iterator_to_array($dom->getElementsByTagName('img')) as $img) {
+            foreach (['src', 'data-src'] as $attr) {
+                $src = $img->getAttribute($attr);
+                if ($src && preg_match('/^https?:\/\//', $src)) {
+                    $localUrl = $this->downloadAndStoreImage($src, $baseStoragePath, $landing);
+                    if ($localUrl) $img->setAttribute($attr, $localUrl);
                 }
             }
         }
 
-        // Return modified HTML
+        // Process Media Tags
+        foreach (['video', 'audio', 'source'] as $tagName) {
+            foreach (iterator_to_array($dom->getElementsByTagName($tagName)) as $el) {
+                foreach (['src', 'poster'] as $attr) {
+                    $val = $el->getAttribute($attr);
+                    if ($val && preg_match('/^https?:\/\//', $val)) {
+                        $localUrl = $this->downloadAndStore($val, $fullStoragePath, $baseStoragePath, $landing);
+                        if ($localUrl) $el->setAttribute($attr, $localUrl);
+                    }
+                }
+            }
+        }
+
+        $processedHtml = $dom->saveHTML();
+        $processedHtml = preg_replace('/^<\?xml[^>]*\?>/', '', $processedHtml);
+
         return [
-            'html' => $dom->saveHTML()
+            'html' => trim($processedHtml),
+            'body_scripts' => implode("\n", $extractedScripts),
         ];
+    }
+
+    /**
+     * Download an image, store it, and create a MediaAsset record.
+     */
+    protected function downloadAndStoreImage($url, $baseStoragePath, Landing $landing)
+    {
+        try {
+            $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
+            if ($extension) $extension = explode('?', $extension)[0];
+            
+            $filename = 'imported_' . md5($url) . '.' . ($extension ?: 'png');
+            $relativePath = "{$baseStoragePath}/{$filename}";
+            $fullPath = storage_path("app/public/{$relativePath}");
+
+            if (File::exists($fullPath)) return Storage::url($relativePath);
+            
+            $content = $this->downloadWithRetry($url, $mimeType);
+            
+            if ($content !== null) {
+                if (!$extension && $mimeType) {
+                    $extension = $this->mimeToExtension($mimeType);
+                    $filename = 'imported_' . md5($url) . '.' . $extension;
+                    $relativePath = "{$baseStoragePath}/{$filename}";
+                }
+
+                Storage::disk('public')->put($relativePath, $content);
+                
+                \App\Models\MediaAsset::create([
+                    'landing_id' => $landing->id,
+                    'user_id' => Auth::id(),
+                    'filename' => $filename,
+                    'disk' => 'public',
+                    'relative_path' => $relativePath,
+                    'mime_type' => $mimeType ?? 'image/png',
+                    'size' => strlen($content),
+                    'source' => 'import',
+                ]);
+
+                return Storage::url($relativePath);
+            }
+        } catch (\Exception $e) {
+            Log::warning("Failed to download image: $url - " . $e->getMessage());
+        }
+        return null;
     }
 
     protected function createDefaultPages(Landing $landing) 
     {
-         // 7. Create Checkout Page
         LandingPage::create([
-            'landing_id' => $landing->id,
-            'type' => 'checkout',
-            'name' => 'Checkout',
-            'slug' => 'checkout',
-            'status' => 'draft',
+            'landing_id' => $landing->id, 'type' => 'checkout', 'name' => 'Checkout', 'slug' => 'checkout', 'status' => 'draft',
             'html' => '<div class="container mx-auto px-4 py-8"><h1 class="text-3xl font-bold mb-4">Checkout</h1><p>Dynamic Checkout Form will appear here.</p></div>',
-            'css' => '',
-            'js' => '',
         ]);
-
-        // 8. Create Thank You Page
         LandingPage::create([
-            'landing_id' => $landing->id,
-            'type' => 'thankyou',
-            'name' => 'Thank You',
-            'slug' => 'thank-you',
-            'status' => 'draft',
+            'landing_id' => $landing->id, 'type' => 'thankyou', 'name' => 'Thank You', 'slug' => 'thank-you', 'status' => 'draft',
             'html' => '<div class="bg-gray-50 min-h-screen flex items-center justify-center"><h1>Thank You</h1></div>',
-             'css' => '',
-             'js' => '',
         ]);
     }
 
-    protected function processHeadAssets($html, Landing $landing)
+    /**
+     * Process head assets (CSS/JS from custom_head).
+     */
+    protected function processHeadAssets($html, Landing $landing, $fullStoragePath, $baseStoragePath)
     {
         if (empty($html)) return '';
 
         $dom = new \DOMDocument();
         libxml_use_internal_errors(true);
-        // Head often lacks a root, so wrap strictly for parsing then unwrap
         $dom->loadHTML('<?xml encoding="UTF-8"><root>' . $html . '</root>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
         libxml_clear_errors();
-        
-        $baseStoragePath = "landings/{$landing->uuid}/assets"; 
-        $fullStoragePath = storage_path("app/public/{$baseStoragePath}");
 
-        if (!File::exists($fullStoragePath)) {
-            File::makeDirectory($fullStoragePath, 0755, true);
-        }
-
-        // 1. Process Links (CSS)
-        foreach ($dom->getElementsByTagName('link') as $link) {
+        // Process Links (CSS)
+        foreach (iterator_to_array($dom->getElementsByTagName('link')) as $link) {
             $href = $link->getAttribute('href');
             if ($href && preg_match('/^https?:\/\//', $href)) {
-                 $newUrl = $this->downloadAndStore($href, $fullStoragePath, $baseStoragePath, $landing);
+                 $newUrl = $this->downloadAndStore($href, $fullStoragePath, $baseStoragePath, $landing, true);
                  if ($newUrl) $link->setAttribute('href', $newUrl);
             }
         }
 
-        // 2. Process Scripts (JS)
-        foreach ($dom->getElementsByTagName('script') as $script) {
+        // Process Scripts (JS)
+        foreach (iterator_to_array($dom->getElementsByTagName('script')) as $script) {
             $src = $script->getAttribute('src');
             if ($src && preg_match('/^https?:\/\//', $src)) {
                  $newUrl = $this->downloadAndStore($src, $fullStoragePath, $baseStoragePath, $landing);
@@ -255,7 +496,6 @@ class TemplateController extends Controller
             }
         }
 
-        // Unwrap content from <root>
         $output = '';
         $root = $dom->getElementsByTagName('root')->item(0);
         if ($root) {
@@ -266,34 +506,72 @@ class TemplateController extends Controller
         return $output;
     }
 
-    protected function downloadAndStore($url, $fullPath, $relativePathBase, $landing)
+    /**
+     * Download a remote file and store it locally.
+     */
+    protected function downloadAndStore($url, $fullPath, $relativePathBase, $landing, $isCss = false)
     {
+        Log::info("Asset downloading: $url");
         try {
             $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
-            if (!$extension) $extension = 'bin';
-            $extension = explode('?', $extension)[0]; // Clean
+            if ($extension) $extension = explode('?', $extension)[0];
             
+            $content = $this->downloadWithRetry($url, $mimeType);
+            if ($content === null) return null;
+
+            if (!$extension || $extension === 'bin') {
+                $extension = $this->mimeToExtension($mimeType);
+                if (!$extension) $extension = $isCss ? 'css' : (preg_match('/\.js(\?|$)/i', $url) ? 'js' : 'bin');
+            }
+
             $filename = md5($url) . '.' . $extension;
             $relativePath = "{$relativePathBase}/{$filename}";
             $absolutePath = $fullPath . '/' . $filename;
             
-            // Check if already exists
-            if (File::exists($absolutePath)) {
-                return Storage::url($relativePath);
+            if (File::exists($absolutePath)) return Storage::url($relativePath);
+
+            // Rewrite CSS internal refs
+            if ($isCss || strtolower($extension) === 'css') {
+                $baseDir = dirname($url);
+                $content = preg_replace_callback('/url\(["\']?(?!data:|https?:\/\/|\/\/)([^"\')\s]+)["\']?\)/i', function($match) use ($baseDir, $fullPath, $relativePathBase, $landing) {
+                    $assetUrl = $baseDir . '/' . $match[1];
+                    $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
+                    return $localUrl ? "url('{$localUrl}')" : $match[0];
+                }, $content);
             }
 
-            // Use Http facade for better control/logging
-            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($url);
-            
-            if ($response->successful()) {
-                Storage::disk('public')->put($relativePath, $response->body());
-                return Storage::url($relativePath);
-            } else {
-                 \Illuminate\Support\Facades\Log::warning("Failed to download asset: $url - Status: " . $response->status());
-            }
+            Storage::disk('public')->put($relativePath, $content);
+            return Storage::url($relativePath);
         } catch (\Exception $e) {
-            \Illuminate\Support\Facades\Log::warning("Failed to download asset: $url - " . $e->getMessage());
+            Log::warning("Failed to download asset: $url - " . $e->getMessage());
         }
-        return null; // Return null to keep original URL on failure
+        return null;
+    }
+
+    protected function downloadWithRetry($url, &$mimeType = null, $maxRetries = 2)
+    {
+        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
+            try {
+                $response = \Illuminate\Support\Facades\Http::timeout(15)->withOptions(['verify' => false])->get($url);
+                if ($response->successful()) {
+                    $mimeType = $response->header('Content-Type');
+                    return $response->body();
+                }
+            } catch (\Exception $e) { }
+            if ($attempt < $maxRetries) usleep(500000);
+        }
+        return null;
+    }
+
+    protected function mimeToExtension($mime)
+    {
+        $map = [
+            'application/javascript' => 'js', 'text/javascript' => 'js', 'text/css' => 'css',
+            'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp',
+            'image/svg+xml' => 'svg', 'application/json' => 'json', 'font/woff' => 'woff',
+            'font/woff2' => 'woff2', 'application/font-woff' => 'woff', 'application/font-woff2' => 'woff2',
+        ];
+        $baseMime = explode(';', $mime)[0];
+        return $map[$baseMime] ?? null;
     }
 }
