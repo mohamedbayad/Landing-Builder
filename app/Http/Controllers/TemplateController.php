@@ -521,7 +521,8 @@ class TemplateController extends Controller
     {
         Log::info("Asset downloading: $url");
         try {
-            $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
+            $parsedUrl = parse_url($url);
+            $extension = pathinfo($parsedUrl['path'] ?? '', PATHINFO_EXTENSION);
             if ($extension) $extension = explode('?', $extension)[0];
             
             $content = $this->downloadWithRetry($url, $mimeType);
@@ -538,6 +539,7 @@ class TemplateController extends Controller
                 if (!$extension) $extension = $isCss ? 'css' : (preg_match('/\.js(\?|$)/i', $url) ? 'js' : 'bin');
             }
 
+            $extension = strtolower($extension);
             $filename = md5($url) . '.' . $extension;
             $relativePath = "{$relativePathBase}/{$filename}";
             $absolutePath = $fullPath . '/' . $filename;
@@ -545,10 +547,9 @@ class TemplateController extends Controller
             if (File::exists($absolutePath)) return Storage::url($relativePath);
 
             // Rewrite CSS internal refs
-            if ($isCss || strtolower($extension) === 'css') {
-                $baseDir = dirname($url);
-                $content = preg_replace_callback('/url\(["\']?(?!data:|https?:\/\/|\/\/)([^"\')\s]+)["\']?\)/i', function($match) use ($baseDir, $fullPath, $relativePathBase, $landing) {
-                    $assetUrl = $baseDir . '/' . $match[1];
+            if ($isCss || $extension === 'css') {
+                $content = preg_replace_callback('/url\(["\']?(?!data:|https?:\/\/|\/\/)([^"\')\s]+)["\']?\)/i', function($match) use ($url, $fullPath, $relativePathBase, $landing) {
+                    $assetUrl = $this->resolveUrl($url, $match[1]);
                     $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
                     return $localUrl ? "url('{$localUrl}')" : $match[0];
                 }, $content);
@@ -556,16 +557,14 @@ class TemplateController extends Controller
 
             // DEEP ASSET CRAWLING for JS/CSS (Detect hidden assets like .glb, .json, etc.)
             if ($extension === 'js' || $extension === 'css') {
-                $baseDir = dirname($url);
                 // Regex to find "assets/...", "./assets/...", etc. ending in common asset extensions
                 $pattern = '/(["\'])(\.\/|(?:\.\.\/)+|(?:\/)?assets\/)((?:(?!\1).)+?\.(?:glb|gltf|json|bin|wasm|mp4|webm|obj|fbx))\1/i';
                 
-                $content = preg_replace_callback($pattern, function($match) use ($baseDir, $fullPath, $relativePathBase, $landing) {
-                    $originalPath = $match[2] . $match[3];
-                    $cleanPath = ltrim($originalPath, './');
-                    $assetUrl = $baseDir . '/' . $cleanPath;
+                $content = preg_replace_callback($pattern, function($match) use ($url, $fullPath, $relativePathBase, $landing) {
+                    $relPath = $match[2] . $match[3];
+                    $assetUrl = $this->resolveUrl($url, $relPath);
                     
-                    Log::info("Deep Crawler discovered asset: $assetUrl from parent script/css");
+                    Log::info("Deep Crawler discovered asset: $assetUrl");
                     $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
                     
                     return $localUrl ? $match[1] . $localUrl . $match[1] : $match[0];
@@ -624,5 +623,34 @@ class TemplateController extends Controller
         ];
         $baseMime = explode(';', $mime)[0];
         return $map[$baseMime] ?? null;
+    }
+
+    /**
+     * Resolve a relative URL based on a parent absolute URL.
+     */
+    protected function resolveUrl($base, $rel)
+    {
+        if (preg_match('/^https?:\/\//i', $rel) || str_starts_with($rel, '//')) return $rel;
+        
+        $parse = parse_url($base);
+        $root = $parse['scheme'] . "://" . $parse['host'] . (isset($parse['port']) ? ":" . $parse['port'] : "");
+        $path = $parse['path'] ?? '/';
+        $dir = dirname($path);
+        
+        if (str_starts_with($rel, '/')) return $root . $rel;
+        
+        // Handle ../ and ./ relative to dir
+        $absolute = $dir . '/' . $rel;
+        $parts = explode('/', $absolute);
+        $stack = [];
+        foreach ($parts as $part) {
+            if ($part === '' || $part === '.') continue;
+            if ($part === '..') {
+                if (count($stack) > 0) array_pop($stack);
+                continue;
+            }
+            $stack[] = $part;
+        }
+        return $root . '/' . implode('/', $stack);
     }
 }
