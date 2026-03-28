@@ -320,6 +320,14 @@ class TemplateController extends Controller
                 if ($importmap && isset($importmap['imports'])) {
                     foreach ($importmap['imports'] as $key => $src) {
                         if (preg_match('/^https?:\/\//', $src)) {
+                            // SKIP FOLDER MAPPINGS: If key or src ends in '/', keep it remote.
+                            // The browser requires folder mappings to end in '/' on both sides.
+                            // Flattening them into a single local file breaks the mapping.
+                            if (str_ends_with($key, '/') || str_ends_with($src, '/')) {
+                                Log::info("Skipping folder-based importmap entry: $key -> $src (keeping remote)");
+                                continue;
+                            }
+
                             $localUrl = $this->downloadAndStore($src, $fullStoragePath, $baseStoragePath, $landing);
                             if ($localUrl) $importmap['imports'][$key] = $localUrl;
                         }
@@ -519,6 +527,12 @@ class TemplateController extends Controller
             $content = $this->downloadWithRetry($url, $mimeType);
             if ($content === null) return null;
 
+            // CONTENT VALIDATION: Detect 404/Error HTML pages saved as JS/CSS
+            if (($isCss || preg_match('/\.js(\?|$)/i', $url)) && preg_match('/^\s*<!DOCTYPE\b/i', $content)) {
+                Log::warning("Skipping asset $url: Server returned HTML (likely 404/error) instead of the requested resource.");
+                return null;
+            }
+
             if (!$extension || $extension === 'bin') {
                 $extension = $this->mimeToExtension($mimeType);
                 if (!$extension) $extension = $isCss ? 'css' : (preg_match('/\.js(\?|$)/i', $url) ? 'js' : 'bin');
@@ -566,10 +580,13 @@ class TemplateController extends Controller
     protected function mimeToExtension($mime)
     {
         $map = [
-            'application/javascript' => 'js', 'text/javascript' => 'js', 'text/css' => 'css',
+            'application/javascript' => 'js', 'application/x-javascript' => 'js', 'text/javascript' => 'js', 
+            'text/css' => 'css', 'text/plain' => null, // Let fallback decide for text/plain
             'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp',
-            'image/svg+xml' => 'svg', 'application/json' => 'json', 'font/woff' => 'woff',
-            'font/woff2' => 'woff2', 'application/font-woff' => 'woff', 'application/font-woff2' => 'woff2',
+            'image/svg+xml' => 'svg', 'application/json' => 'json', 
+            'font/woff' => 'woff', 'font/woff2' => 'woff2', 'font/ttf' => 'ttf', 'font/otf' => 'otf',
+            'application/font-woff' => 'woff', 'application/font-woff2' => 'woff2',
+            'application/x-font-ttf' => 'ttf', 'application/x-font-opentype' => 'otf',
         ];
         $baseMime = explode(';', $mime)[0];
         return $map[$baseMime] ?? null;

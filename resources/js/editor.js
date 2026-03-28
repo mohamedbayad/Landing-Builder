@@ -223,9 +223,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // INJECT CUSTOM HEAD (Template Styles)
         if (window.editorData.customHead) {
-            const canvasHead = editor.Canvas.getDocument().head;
+            const canvasDoc = editor.Canvas.getDocument();
+            const canvasHead = canvasDoc.head;
+            
+            // Inject CSP Meta tag to allow remote folder-based importmaps/scripts
+            // This is needed because some templates use CDNs (unpkg, cdnjs) that we can't easily flatten.
+            const cspMeta = canvasDoc.createElement('meta');
+            cspMeta.setAttribute('http-equiv', 'Content-Security-Policy');
+            cspMeta.setAttribute('content', "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;");
+            canvasHead.appendChild(cspMeta);
+
             canvasHead.insertAdjacentHTML('beforeend', window.editorData.customHead);
-            console.log('Injected custom head scripts/styles into canvas');
+            console.log('Injected custom head scripts/styles into canvas with CSP');
         }
 
         // INJECT BODY SCRIPTS (Template JS - animations, interactions, etc.)
