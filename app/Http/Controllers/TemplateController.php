@@ -554,6 +554,24 @@ class TemplateController extends Controller
                 }, $content);
             }
 
+            // DEEP ASSET CRAWLING for JS/CSS (Detect hidden assets like .glb, .json, etc.)
+            if ($extension === 'js' || $extension === 'css') {
+                $baseDir = dirname($url);
+                // Regex to find "assets/...", "./assets/...", etc. ending in common asset extensions
+                $pattern = '/(["\'])(\.\/|(?:\.\.\/)+|(?:\/)?assets\/)((?:(?!\1).)+?\.(?:glb|gltf|json|bin|wasm|mp4|webm|obj|fbx))\1/i';
+                
+                $content = preg_replace_callback($pattern, function($match) use ($baseDir, $fullPath, $relativePathBase, $landing) {
+                    $originalPath = $match[2] . $match[3];
+                    $cleanPath = ltrim($originalPath, './');
+                    $assetUrl = $baseDir . '/' . $cleanPath;
+                    
+                    Log::info("Deep Crawler discovered asset: $assetUrl from parent script/css");
+                    $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
+                    
+                    return $localUrl ? $match[1] . $localUrl . $match[1] : $match[0];
+                }, $content);
+            }
+
             Storage::disk('public')->put($relativePath, $content);
             return Storage::url($relativePath);
         } catch (\Exception $e) {
@@ -566,10 +584,24 @@ class TemplateController extends Controller
     {
         for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
             try {
-                $response = \Illuminate\Support\Facades\Http::timeout(15)->withOptions(['verify' => false])->get($url);
+                $response = \Illuminate\Support\Facades\Http::timeout(20)->withOptions(['verify' => false])->get($url);
                 if ($response->successful()) {
                     $mimeType = $response->header('Content-Type');
                     return $response->body();
+                }
+
+                // Case-Sensitivity / Common Path Attempt for 404s
+                if ($response->status() === 404) {
+                    // Try lowercase version
+                    $lowerUrl = strtolower($url);
+                    if ($lowerUrl !== $url) {
+                        Log::info("404 for $url, retrying with lowercase: $lowerUrl");
+                        $lowerResponse = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->get($lowerUrl);
+                        if ($lowerResponse->successful()) {
+                            $mimeType = $lowerResponse->header('Content-Type');
+                            return $lowerResponse->body();
+                        }
+                    }
                 }
             } catch (\Exception $e) { }
             if ($attempt < $maxRetries) usleep(500000);
@@ -587,6 +619,8 @@ class TemplateController extends Controller
             'font/woff' => 'woff', 'font/woff2' => 'woff2', 'font/ttf' => 'ttf', 'font/otf' => 'otf',
             'application/font-woff' => 'woff', 'application/font-woff2' => 'woff2',
             'application/x-font-ttf' => 'ttf', 'application/x-font-opentype' => 'otf',
+            'model/gltf-binary' => 'glb', 'model/gltf+json' => 'gltf', 
+            'application/wasm' => 'wasm', 'video/mp4' => 'mp4', 'video/webm' => 'webm',
         ];
         $baseMime = explode(';', $mime)[0];
         return $map[$baseMime] ?? null;
