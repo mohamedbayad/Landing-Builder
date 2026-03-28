@@ -555,19 +555,28 @@ class TemplateController extends Controller
                 }, $content);
             }
 
-            // DEEP ASSET CRAWLING for JS/CSS (Detect hidden assets like .glb, .json, etc.)
+            // DEEP ASSET CRAWLING for JS/CSS (Detect both relative and absolute assets)
             if ($extension === 'js' || $extension === 'css') {
-                // Regex to find "assets/...", "./assets/...", etc. ending in common asset extensions
-                $pattern = '/(["\'])(\.\/|(?:\.\.\/)+|(?:\/)?assets\/)((?:(?!\1).)+?\.(?:glb|gltf|json|bin|wasm|mp4|webm|obj|fbx))\1/i';
+                // Aggressive pattern: Catch any string literally starting or containing asset paths ending in model/media extensions
+                // It now matches: "./assets/...", "/assets/...", and "https://domain.com/assets/..."
+                $pattern = '/(["\'])((?:https?:\/\/[^\/\"\'\s]+)?(?:\.\/|(?:\.\.\/)+|\/)?(?:assets\/)?[^\"\']+\.(?:glb|gltf|json|bin|wasm|mp4|webm|obj|fbx|woff|woff2|ttf|otf))\1/i';
                 
                 $content = preg_replace_callback($pattern, function($match) use ($url, $fullPath, $relativePathBase, $landing) {
-                    $relPath = $match[2] . $match[3];
-                    $assetUrl = $this->resolveUrl($url, $relPath);
+                    $assetUrl = $this->resolveUrl($url, $match[2]);
                     
-                    Log::info("Deep Crawler discovered asset: $assetUrl");
-                    $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
+                    Log::info("Aggressive Crawler discovered: " . $match[2] . " -> Resolved to: " . $assetUrl);
                     
-                    return $localUrl ? $match[1] . $localUrl . $match[1] : $match[0];
+                    // Only download if it's on the SAME host as the template source OR it's a relative path
+                    // We don't want to download every random external link from JS, just template assets.
+                    $sourceHost = parse_url($url, PHP_URL_HOST);
+                    $assetHost = parse_url($assetUrl, PHP_URL_HOST);
+                    
+                    if ($sourceHost === $assetHost || !$assetHost) {
+                        $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing);
+                        return $localUrl ? $match[1] . $localUrl . $match[1] : $match[0];
+                    }
+                    
+                    return $match[0];
                 }, $content);
             }
 
