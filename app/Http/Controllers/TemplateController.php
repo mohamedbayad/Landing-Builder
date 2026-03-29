@@ -745,13 +745,6 @@ class TemplateController extends Controller
                 if (!$extension) $extension = $isCss ? 'css' : (preg_match('/\.js(\?|$)/i', $url) ? 'js' : 'bin');
             }
 
-            $extension = strtolower($extension);
-            $filename = md5($url) . '.' . $extension;
-            $relativePath = "{$baseStoragePath}/{$filename}";
-            $absolutePath = $fullStoragePath . '/' . $filename;
-            
-            if (File::exists($absolutePath)) return Storage::url($relativePath);
-
             // Rewrite CSS internal refs
             if ($isCss || $extension === 'css') {
                 $content = $this->processRemoteCss($content, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl ?? $url);
@@ -781,6 +774,14 @@ class TemplateController extends Controller
                     return $match[0];
                 }, $content);
             }
+
+            $extension = strtolower($extension);
+            $contentHash = md5($content);
+            $filename = md5($url . '|' . $contentHash) . '.' . $extension;
+            $relativePath = "{$baseStoragePath}/{$filename}";
+            $absolutePath = $fullStoragePath . '/' . $filename;
+
+            if (File::exists($absolutePath)) return Storage::url($relativePath);
 
             Storage::disk('public')->put($relativePath, $content);
             return Storage::url($relativePath);
