@@ -35,6 +35,14 @@
                                 </thead>
                                 <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                                     @foreach($landings as $landing)
+                                        @php
+                                            $source = (string) ($landing->source ?? '');
+                                            $canSyncTemplate = !empty($landing->template_id)
+                                                || str_starts_with($source, 'remote-template:')
+                                                || str_starts_with($source, 'local-template:')
+                                                || $source === 'template'
+                                                || preg_match('/\s*-\s*copy$/i', (string) $landing->name);
+                                        @endphp
                                         <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors duration-150">
                                             <td class="px-6 py-4 whitespace-nowrap">
                                                 <div class="text-sm font-bold text-gray-900 dark:text-white">{{ $landing->name }}</div>
@@ -58,6 +66,17 @@
                                             </td>
                                             <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <div class="flex justify-end items-center gap-3">
+                                                    @if($canSyncTemplate)
+                                                        <form action="{{ route('landings.templates.sync', $landing) }}" method="POST" onsubmit="event.preventDefault(); window.confirmAction('Sync this landing with its source template? This will update template content and styles.', this);">
+                                                            @csrf
+                                                            <button type="submit" class="text-gray-400 hover:text-cyan-500 dark:hover:text-cyan-400" title="Sync Template">
+                                                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v6h6M20 20v-6h-6M5.64 17.66A9 9 0 0019 8.36M18.36 6.34A9 9 0 005 15.64"></path>
+                                                                </svg>
+                                                            </button>
+                                                        </form>
+                                                    @endif
+
                                                     @if(!$landing->is_main)
                                                         <form action="{{ route('landings.main', $landing) }}" method="POST">
                                                             @csrf

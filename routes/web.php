@@ -38,6 +38,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/templates/upload', [App\Http\Controllers\TemplateController::class, 'upload'])->name('templates.upload');
 
     Route::resource('landings', App\Http\Controllers\LandingController::class)->except(['create', 'store']);
+    Route::post('/landings/{landing}/sync-template', [App\Http\Controllers\TemplateController::class, 'syncLandingTemplate'])
+        ->name('landings.templates.sync');
     
     // Leads (Sales/Checkouts) - Admin
     Route::get('/leads/export', [App\Http\Controllers\LeadsController::class, 'export'])->name('leads.export');

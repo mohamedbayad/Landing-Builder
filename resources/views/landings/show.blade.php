@@ -1,12 +1,30 @@
 <x-app-layout>
     <x-slot name="header">
+        @php
+            $source = (string) ($landing->source ?? '');
+            $canSyncTemplate = !empty($landing->template_id)
+                || str_starts_with($source, 'remote-template:')
+                || str_starts_with($source, 'local-template:')
+                || $source === 'template'
+                || preg_match('/\s*-\s*copy$/i', (string) $landing->name);
+        @endphp
         <div class="flex justify-between items-center">
             <h2 class="font-semibold text-xl text-gray-800 leading-tight">
                 {{ __('Landing Details') }}: {{ $landing->name }}
             </h2>
-            <a href="{{ route('landings.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
-                &larr; Back to Listings
-            </a>
+            <div class="flex items-center gap-3">
+                @if($canSyncTemplate)
+                    <form action="{{ route('landings.templates.sync', $landing) }}" method="POST" onsubmit="return confirm('Sync this landing with its source template? This will update page content and styles.');">
+                        @csrf
+                        <button type="submit" class="inline-flex items-center px-3 py-2 text-sm font-medium rounded-md bg-indigo-600 text-white hover:bg-indigo-700">
+                            Sync Template
+                        </button>
+                    </form>
+                @endif
+                <a href="{{ route('landings.index') }}" class="text-sm text-gray-600 hover:text-gray-900">
+                    &larr; Back to Listings
+                </a>
+            </div>
         </div>
     </x-slot>
 
@@ -14,6 +32,17 @@
         <div class="max-w-7xl mx-auto sm:px-6 lg:px-8">
             <div class="bg-white overflow-hidden shadow-sm sm:rounded-lg">
                 <div class="p-6 text-gray-900">
+                    @if(session('status'))
+                        <div class="mb-4 rounded-md border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-800">
+                            {{ session('status') }}
+                        </div>
+                    @endif
+
+                    @if(session('error'))
+                        <div class="mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+                            {{ session('error') }}
+                        </div>
+                    @endif
                     
                     <div class="mb-6">
                         <h3 class="text-lg font-medium text-gray-900">Pages</h3>
