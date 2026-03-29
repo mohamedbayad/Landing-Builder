@@ -885,14 +885,33 @@ class TemplateController extends Controller
 
                 // Case-Sensitivity / Common Path Attempt for 404s
                 if ($response->status() === 404) {
+                    $variants = [];
+
                     // Try lowercase version
                     $lowerUrl = strtolower($url);
                     if ($lowerUrl !== $url) {
-                        Log::info("404 for $url, retrying with lowercase: $lowerUrl");
-                        $lowerResponse = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->get($lowerUrl);
-                        if ($lowerResponse->successful()) {
-                            $mimeType = $lowerResponse->header('Content-Type');
-                            return $lowerResponse->body();
+                        $variants[] = $lowerUrl;
+                    }
+
+                    // Try basename with uppercase first letter (rocket.glb -> Rocket.glb)
+                    $parsedPath = parse_url($url, PHP_URL_PATH);
+                    if (is_string($parsedPath) && $parsedPath !== '') {
+                        $basename = basename($parsedPath);
+                        $upperFirst = ucfirst($basename);
+                        if ($upperFirst !== $basename) {
+                            $upperFirstUrl = $this->replaceUrlPath($url, rtrim(dirname($parsedPath), '/\\') . '/' . $upperFirst);
+                            if ($upperFirstUrl !== $url) {
+                                $variants[] = $upperFirstUrl;
+                            }
+                        }
+                    }
+
+                    foreach (array_values(array_unique($variants)) as $variantUrl) {
+                        Log::info("404 for $url, retrying variant: $variantUrl");
+                        $variantResponse = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->get($variantUrl);
+                        if ($variantResponse->successful()) {
+                            $mimeType = $variantResponse->header('Content-Type');
+                            return $variantResponse->body();
                         }
                     }
                 }
@@ -900,6 +919,23 @@ class TemplateController extends Controller
             if ($attempt < $maxRetries) usleep(500000);
         }
         return null;
+    }
+
+    protected function replaceUrlPath(string $url, string $newPath): string
+    {
+        $parts = parse_url($url);
+        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
+            return $url;
+        }
+
+        $scheme = $parts['scheme'];
+        $host = $parts['host'];
+        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
+        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
+        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
+
+        $normalizedPath = '/' . ltrim($newPath, '/');
+        return "{$scheme}://{$host}{$port}{$normalizedPath}{$query}{$fragment}";
     }
 
     protected function mimeToExtension($mime)
