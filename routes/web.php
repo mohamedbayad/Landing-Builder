@@ -153,6 +153,9 @@ Route::middleware('auth')->group(function () {
 require __DIR__.'/auth.php';
 
 // Public Routes (Catch-all should be last if possible, but strict slug matching avoids issues)
+    Route::get('/template-asset-proxy', [App\Http\Controllers\TemplateController::class, 'proxyTemplateAsset'])
+        ->name('templates.asset-proxy');
+
     // Countdown Timer API
     Route::get('/l/{landing}/countdown', [App\Http\Controllers\CountdownController::class, 'show'])->name('landings.countdown');
 

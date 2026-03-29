@@ -19,6 +19,63 @@ use App\Services\LicenseService;
 
 class TemplateController extends Controller
 {
+    public function proxyTemplateAsset(Request $request)
+    {
+        $validated = $request->validate([
+            'u' => 'required|url',
+        ]);
+
+        $url = (string) $validated['u'];
+        $parsed = parse_url($url);
+        $host = strtolower((string) ($parsed['host'] ?? ''));
+        $path = (string) ($parsed['path'] ?? '');
+
+        if ($host === '' || $path === '') {
+            abort(404);
+        }
+
+        // Allow only expected licensing/template hosts (prevents open proxy abuse)
+        $allowedHosts = [];
+        $licensingBase = (string) env('LICENSING_SERVER_URL', '');
+        if ($licensingBase !== '') {
+            $licensingHost = parse_url($licensingBase, PHP_URL_HOST);
+            if ($licensingHost) {
+                $allowedHosts[] = strtolower((string) $licensingHost);
+            }
+        }
+
+        $extraAllowed = array_filter(array_map('trim', explode(',', (string) env('TEMPLATE_ASSET_PROXY_ALLOWED_HOSTS', ''))));
+        foreach ($extraAllowed as $h) {
+            $allowedHosts[] = strtolower($h);
+        }
+
+        $allowedHosts = array_values(array_unique($allowedHosts));
+
+        $hostAllowed = empty($allowedHosts) || in_array($host, $allowedHosts, true);
+        if (!$hostAllowed) {
+            abort(403);
+        }
+
+        if (!str_contains($path, '/storage/templates/')) {
+            abort(403);
+        }
+
+        $response = \Illuminate\Support\Facades\Http::timeout(30)
+            ->withOptions(['verify' => false])
+            ->get($url);
+
+        if (!$response->successful()) {
+            abort(404);
+        }
+
+        $contentType = $response->header('Content-Type') ?: 'application/octet-stream';
+
+        return response($response->body(), 200, [
+            'Content-Type' => $contentType,
+            'Cache-Control' => 'public, max-age=86400',
+        ]);
+    }
+
     public function index(Request $request, LicenseService $licenseService)
     {
         $remoteTemplates = collect($licenseService->getTemplates());
@@ -536,7 +593,7 @@ class TemplateController extends Controller
                     if ($localUrl) {
                         $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $localUrl . '"', $attrs);
                     } elseif (!empty($assetUrl)) {
-                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $assetUrl . '"', $attrs);
+                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $this->buildSameOriginFallbackUrl($assetUrl) . '"', $attrs);
                     }
                 }
                 $extractedScripts[] = "<script{$attrs}></script>";
@@ -623,7 +680,7 @@ class TemplateController extends Controller
                 return "url('{$localUrl}')";
             }
             if (!empty($assetUrl)) {
-                return "url('{$assetUrl}')";
+                return "url('" . $this->buildSameOriginFallbackUrl($assetUrl) . "')";
             }
             return $match[0];
         }, $css);
@@ -704,7 +761,7 @@ class TemplateController extends Controller
                  if ($newUrl) {
                      $link->setAttribute('href', $newUrl);
                  } elseif (!empty($assetUrl)) {
-                     $link->setAttribute('href', $assetUrl);
+                     $link->setAttribute('href', $this->buildSameOriginFallbackUrl($assetUrl));
                  }
             }
         }
@@ -718,7 +775,7 @@ class TemplateController extends Controller
                  if ($newUrl) {
                      $script->setAttribute('src', $newUrl);
                  } elseif (!empty($assetUrl)) {
-                     $script->setAttribute('src', $assetUrl);
+                     $script->setAttribute('src', $this->buildSameOriginFallbackUrl($assetUrl));
                  }
             }
         }
@@ -788,7 +845,7 @@ class TemplateController extends Controller
                             return $match[1] . $localUrl . $match[1];
                         }
                         if (!empty($assetUrl)) {
-                            return $match[1] . $assetUrl . $match[1];
+                            return $match[1] . $this->buildSameOriginFallbackUrl($assetUrl) . $match[1];
                         }
                         return $match[0];
                     }
@@ -955,5 +1012,21 @@ class TemplateController extends Controller
 
         $base = $contextUrl ?: ($assetBaseUrl ?? '');
         return $this->resolveUrl($base, $reference);
+    }
+
+    protected function buildSameOriginFallbackUrl(string $assetUrl): string
+    {
+        if (!preg_match('/^https?:\/\//i', $assetUrl)) {
+            return $assetUrl;
+        }
+
+        $assetHost = strtolower((string) (parse_url($assetUrl, PHP_URL_HOST) ?? ''));
+        $appHost = strtolower((string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?? ''));
+
+        if ($assetHost !== '' && $appHost !== '' && $assetHost === $appHost) {
+            return $assetUrl;
+        }
+
+        return url('/template-asset-proxy') . '?u=' . rawurlencode($assetUrl);
     }
 }
