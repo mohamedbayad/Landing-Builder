@@ -535,6 +535,8 @@ class TemplateController extends Controller
                     $localUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
                     if ($localUrl) {
                         $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $localUrl . '"', $attrs);
+                    } elseif (!empty($assetUrl)) {
+                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $assetUrl . '"', $attrs);
                     }
                 }
                 $extractedScripts[] = "<script{$attrs}></script>";
@@ -617,7 +619,13 @@ class TemplateController extends Controller
         return preg_replace_callback('/url\(["\']?(?!data:|https?:\/\/|\/\/)([^"\')\s]+)["\']?\)/i', function($match) use ($landing, $fullPath, $relativePathBase, $assetBaseUrl) {
             $assetUrl = $this->resolveAssetReference($match[1], $assetBaseUrl, $assetBaseUrl);
             $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing, false, $assetBaseUrl);
-            return $localUrl ? "url('{$localUrl}')" : $match[0];
+            if ($localUrl) {
+                return "url('{$localUrl}')";
+            }
+            if (!empty($assetUrl)) {
+                return "url('{$assetUrl}')";
+            }
+            return $match[0];
         }, $css);
     }
 
@@ -693,7 +701,11 @@ class TemplateController extends Controller
             if ($href && (preg_match('/^https?:\/\//', $href) || !empty($assetBaseUrl))) {
                  $assetUrl = $this->resolveAssetReference($href, $assetBaseUrl, $assetBaseUrl);
                  $newUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, true, $assetBaseUrl);
-                 if ($newUrl) $link->setAttribute('href', $newUrl);
+                 if ($newUrl) {
+                     $link->setAttribute('href', $newUrl);
+                 } elseif (!empty($assetUrl)) {
+                     $link->setAttribute('href', $assetUrl);
+                 }
             }
         }
 
@@ -703,7 +715,11 @@ class TemplateController extends Controller
             if ($src && (preg_match('/^https?:\/\//', $src) || !empty($assetBaseUrl))) {
                  $assetUrl = $this->resolveAssetReference($src, $assetBaseUrl, $assetBaseUrl);
                  $newUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                 if ($newUrl) $script->setAttribute('src', $newUrl);
+                 if ($newUrl) {
+                     $script->setAttribute('src', $newUrl);
+                 } elseif (!empty($assetUrl)) {
+                     $script->setAttribute('src', $assetUrl);
+                 }
             }
         }
 
@@ -768,7 +784,13 @@ class TemplateController extends Controller
                     
                     if ($sourceHost === $assetHost || !$assetHost || ($assetBaseUrl && parse_url($assetBaseUrl, PHP_URL_HOST) === $assetHost)) {
                         $localUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                        return $localUrl ? $match[1] . $localUrl . $match[1] : $match[0];
+                        if ($localUrl) {
+                            return $match[1] . $localUrl . $match[1];
+                        }
+                        if (!empty($assetUrl)) {
+                            return $match[1] . $assetUrl . $match[1];
+                        }
+                        return $match[0];
                     }
                     
                     return $match[0];
