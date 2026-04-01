@@ -96,9 +96,17 @@ Route::middleware('auth')->group(function () {
 
     Route::get('/landings/{landing}/pages/{page}/edit', [App\Http\Controllers\LandingPageController::class, 'edit'])->name('landings.pages.edit');
     Route::put('/landings/{landing}/pages/{page}', [App\Http\Controllers\LandingPageController::class, 'update'])->name('landings.pages.update');
+    Route::post('/landings/{landing}/pages/{page}/duplicate', [App\Http\Controllers\LandingPageController::class, 'duplicate'])->name('landings.pages.duplicate');
     Route::get('/landings/{landing}/editor', [App\Http\Controllers\LandingController::class, 'editor'])
         ->name('landings.editor')
         ->middleware('license.realtime'); 
+
+    // Editor AI Actions (used by GrapesJS ai-assistant plugin)
+    Route::prefix('editor/ai')->name('editor.ai.')->group(function () {
+        Route::post('/improve-copy', [App\Http\Controllers\EditorAIController::class, 'improveCopy'])->name('improve-copy');
+        Route::post('/generate-image', [App\Http\Controllers\EditorAIController::class, 'generateImage'])->name('generate-image');
+        Route::post('/suggest-section', [App\Http\Controllers\EditorAIController::class, 'suggestSection'])->name('suggest-section');
+    });
 
     // Additional editor-related routes if any, e.g. saving
     Route::post('/landings/{landing}/save', [App\Http\Controllers\LandingController::class, 'save'])
@@ -108,6 +116,8 @@ Route::middleware('auth')->group(function () {
     Route::post('/landings/{landing}/publish', [App\Http\Controllers\LandingController::class, 'publish'])
         ->name('landings.publish')
         ->middleware('license.realtime');
+    Route::post('/landings/{landing}/unpublish', [App\Http\Controllers\LandingController::class, 'unpublish'])
+        ->name('landings.unpublish');
     
     // Funnel Management
     Route::get('/landings/{landing}/funnel', [App\Http\Controllers\FunnelController::class, 'show'])->name('landings.funnel');

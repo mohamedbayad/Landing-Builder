@@ -24,6 +24,32 @@
 export default function canvasInteractionControlPlugin(editor, opts = {}) {
     let _observer = null;
 
+    function _normalizeClassHiddenState(el) {
+        if (!el || !el.classList) return;
+
+        // Keep GSAP sections untouched: their internal visibility/pinning
+        // is handled by editor-animation-safe-mode using data-gsap-section.
+        if (typeof el.closest === 'function' && el.closest('[data-gsap-section], #solution')) return;
+
+        // Tailwind/common utility classes that fully hide elements.
+        if (el.classList.contains('hidden')) el.classList.remove('hidden');
+        if (el.classList.contains('invisible')) el.classList.remove('invisible');
+        if (el.classList.contains('opacity-0')) el.classList.remove('opacity-0');
+
+        const classText = String(el.className || '');
+        const hasRevealLikeClass = /\breveal\b|fade|animate-|scroll|transition/i.test(classText);
+        const hasRevealAttr = el.hasAttribute('data-reveal') || el.hasAttribute('data-animate');
+
+        // Many templates keep content invisible until JS adds a class on scroll.
+        // In editor mode we force these blocks visible for direct editing.
+        if (hasRevealLikeClass || hasRevealAttr) {
+            el.style.setProperty('opacity', '1', 'important');
+            el.style.setProperty('visibility', 'visible', 'important');
+            el.style.setProperty('transform', 'none', 'important');
+            el.style.setProperty('filter', 'none', 'important');
+        }
+    }
+
     // ── A. FORCE-OPEN <details> ───────────────────────────────────────────────
 
     function _openAllDetails(body) {
@@ -41,8 +67,15 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
      */
     function _revealInlineHidden(root) {
         if (!root) return;
+
+        if (root.nodeType === 1) {
+            _normalizeClassHiddenState(root);
+        }
+
         const elements = (root.querySelectorAll ? root.querySelectorAll('*') : []);
         elements.forEach(el => {
+            _normalizeClassHiddenState(el);
+
             // Inline display:none
             if (el.style && el.style.display === 'none') {
                 el.style.removeProperty('display');
@@ -52,13 +85,6 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
                 el.removeAttribute('hidden');
             }
             // Inline height:0 with overflow:hidden (collapsed panels)
-            if (el.style && (el.style.height === '0' || el.style.height === '0px')) {
-                el.style.removeProperty('height');
-                el.style.removeProperty('max-height');
-                el.style.removeProperty('overflow');
-                el.style.opacity = '1';
-                el.style.visibility = 'visible';
-            }
             // Inline visibility:hidden
             if (el.style && el.style.visibility === 'hidden') {
                 el.style.removeProperty('visibility');
@@ -92,14 +118,12 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
                         if (target.style.opacity === '0') {
                             target.style.removeProperty('opacity');
                         }
-                        if (target.style.height === '0' || target.style.height === '0px') {
-                            target.style.removeProperty('height');
-                            target.style.removeProperty('max-height');
-                            target.style.removeProperty('overflow');
-                        }
                     }
                     if (attributeName === 'hidden') {
                         target.removeAttribute('hidden');
+                    }
+                    if (attributeName === 'class') {
+                        _normalizeClassHiddenState(target);
                     }
                 }
 
@@ -120,7 +144,7 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
             subtree: true,
             attributes: true,
             // Only watch style and hidden — minimises performance impact
-            attributeFilter: ['style', 'hidden']
+            attributeFilter: ['style', 'hidden', 'class']
         });
     }
 
@@ -150,22 +174,8 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
     }
 
     // ── C. LINK TRAITS FIX ────────────────────────────────────────────────────
-
-    function _ensureLinkTraits(component) {
-        if (!component) return;
-        const tagName = (component.get('tagName') || '').toLowerCase();
-        if (tagName !== 'a') return;
-        if (component.getTraits().some(t => t.getName() === 'href')) return;
-
-        component.addTrait([
-            { type: 'text', name: 'href', label: 'URL (Href)', placeholder: 'https://example.com' },
-            {
-                type: 'select', name: 'target', label: 'Open in',
-                options: [{ value: '_self', name: 'Same Tab' }, { value: '_blank', name: 'New Tab' }]
-            },
-            { type: 'text', name: 'title', label: 'Title (Tooltip)' }
-        ], { at: 0 });
-    }
+    // REMOVED: _ensureLinkTraits is now consolidated in custom-components.js
+    // (Section 2 — EXTEND NATIVE LINK COMPONENT). No duplicate injection here.
 
     // ── LIFECYCLE ─────────────────────────────────────────────────────────────
 
@@ -176,7 +186,7 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
         if (body) setTimeout(() => { _openAllDetails(body); _revealInlineHidden(body); }, 50);
     });
     editor.on('destroy', _stopObserver);
-    editor.on('component:selected', _ensureLinkTraits);
+    // Link trait injection handled by custom-components.js
 
     console.log('[GrapesJS] Canvas Interaction plugin v10 loaded.');
 }

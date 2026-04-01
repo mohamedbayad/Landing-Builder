@@ -187,6 +187,21 @@ class LandingController extends Controller
         return redirect()->back()->with('status', 'Landing published successfully!');
     }
 
+    public function unpublish(Landing $landing)
+    {
+        if ($landing->workspace->user_id != Auth::id()) {
+            abort(403);
+        }
+
+        $landing->update([
+            'status' => 'draft',
+            'published_at' => null,
+            'visibility' => 'private',
+        ]);
+
+        return redirect()->back()->with('status', 'Landing moved back to draft.');
+    }
+
     /**
      * Explicit conversion action. Templates are created only here.
      */

@@ -30,8 +30,29 @@ class TemplateController extends Controller
         $host = strtolower((string) ($parsed['host'] ?? ''));
         $path = (string) ($parsed['path'] ?? '');
 
+        // Determine correct content type early so we can fail gracefully without HTML
+        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
+        $fallbackType = match ($extension) {
+            'css' => 'text/css',
+            'js' => 'application/javascript',
+            'json' => 'application/json',
+            default => 'text/plain',
+        };
+
+        // Helper to fail safely (returns empty content or comment, preventing JS/CSS syntax errors)
+        $failSafe = function () use ($fallbackType) {
+            $body = str_contains($fallbackType, 'css') || str_contains($fallbackType, 'javascript') 
+                ? '/* Asset Proxy Failed or Forbidden */' 
+                : '';
+                
+            return response($body, 200, [
+                'Content-Type' => $fallbackType,
+                'Cache-Control' => 'no-cache, no-store, must-revalidate',
+            ]);
+        };
+
         if ($host === '' || $path === '') {
-            abort(404);
+            return $failSafe();
         }
 
         // Allow only expected licensing/template hosts (prevents open proxy abuse)
@@ -52,28 +73,28 @@ class TemplateController extends Controller
         $allowedHosts = array_values(array_unique($allowedHosts));
 
         $hostAllowed = empty($allowedHosts) || in_array($host, $allowedHosts, true);
-        if (!$hostAllowed) {
-            abort(403);
+        if (!$hostAllowed || !str_contains($path, '/storage/templates/')) {
+            return $failSafe();
         }
 
-        if (!str_contains($path, '/storage/templates/')) {
-            abort(403);
+        try {
+            $response = \Illuminate\Support\Facades\Http::timeout(10)
+                ->withOptions(['verify' => false])
+                ->get($url);
+
+            if (!$response->successful()) {
+                return $failSafe();
+            }
+
+            $contentType = $response->header('Content-Type') ?: $fallbackType;
+
+            return response($response->body(), 200, [
+                'Content-Type' => $contentType,
+                'Cache-Control' => 'public, max-age=86400',
+            ]);
+        } catch (\Exception $e) {
+            return $failSafe();
         }
-
-        $response = \Illuminate\Support\Facades\Http::timeout(30)
-            ->withOptions(['verify' => false])
-            ->get($url);
-
-        if (!$response->successful()) {
-            abort(404);
-        }
-
-        $contentType = $response->header('Content-Type') ?: 'application/octet-stream';
-
-        return response($response->body(), 200, [
-            'Content-Type' => $contentType,
-            'Cache-Control' => 'public, max-age=86400',
-        ]);
     }
 
     public function index(Request $request, LicenseService $licenseService)
@@ -223,8 +244,8 @@ class TemplateController extends Controller
         $baseStoragePath = "landings/{$landing->uuid}/assets";
         File::ensureDirectoryExists($fullStoragePath);
 
-        $processed = $this->processRemoteAssets($template->structure['html'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-        $css = $this->processRemoteCss($template->structure['css'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
+        $processed = $this->processRemoteAssets($structure['html'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
+        $css = $this->processRemoteCss($structure['css'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
         $html = $processed['html'];
         $extractedJs = $processed['body_scripts'] ?? '';
 
@@ -234,7 +255,10 @@ class TemplateController extends Controller
         }
 
         // Process Head Assets (CSS/JS from custom_head)
-        $customHead = $structure['custom_head'] ?? '';
+        $customHead = trim((string) ($structure['custom_head'] ?? ''));
+        if (!empty($processed['head_assets'])) {
+            $customHead = trim($customHead . "\n" . $processed['head_assets']);
+        }
         if (!empty($customHead)) {
             $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
             
@@ -448,7 +472,10 @@ class TemplateController extends Controller
             $js = trim($js . "\n" . $extractedJs);
         }
 
-        $customHead = $structure['custom_head'] ?? '';
+        $customHead = trim((string) ($structure['custom_head'] ?? ''));
+        if (!empty($processed['head_assets'])) {
+            $customHead = trim($customHead . "\n" . $processed['head_assets']);
+        }
         if (!empty($customHead)) {
             $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
             $landing->settings()->updateOrCreate([], ['custom_head_scripts' => $processedHead]);
@@ -657,12 +684,30 @@ class TemplateController extends Controller
             }
         }
 
+        // Extract stylesheet/style tags from mixed HTML payloads and return them
+        // separately so editor components remain body-only and render reliably.
+        $extractedHeadAssets = [];
+        $xpath = new \DOMXPath($dom);
+        $headLikeNodes = $xpath->query(
+            '//link[translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="stylesheet"'
+            . ' or translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="preload"]'
+            . ' | //style'
+        );
+
+        foreach (iterator_to_array($headLikeNodes) as $headNode) {
+            $extractedHeadAssets[] = $dom->saveHTML($headNode);
+            if ($headNode->parentNode) {
+                $headNode->parentNode->removeChild($headNode);
+            }
+        }
+
         $processedHtml = $dom->saveHTML();
-        $processedHtml = preg_replace('/^<\?xml[^>]*\?>/', '', $processedHtml);
+        $processedHtml = preg_replace('/^\s*<\?xml[^>]*\??>/i', '', $processedHtml);
 
         return [
             'html' => trim($processedHtml),
             'body_scripts' => implode("\n", $extractedScripts),
+            'head_assets' => trim(implode("\n", array_filter(array_map('trim', $extractedHeadAssets)))),
         ];
     }
 

@@ -4,7 +4,7 @@ import 'iconify-icon';
 import 'grapesjs/dist/css/grapes.min.css';
 import grapesjsTailwind from 'grapesjs-tailwind';
 import grapesjsPresetWebpage from 'grapesjs-preset-webpage';
-import grapesjsPluginForms from 'grapesjs-plugin-forms';
+// grapesjs-plugin-forms removed Ã¢â‚¬â€ editorOverrides.js defines all form component types
 import SpacingTool from './grapesjs/plugins/spacing-tool';
 import editorOverrides from './editor-overrides';
 import landingParserPlugin from './grapesjs/landing-parser-plugin';
@@ -12,6 +12,14 @@ import countdownPlugin from './grapesjs/countdown-plugin';
 import SidebarContentEditing from './grapesjs/plugins/sidebar-content-editing';
 import CanvasInteractionControl from './grapesjs/plugins/canvas-interaction-control';
 import CustomComponents from './grapesjs/plugins/custom-components';
+import keyboardShortcutsPlugin from './grapesjs/plugins/keyboard-shortcuts';
+import contextMenuPlugin from './grapesjs/plugins/context-menu';
+import conversionBlocksPlugin from './grapesjs/plugins/conversion-blocks';
+import aiAssistantPlugin from './grapesjs/plugins/ai-assistant';
+import exitIntentPlugin from './grapesjs/plugins/exit-intent';
+import deviceVisibilityPlugin from './grapesjs/plugins/device-visibility';
+import advancedEditingControlsPlugin from './grapesjs/plugins/advanced-editing-controls';
+import editorAnimationSafeModePlugin from './grapesjs/plugins/editor-animation-safe-mode';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -58,10 +66,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // Define where standard panels go
         blockManager: {
-            appendTo: '#panel-blocks',
+            appendTo: '#blocks-container',
         },
         layerManager: {
-            appendTo: '#panel-layers',
+            appendTo: '#layers-container',
         },
         traitManager: {
             appendTo: '#panel-traits',
@@ -69,50 +77,84 @@ document.addEventListener('DOMContentLoaded', () => {
         styleManager: {
             appendTo: '#panel-styles',
             sectors: [{
-                name: 'General',
+                name: 'Layout',
                 open: false,
-                buildProps: ['float', 'display']
+                buildProps: ['display', 'float', 'overflow'],
+                properties: [
+                    { name: 'Display', property: 'display', type: 'select', defaults: 'block',
+                      list: [{value:'block',name:'Block'},{value:'inline-block',name:'Inline Block'},{value:'inline',name:'Inline'},{value:'flex',name:'Flex'},{value:'grid',name:'Grid'},{value:'none',name:'None'},{value:'inline-flex',name:'Inline Flex'}] },
+                    { name: 'Overflow', property: 'overflow', type: 'select', defaults: 'visible',
+                      list: [{value:'visible',name:'Visible'},{value:'hidden',name:'Hidden'},{value:'auto',name:'Auto'},{value:'scroll',name:'Scroll'}] },
+                ]
             }, {
-                name: 'Positioning & Layering',
+                name: 'Flexbox',
+                open: false,
+                buildProps: ['flex-direction', 'flex-wrap', 'justify-content', 'align-items', 'gap', 'align-self', 'flex-grow', 'flex-shrink'],
+                properties: [
+                    { name: 'Direction', property: 'flex-direction', type: 'select', defaults: 'row',
+                      list: [{value:'row',name:'Row'},{value:'row-reverse',name:'Row Reverse'},{value:'column',name:'Column'},{value:'column-reverse',name:'Column Reverse'}] },
+                    { name: 'Wrap', property: 'flex-wrap', type: 'select', defaults: 'nowrap',
+                      list: [{value:'nowrap',name:'No Wrap'},{value:'wrap',name:'Wrap'},{value:'wrap-reverse',name:'Wrap Reverse'}] },
+                    { name: 'Justify', property: 'justify-content', type: 'select', defaults: 'flex-start',
+                      list: [{value:'flex-start',name:'Start'},{value:'flex-end',name:'End'},{value:'center',name:'Center'},{value:'space-between',name:'Space Between'},{value:'space-around',name:'Space Around'},{value:'space-evenly',name:'Space Evenly'}] },
+                    { name: 'Align Items', property: 'align-items', type: 'select', defaults: 'stretch',
+                      list: [{value:'stretch',name:'Stretch'},{value:'flex-start',name:'Start'},{value:'flex-end',name:'End'},{value:'center',name:'Center'},{value:'baseline',name:'Baseline'}] },
+                    { name: 'Gap', property: 'gap', type: 'text', defaults: '0' },
+                    { name: 'Align Self', property: 'align-self', type: 'select', defaults: 'auto',
+                      list: [{value:'auto',name:'Auto'},{value:'stretch',name:'Stretch'},{value:'flex-start',name:'Start'},{value:'flex-end',name:'End'},{value:'center',name:'Center'}] },
+                ]
+            }, {
+                name: 'Position',
                 open: false,
                 buildProps: ['position', 'z-index', 'top', 'right', 'bottom', 'left'],
                 properties: [
-                    {
-                        name: 'Position',
-                        property: 'position',
-                        type: 'select',
-                        defaults: 'static',
-                        list: [
-                            { value: 'static', name: 'Static' },
-                            { value: 'relative', name: 'Relative' },
-                            { value: 'absolute', name: 'Absolute' },
-                            { value: 'fixed', name: 'Fixed' },
-                            { value: 'sticky', name: 'Sticky' },
-                        ],
-                    },
-                    {
-                        name: 'Z-Index (Layer)',
-                        property: 'z-index',
-                        type: 'integer',
-                        defaults: 0,
-                    }
+                    { name: 'Position', property: 'position', type: 'select', defaults: 'static',
+                      list: [{value:'static',name:'Static'},{value:'relative',name:'Relative'},{value:'absolute',name:'Absolute'},{value:'fixed',name:'Fixed'},{value:'sticky',name:'Sticky'}] },
+                    { name: 'Z-Index', property: 'z-index', type: 'integer', defaults: 0 }
                 ]
             }, {
                 name: 'Dimension',
                 open: false,
-                buildProps: ['width', 'height', 'max-width', 'min-height', 'margin', 'padding']
+                buildProps: ['width', 'height', 'max-width', 'min-width', 'max-height', 'min-height', 'margin', 'padding'],
+                properties: [
+                    { name: 'Aspect Ratio', property: 'aspect-ratio', type: 'text', defaults: 'auto' }
+                ]
             }, {
                 name: 'Typography',
                 open: false,
-                buildProps: ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color', 'line-height', 'text-align', 'text-decoration', 'text-shadow']
+                buildProps: ['font-family', 'font-size', 'font-weight', 'letter-spacing', 'color', 'line-height', 'text-align', 'text-decoration', 'text-shadow'],
+                properties: [
+                    { name: 'Text Transform', property: 'text-transform', type: 'select', defaults: 'none',
+                      list: [{value:'none',name:'None'},{value:'uppercase',name:'UPPERCASE'},{value:'lowercase',name:'lowercase'},{value:'capitalize',name:'Capitalize'}] },
+                    { name: 'White Space', property: 'white-space', type: 'select', defaults: 'normal',
+                      list: [{value:'normal',name:'Normal'},{value:'nowrap',name:'No Wrap'},{value:'pre',name:'Pre'},{value:'pre-wrap',name:'Pre Wrap'}] },
+                ]
             }, {
-                name: 'Decorations',
+                name: 'Background',
                 open: false,
-                buildProps: ['background-color', 'border', 'border-radius', 'box-shadow']
+                buildProps: ['background-color', 'background-image', 'background-repeat', 'background-position', 'background-size'],
+                properties: [
+                    { name: 'Bg Size', property: 'background-size', type: 'select', defaults: 'auto',
+                      list: [{value:'auto',name:'Auto'},{value:'cover',name:'Cover'},{value:'contain',name:'Contain'}] },
+                    { name: 'Bg Position', property: 'background-position', type: 'select', defaults: 'center center',
+                      list: [{value:'center center',name:'Center'},{value:'top center',name:'Top'},{value:'bottom center',name:'Bottom'},{value:'left center',name:'Left'},{value:'right center',name:'Right'}] },
+                    { name: 'Bg Repeat', property: 'background-repeat', type: 'select', defaults: 'repeat',
+                      list: [{value:'repeat',name:'Repeat'},{value:'no-repeat',name:'No Repeat'},{value:'repeat-x',name:'Repeat X'},{value:'repeat-y',name:'Repeat Y'}] },
+                ]
             }, {
-                name: 'Extra',
+                name: 'Borders & Shadows',
                 open: false,
-                buildProps: ['opacity', 'cursor', 'transition', 'perspective', 'transform']
+                buildProps: ['border', 'border-radius', 'box-shadow', 'outline']
+            }, {
+                name: 'Effects',
+                open: false,
+                buildProps: ['opacity', 'cursor', 'transition', 'transform'],
+                properties: [
+                    { name: 'Filter', property: 'filter', type: 'text', defaults: 'none' },
+                    { name: 'Backdrop Filter', property: 'backdrop-filter', type: 'text', defaults: 'none' },
+                    { name: 'Mix Blend', property: 'mix-blend-mode', type: 'select', defaults: 'normal',
+                      list: [{value:'normal',name:'Normal'},{value:'multiply',name:'Multiply'},{value:'screen',name:'Screen'},{value:'overlay',name:'Overlay'},{value:'darken',name:'Darken'},{value:'lighten',name:'Lighten'}] },
+                ]
             }],
         },
         // Disable default panels
@@ -129,8 +171,9 @@ document.addEventListener('DOMContentLoaded', () => {
         },
         plugins: [
             grapesjsTailwind,
+            // grapesjsPluginForms removed Ã¢â‚¬â€ editorOverrides handles form/input/button/textarea
             grapesjsPresetWebpage,
-            grapesjsPluginForms,
+
             SpacingTool,
             editorOverrides,
             landingParserPlugin,
@@ -138,6 +181,14 @@ document.addEventListener('DOMContentLoaded', () => {
             SidebarContentEditing,
             CustomComponents,
             CanvasInteractionControl,
+            keyboardShortcutsPlugin,
+            contextMenuPlugin,
+            conversionBlocksPlugin,
+            aiAssistantPlugin,
+            exitIntentPlugin,
+            deviceVisibilityPlugin,
+            advancedEditingControlsPlugin,
+            editorAnimationSafeModePlugin,
             (editor, opts) => {
                 console.log('--- GRAPESJS-ICONS PLUGIN INITIALIZATION ---(INTERCEPTED)');
                 console.log('Received options:', opts);
@@ -161,9 +212,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 formsOpts: false,
                 blocksBasicOpts: { flexGrid: true },
             },
-            [grapesjsPluginForms]: {
-                // Add any specific options here if needed, for now default is fine
-            },
             [SpacingTool]: {
                 panelId: 'panel-options', // Assuming this is where we want it, or maybe a dedicated toolbar
                 // Note: panel-options might be hidden by our custom logic. 
@@ -183,8 +231,11 @@ document.addEventListener('DOMContentLoaded', () => {
             [SidebarContentEditing]: {},
             [CustomComponents]: {},
             [CanvasInteractionControl]: {},
+            [editorAnimationSafeModePlugin]: {},
         }
     });
+
+    const hiddenCss = document.getElementById('gjs-css');
 
     // Load initial content
     // FIX: Check if JSON is actually valid and has pages/styles, otherwise fall back to HTML
@@ -192,7 +243,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const projectData = window.editorData.grapesJsJson;
 
     // Check if we have meaningful project data (at least 1 page with components, or styles)
-    const hasProjectData = projectData &&
+    const hasProjectData = !window.editorData.forceHtmlMode && projectData &&
         (projectData.pages?.length > 0 || Object.keys(projectData).length > 2);
 
     if (hasProjectData) {
@@ -202,14 +253,25 @@ document.addEventListener('DOMContentLoaded', () => {
         editor.setComponents(hiddenContainer.innerHTML);
 
         // Fallback to CSS
-        const hiddenCss = document.getElementById('gjs-css');
         if (hiddenCss && hiddenCss.innerHTML.trim().length > 0) {
             editor.setStyle(hiddenCss.innerHTML);
         }
     }
 
+    // Safety net: if project JSON exists but contains no styles, use saved CSS.
+    const applyCssFallback = () => {
+        if (!hiddenCss || hiddenCss.innerHTML.trim().length === 0) return;
+        const currentCss = (editor.getCss() || '').trim();
+        if (!currentCss) {
+            editor.setStyle(hiddenCss.innerHTML);
+            console.log('[GrapesJS] Applied CSS fallback from #gjs-css');
+        }
+    };
+
     // --- LOGIC: Clean up Default UI (Post-Init) ---
     editor.on('load', () => {
+        applyCssFallback();
+
         // Force remove right sidebar panels if they exist
         const panelsToRemove = ['views', 'views-container', 'options', 'open-tm', 'open-layers', 'open-sm', 'open-blocks'];
         panelsToRemove.forEach(id => {
@@ -221,108 +283,168 @@ document.addEventListener('DOMContentLoaded', () => {
         // Force resize
         editor.trigger('change:canvasOffset');
 
-        // INJECT CUSTOM HEAD (Template Styles)
-        if (window.editorData.customHead) {
-            const canvasDoc = editor.Canvas.getDocument();
-            const canvasHead = canvasDoc.head;
-            
-            // Inject CSP Meta tag to allow remote folder-based importmaps/scripts
-            // This is needed because some templates use CDNs (unpkg, cdnjs) that we can't easily flatten.
-            const cspMeta = canvasDoc.createElement('meta');
-            cspMeta.setAttribute('http-equiv', 'Content-Security-Policy');
-            cspMeta.setAttribute('content', "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://unpkg.com https://cdnjs.cloudflare.com https://cdn.jsdelivr.net;");
-            canvasHead.appendChild(cspMeta);
+        const runInjectedTemplateScripts = async (scripts, targetParent) => {
+            const frameDoc = editor.Canvas.getDocument();
+            const scriptList = Array.isArray(scripts)
+                ? scripts
+                : (scripts ? Array.from(scripts) : []);
 
-            canvasHead.insertAdjacentHTML('beforeend', window.editorData.customHead);
-            console.log('Injected custom head scripts/styles into canvas with CSP');
-        }
-
-        // INJECT BODY SCRIPTS (Template JS - animations, interactions, etc.)
-        const jsContainer = document.getElementById('gjs-js');
-        if (jsContainer && jsContainer.textContent.trim().length > 0) {
-            const canvasDoc = editor.Canvas.getDocument();
-            const canvasBody = canvasDoc.body;
-            // Content was HTML-escaped via e() in blade, decode it
-            const rawJs = jsContainer.textContent;
-            
-            // Parse script tags from the decoded content
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = rawJs;
-            const scriptTags = tempDiv.querySelectorAll('script');
-            
-            if (scriptTags.length > 0) {
-                scriptTags.forEach(origScript => {
-                    const newScript = canvasDoc.createElement('script');
-                    // Copy all attributes (src, type, defer, etc.)
-                    Array.from(origScript.attributes).forEach(attr => {
-                        newScript.setAttribute(attr.name, attr.value);
-                    });
-                    // Copy inline content if any
-                    if (origScript.textContent) {
-                        newScript.textContent = origScript.textContent;
-                    }
-                    canvasBody.appendChild(newScript);
-                });
-                console.log('Injected', scriptTags.length, 'body scripts into canvas');
+            if (scriptList.length === 0) {
+                return;
             }
-        }
 
-        // ── EDITOR CANVAS REVEAL CSS ───────────────────────────────────────────
-        // Force all hidden/collapsed elements to be permanently visible inside
-        // the GrapesJS editor canvas so you can click and edit them directly.
-        // This style tag ONLY lives in the canvas iframe — it has ZERO effect
-        // on the published/live page.
-        //
-        // HOW TO USE:
-        //   Add the CSS class names of your hidden elements to the selector
-        //   list below. Inspect your template in DevTools and look for the
-        //   classes that control visibility (display:none, height:0, etc.).
-        //
-        // ─────────────────────────────────────────────────────────────────────
-        // EXAMPLE selectors — replace / extend with your real class names:
-        //   .accordion-body      → Bootstrap accordion panels
-        //   .collapse            → Bootstrap collapse targets
-        //   .panel-content       → custom panel content
-        //   .card-details        → toggle-card hidden details
-        //   .toggle-body         → custom toggle body
-        //   [data-toggle-target] → data-attribute hidden targets
-        // ─────────────────────────────────────────────────────────────────────
-        (function injectEditorRevealCSS() {
-            const canvasHead = editor.Canvas.getDocument().head;
-            const style = document.createElement('style');
-            style.id = 'gjs-editor-reveal-hidden';
+            for (const origScript of scriptList) {
+                if (!origScript || typeof origScript.getAttribute !== 'function') {
+                    continue;
+                }
+
+                const script = frameDoc.createElement('script');
+                const attrs = origScript.attributes ? Array.from(origScript.attributes) : [];
+                attrs.forEach(attr => {
+                    script.setAttribute(attr.name, attr.value);
+                });
+
+                if (origScript.textContent) {
+                    script.textContent = origScript.textContent;
+                }
+
+                const type = (script.getAttribute('type') || '').toLowerCase();
+                const src = script.getAttribute('src') || '';
+
+                // Editor-safe mode for remote templates: skip heavy module scripts
+                // (ThreeJS/ScrollTrigger scenes) that can hide/pin full sections in iframe.
+                if (window.editorData.disableModuleScripts && type === 'module') {
+                    console.log('[GrapesJS] Skipped module script in editor:', src || '[inline module]');
+                    continue;
+                }
+
+                const parent = type === 'importmap' ? frameDoc.head : targetParent;
+
+                await new Promise(resolve => {
+                    script.onload = () => resolve();
+                    script.onerror = () => resolve();
+                    parent.appendChild(script);
+
+                    // Inline scripts (and importmaps) do not fire onload consistently.
+                    if (!script.src || type === 'importmap') {
+                        resolve();
+                    }
+                });
+            }
+        };
+
+        const canvasDoc = editor.Canvas.getDocument();
+        const canvasHead = canvasDoc.head;
+        const canvasBody = canvasDoc.body;
+
+        const injectEditorSolutionFallbackCss = () => {
+            if (canvasDoc.getElementById('editor-solution-fallback-css')) {
+                return;
+            }
+
+            const gsapSectionSelector = '[data-gsap-section], #solution';
+            const gsapItemSelector = '[data-gsap-item], .slide-solution';
+            const style = canvasDoc.createElement('style');
+            style.id = 'editor-solution-fallback-css';
             style.textContent = `
-                /*
-                 * ============================================================
-                 * GrapesJS Editor-Only: Force-Reveal <details>/<summary> FAQs
-                 * ============================================================
-                 * Targets native HTML <details> accordions. The browser hides
-                 * all children except <summary> unless the 'open' attribute is
-                 * present. This rule forces them permanently visible inside the
-                 * editor so every panel is editable without clicking to open it.
-                 */
-
-                /* Force every <details> to show its content in the editor */
-                details > *:not(summary) {
-                    display: block !important;
-                    visibility: visible !important;
+                :is(${gsapSectionSelector}) {
+                    position: relative !important;
+                    min-height: 100vh !important;
                     height: auto !important;
                     max-height: none !important;
                     overflow: visible !important;
-                    opacity: 1 !important;
-                    transition: none !important;
-                    animation: none !important;
+                }
+                :is(${gsapSectionSelector}) .ui-layer {
+                    position: relative !important;
+                    inset: auto !important;
+                    height: auto !important;
+                    max-height: none !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    justify-content: flex-start !important;
+                    gap: 16px !important;
                     pointer-events: auto !important;
                 }
-
-                /* Also prevent the summary triangle/marker from hiding content */
-                details {
-                    overflow: visible !important;
+                :is(${gsapSectionSelector}) .ui-layer > div[class*="max-w-2xl"] {
+                    position: relative !important;
+                    height: auto !important;
+                    min-height: 0 !important;
+                }
+                :is(${gsapSectionSelector}) :is(${gsapItemSelector}) {
+                    position: relative !important;
+                    inset: auto !important;
+                    display: flex !important;
+                    opacity: 1 !important;
+                    visibility: visible !important;
+                    transform: none !important;
+                    filter: none !important;
+                    pointer-events: auto !important;
+                }
+                :is(${gsapSectionSelector}) :is(${gsapItemSelector}) + :is(${gsapItemSelector}) {
+                    margin-top: 16px !important;
                 }
             `;
             canvasHead.appendChild(style);
-            console.log('[GrapesJS] Editor Reveal CSS injected into canvas.');
-        })();
+        };
+
+        // INJECT CUSTOM HEAD (Template styles/links). Script tags are extracted
+        // and executed via DOM APIs (insertAdjacentHTML does not execute scripts).
+        let templateHeadScripts = [];
+        if (window.editorData.customHead) {
+            // Inject CSP Meta tag to allow remote folder-based importmaps/scripts.
+            const cspMeta = canvasDoc.createElement('meta');
+            cspMeta.setAttribute('http-equiv', 'Content-Security-Policy');
+            cspMeta.setAttribute('content', "default-src 'self' data: blob: https: http:; script-src 'self' 'unsafe-inline' 'unsafe-eval' data: blob: https: http:; style-src 'self' 'unsafe-inline' https: http:; img-src 'self' data: blob: https: http:; font-src 'self' data: https: http:; connect-src 'self' https: http: ws: wss:;");
+            canvasHead.appendChild(cspMeta);
+
+            const tempHead = document.createElement('div');
+            tempHead.innerHTML = window.editorData.customHead;
+            templateHeadScripts = Array.from(tempHead.querySelectorAll('script'));
+            templateHeadScripts.forEach(node => node.remove());
+
+            canvasHead.insertAdjacentHTML('beforeend', tempHead.innerHTML);
+            console.log('Injected custom head styles into canvas with CSP');
+        }
+
+        // INJECT BODY/EXTRACTED SCRIPTS (Template JS - animations, interactions, etc.)
+        const jsContainer = document.getElementById('gjs-js');
+        let bodyScripts = [];
+
+        if (jsContainer && jsContainer.textContent.trim().length > 0) {
+            // Content was HTML-escaped via e() in blade, decode it
+            const rawJs = jsContainer.textContent;
+
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = rawJs;
+            bodyScripts = Array.from(tempDiv.querySelectorAll('script'));
+
+            // Backward compatibility: if JS was saved as raw code (without <script> wrappers)
+            if (bodyScripts.length === 0 && rawJs.trim().length > 0) {
+                const fallbackScript = document.createElement('script');
+                fallbackScript.textContent = rawJs;
+                bodyScripts = [fallbackScript];
+            }
+        }
+
+        
+        runInjectedTemplateScripts(templateHeadScripts, canvasHead)
+            .then(() => runInjectedTemplateScripts(bodyScripts, canvasBody))
+            .then(() => {
+            // Many imported templates register logic on DOMContentLoaded.
+            // Scripts are injected after frame load, so fire synthetic events.
+            injectEditorSolutionFallbackCss();
+            canvasDoc.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }));
+            canvasDoc.defaultView?.dispatchEvent(new Event('load'));
+
+            // Fallback: force-reveal blocks that depend on JS-added .active class.
+            canvasDoc.querySelectorAll('.reveal').forEach(el => el.classList.add('active'));
+const totalScripts = templateHeadScripts.length + bodyScripts.length;
+            if (totalScripts > 0) {
+                console.log('Injected', totalScripts, 'scripts into canvas');
+            }
+        });
+        // NOTE: Editor reveal CSS is now consolidated in custom-components.js plugin
+        // (Section 3 Ã¢â‚¬â€ EDITOR-ONLY REVEAL CSS). No duplicate injection here.
 
         // FORCE IMAGE DOUBLE-CLICK -> OPEN ASSETS
         const body = editor.Canvas.getBody();
@@ -360,24 +482,17 @@ document.addEventListener('DOMContentLoaded', () => {
         }, 1000);
     });
 
-    editor.on('load', () => {
-        // Load Assets
-        const loadAssets = async () => {
-            try {
-                const response = await fetch(`/landings/${window.editorData.landingId}/media`);
-                const assets = await response.json();
-                editor.AssetManager.add(assets);
-            } catch (error) {
-                console.error('Failed to load assets', error);
-            }
-        };
-        loadAssets();
-
-        // Remove default panels if they were added by presets
-        const panels = editor.Panels;
-        ['views-container', 'options', 'defaults'].forEach(id => {
-            if (panels.getPanel(id)) panels.removePanel(id);
-        });
+    // Asset loading merged into the main 'load' handler above.
+    // Panel cleanup is also handled in the main 'load' handler (L227-232).
+    editor.on('load', async () => {
+        // Load media assets from server
+        try {
+            const response = await fetch(`/landings/${window.editorData.landingId}/media`);
+            const assets = await response.json();
+            editor.AssetManager.add(assets);
+        } catch (error) {
+            console.error('Failed to load assets', error);
+        }
     });
 
     // --- LOGIC: Sidebar Switching & Search ---
@@ -621,9 +736,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnSave = document.getElementById('btn-save');
     if (btnSave) {
+        
+        
+        
+        
         btnSave.addEventListener('click', async () => {
-            const components = editor.getComponents();
-            const html = editor.getHtml();
+            const htmlRaw = editor.getHtml();
+            const html = editor.runCommand('animation-safe:prepare-html-export', { html: htmlRaw }) || htmlRaw;
             const css = editor.getCss();
             const json = editor.getProjectData();
 
@@ -638,10 +757,13 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Content-Type': 'application/json',
                         'X-CSRF-TOKEN': window.editorData.csrfToken
                     },
+                    // Keep extracted/body scripts persistent across editor saves.
+                    // Scripts are injected from #gjs-js and are not edited by GrapesJS.
                     body: JSON.stringify({
                         grapesjs_json: JSON.stringify(json),
                         html: html,
-                        css: css
+                        css: css,
+                        js: document.getElementById('gjs-js')?.textContent || ''
                     })
                 });
 
@@ -660,6 +782,44 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    
+    // Auto-switch Sidebar on Element Selection
+    editor.on('component:selected', (model) => {
+        const editTab = document.querySelector('#rail-tab-edit');
+        if (editTab && !editTab.classList.contains('active')) {
+            editTab.click();
+        }
+        
+        const nameEl = document.getElementById('selected-element-name');
+        const breadEl = document.getElementById('selected-element-breadcrumbs');
+        
+        if (nameEl && model) {
+            nameEl.textContent = model.getName() || model.get('type') || 'Element';
+            
+            const parents = [];
+            let current = model.parent();
+            while(current && current.get('type') !== 'wrapper') {
+                parents.unshift(current.getName() || current.get('type'));
+                current = current.parent();
+            }
+            if (parents.length === 0) parents.push('Body');
+            
+            if (breadEl) {
+                breadEl.innerHTML = '<span>' + parents[0] + '</span>';
+                if (parents.length > 1) {
+                    breadEl.innerHTML += '<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin: 0 4px; display: inline-block"><polyline points="9 18 15 12 9 6"></polyline></svg><span>...</span>';
+                }
+            }
+        }
+    });
+
+    editor.on('component:deselected', () => {
+        const nameEl = document.getElementById('selected-element-name');
+        if (nameEl) nameEl.textContent = 'Select an element';
+        const breadEl = document.getElementById('selected-element-breadcrumbs');
+        if (breadEl) breadEl.innerHTML = '<span>Body</span>';
+    });
 
     // Ensure render
     setTimeout(() => {

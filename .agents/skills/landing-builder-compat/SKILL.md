@@ -43,8 +43,8 @@ Do NOT include — these are auto-loaded:
 
 | Feature | Detail |
 |---|---|
-| **Tailwind CSS** | Via `/js/tailwind.js` |
-| **Alpine.js** | Via Vite (`app.js`) |
+| **Tailwind CSS** | Via CDN CSS link (no runtime compiler) |
+| **Alpine.js** | Conditionally loaded (cart feature) |
 | **CSRF Token** | `<meta name="csrf-token">` |
 | **Analytics** | `/js/analytics.js` — auto-tracks clicks, scroll, heartbeat |
 | **Countdown** | `/js/countdown.js` |
@@ -160,3 +160,118 @@ Use semantic sections with `id` and `data-section` attributes. Clean, semantic H
 - **Do NOT** link images with external URLs — download and store locally
 - **ALWAYS** put all JavaScript in the `js` field, not inline
 - **ALWAYS** put external scripts/fonts in `custom_head`
+
+---
+
+## Editor-Aware HTML Rules
+
+The LandingBuilder editor includes advanced editing controls: **Tag Changer**, **Attributes Manager**, **Class Manager**, **Flexbox/Grid controls**, and **Semantic/SEO panel**. Generated HTML MUST be compatible with these controls.
+
+### Semantic Tag Flexibility
+
+Generated HTML must support future tag conversion by the user:
+- `div` ↔ `section` / `article` / `aside` / `header` / `footer` / `nav`
+- `p` ↔ `h1` / `h2` / `h3` / `h4` / `h5` / `h6` / `blockquote`
+- `a` ↔ `button`
+- `ul` ↔ `ol`
+
+**Rules:**
+1. Keep editable text content in **leaf elements** — not deeply nested inside multiple wrappers
+2. Use clean, semantic tags — avoid `<div>` when `<section>`, `<article>`, or `<header>` is more appropriate
+3. Avoid unnecessary wrapper divs — each structural layer must serve a purpose (container, flex parent, padding box)
+4. **Max 3 nesting levels** between a section root and editable text content
+5. Use proper heading hierarchy: one `<h1>` per page, then `<h2>`, `<h3>`, etc.
+
+**Good:**
+```html
+<section id="hero" data-section="hero" class="py-20 bg-gray-900">
+  <div class="container mx-auto px-4 text-center">
+    <h1 class="text-5xl font-bold text-white">Main Headline</h1>
+    <p class="mt-4 text-xl text-gray-300">Supporting description text</p>
+    <a href="#offer" class="cta mt-8 inline-block px-8 py-4 bg-indigo-600 text-white rounded-lg" data-track="cta_hero">Order Now</a>
+  </div>
+</section>
+```
+
+**Bad (over-nested, non-semantic, hard to edit):**
+```html
+<div>
+  <div>
+    <div>
+      <div>
+        <div><span><b>Headline</b></span></div>
+      </div>
+    </div>
+  </div>
+</div>
+```
+
+### Attribute Compatibility
+
+Generated HTML must include meaningful attributes that the editor can display and modify:
+
+| Attribute | Usage | Required |
+|-----------|-------|----------|
+| `id` | Unique per section. Use descriptive names: `hero`, `features`, `pricing` | ✅ on sections |
+| `data-section` | Analytics section tracking. Matches section `id` | ✅ on sections |
+| `data-track` | CTA click tracking. Format: `cta_{section}_{action}` | ✅ on CTAs |
+| `class` | Tailwind utility classes. Keep organized and readable | ✅ always |
+| `href` | On links — use anchors `#offer` or full URLs | ✅ on links |
+| `src` / `alt` | On images. `alt` must be descriptive for SEO/accessibility | ✅ on images |
+| `role` | ARIA roles for accessibility (`banner`, `navigation`, `main`, etc.) | Recommended |
+| `aria-label` | Accessible labels for interactive elements | Recommended |
+| `loading` | Image lazy loading: `lazy` for below-fold, `eager` for hero | Recommended |
+| `data-gsap-section` | Marks a GSAP/ScrollTrigger section so editor-safe mode can sanitize/export correctly | ✅ required on GSAP sections |
+| `data-gsap-item` | Optional marker for animated items/slides inside a GSAP section (editor reveal + save cleanup) | Recommended |
+| `data-*` | Custom data for JS features (cart, countdown, etc.) | As needed |
+
+### GSAP Animated Sections (Editor-Safe Contract)
+
+If a section uses GSAP/ScrollTrigger (pin, scrub, slide transitions), always mark it:
+
+```html
+<section id="solution" data-section="solution" data-gsap-section="solution" class="min-h-screen ...">
+  <div data-gsap-item>...</div>
+  <div data-gsap-item>...</div>
+</section>
+```
+
+Rules:
+1. Add `data-gsap-section="{name}"` on the GSAP section root.
+2. Keep a stable height baseline on the section root (`min-h-screen` or explicit `min-h-[...]`).
+3. For animated cards/slides, add `data-gsap-item` (or use `.slide-solution`).
+4. Do not rely on runtime pin inline styles as source-of-truth; they are temporary.
+
+### CSS Editability Rules
+
+Generated HTML must be easy to restyle via the editor's Style Manager (Layout, Flexbox, Position, Dimension, Typography, Background, Borders, Effects).
+
+**Do:**
+- Use Tailwind utility classes for base styling (the editor preserves them)
+- Keep flex/grid containers simple: `flex`, `items-center`, `justify-between`, `gap-4`
+- Use standard CSS properties that the Style Manager controls
+- Keep responsive breakpoints via Tailwind (e.g., `md:flex`, `lg:grid-cols-3`)
+
+**Don't:**
+- Don't use deeply nested CSS selectors that fight the editor
+- Don't use `!important` in inline styles — blocks the Style Manager
+- Don't use CSS-in-JS, CSS variables, or custom properties in inline styles
+- Don't hardcode widths/heights in inline styles — use Tailwind utilities or leave for the editor
+- Don't combine multiple unrelated styles in a single wrapper — separate layout from decoration
+
+### Section Structure Template
+
+Every section should follow this pattern:
+
+```html
+<section id="{section-name}" data-section="{section-name}" class="{spacing} {bg-color}">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <!-- Section content: headings, text, CTAs, images -->
+  </div>
+</section>
+```
+
+- `id` + `data-section` = required for analytics and editor identification
+- Outer `<section>` = background, vertical spacing
+- Inner `<div>` = container, horizontal padding, max-width
+- Content elements = clean, editable, properly tagged

@@ -5,10 +5,18 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     
-    <!-- Scripts & Styles -->
-    @vite(['resources/css/app.css', 'resources/js/app.js'])
+    <!-- Styles: Tailwind CDN (CSS only, no 407KB runtime compiler) + Alpine.js for cart/interactions -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script> -->
+
+     @vite(['resources/css/app.css'])
     <script src="/js/tailwind.js"></script>
-    {{-- Tailwind Config moved to external file or local script --}}
+
+    @if($landing->enable_cart)
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
+    @endif
+    {{-- NOTE: @vite removed from public pages — admin CSS/JS is not needed here.
+         Page-specific CSS is rendered inline via $page->css below.
+         For production, pre-compile Tailwind per-landing with CLI. --}}
     
     <title>{{ $landing->settings->meta_title ?? $page->name }}</title>
     <meta name="landing-id" content="{{ $landing->id }}">
@@ -41,13 +49,484 @@
             --cart-text: {{ $landing->cart_text_color ?? '#000000' }};
             --cart-btn: {{ $landing->cart_btn_color ?? '#3b82f6' }};
             --cart-btn-text: {{ $landing->cart_btn_text_color ?? '#ffffff' }};
+            --lp-topbar-height: 48px;
+            --lp-topbar-bg: rgba(8, 13, 24, 0.82);
+            --lp-topbar-border: rgba(148, 163, 184, 0.22);
+            --lp-topbar-muted: rgba(203, 213, 225, 0.72);
+            --lp-topbar-text: #f8fafc;
+            --lp-topbar-accent: #6366f1;
+        }
+
+        body.lp-topbar-visible {
+            padding-top: calc(var(--lp-topbar-height) + 6px);
+        }
+
+        .lp-adminbar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 10000000;
+            height: var(--lp-topbar-height);
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            padding: 0 14px;
+            color: var(--lp-topbar-text);
+            background: var(--lp-topbar-bg);
+            border-bottom: 1px solid var(--lp-topbar-border);
+            backdrop-filter: blur(12px);
+            box-shadow: 0 10px 26px rgba(2, 6, 23, 0.28);
+            font-family: "Inter", "Segoe UI", sans-serif;
+        }
+
+        .lp-adminbar__left,
+        .lp-adminbar__center,
+        .lp-adminbar__right {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+        }
+
+        .lp-adminbar__left {
+            flex: 0 1 36%;
+        }
+
+        .lp-adminbar__center {
+            flex: 1 1 auto;
+            justify-content: center;
+            min-width: 0;
+            overflow-x: auto;
+            scrollbar-width: none;
+        }
+
+        .lp-adminbar__center::-webkit-scrollbar {
+            display: none;
+        }
+
+        .lp-adminbar__right {
+            flex: 0 1 36%;
+            justify-content: flex-end;
+            gap: 6px;
+        }
+
+        .lp-brand-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            font-weight: 700;
+            font-size: 12px;
+            letter-spacing: 0.015em;
+            white-space: nowrap;
+        }
+
+        .lp-brand-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 999px;
+            background: linear-gradient(180deg, #f43f5e, #7c3aed 70%);
+            box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.22);
+        }
+
+        .lp-context {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+            color: var(--lp-topbar-muted);
+            font-size: 11px;
+            white-space: nowrap;
+        }
+
+        .lp-context strong {
+            color: var(--lp-topbar-text);
+            font-weight: 700;
+            max-width: 130px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .lp-context-name {
+            max-width: 140px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .lp-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 1px 7px;
+            border-radius: 999px;
+            font-size: 10px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            border: 1px solid transparent;
+            white-space: nowrap;
+        }
+
+        .lp-badge--draft {
+            color: #fbbf24;
+            background: rgba(146, 64, 14, 0.26);
+            border-color: rgba(251, 191, 36, 0.4);
+        }
+
+        .lp-badge--published {
+            color: #22c55e;
+            background: rgba(22, 101, 52, 0.28);
+            border-color: rgba(34, 197, 94, 0.38);
+        }
+
+        .lp-badge--preview {
+            color: #60a5fa;
+            background: rgba(30, 58, 138, 0.35);
+            border-color: rgba(96, 165, 250, 0.45);
+        }
+
+        .lp-nav {
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+            padding: 2px;
+            border-radius: 11px;
+            background: rgba(15, 23, 42, 0.45);
+            border: 1px solid rgba(148, 163, 184, 0.2);
+        }
+
+        .lp-tab {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 30px;
+            padding: 0 10px;
+            border-radius: 8px;
+            color: #cbd5e1;
+            font-size: 11px;
+            font-weight: 600;
+            line-height: 30px;
+            white-space: nowrap;
+            transition: color .15s ease, background-color .15s ease;
+        }
+
+        .lp-tab:hover {
+            color: #f8fafc;
+            background: rgba(51, 65, 85, 0.72);
+        }
+
+        .lp-tab.is-active {
+            color: #eef2ff;
+            background: linear-gradient(180deg, rgba(79, 70, 229, 0.28), rgba(67, 56, 202, 0.58));
+            box-shadow: inset 0 0 0 1px rgba(129, 140, 248, 0.38);
+        }
+
+        .lp-btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+            height: 32px;
+            border-radius: 9px;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 0 11px;
+            white-space: nowrap;
+            transition: all .17s ease;
+        }
+
+        .lp-btn--ghost {
+            color: #dbe3f1;
+            background: transparent;
+            border: 1px solid transparent;
+        }
+
+        .lp-btn--ghost:hover {
+            color: #ffffff;
+            background: rgba(51, 65, 85, 0.54);
+            border-color: rgba(148, 163, 184, 0.35);
+        }
+
+        .lp-btn--secondary {
+            color: #f1f5f9;
+            background: rgba(30, 41, 59, 0.72);
+            border: 1px solid rgba(148, 163, 184, 0.34);
+        }
+
+        .lp-btn--secondary:hover {
+            background: rgba(51, 65, 85, 0.85);
+            border-color: rgba(148, 163, 184, 0.52);
+        }
+
+        .lp-btn--primary {
+            color: #ffffff;
+            border: 1px solid rgba(129, 140, 248, 0.68);
+            background: linear-gradient(180deg, #6366f1, #4f46e5);
+            box-shadow: 0 8px 18px rgba(79, 70, 229, 0.34);
+        }
+
+        .lp-btn--primary:hover {
+            background: linear-gradient(180deg, #7c83ff, #5a52eb);
+            box-shadow: 0 10px 24px rgba(79, 70, 229, 0.45);
+        }
+
+        .lp-btn--danger {
+            color: #fecdd3;
+            background: rgba(136, 19, 55, 0.38);
+            border: 1px solid rgba(244, 114, 182, 0.55);
+        }
+
+        .lp-btn--danger:hover {
+            color: #fff1f2;
+            background: rgba(159, 18, 57, 0.55);
+            border-color: rgba(251, 113, 133, 0.72);
+        }
+
+        .lp-user-wrap {
+            position: relative;
+        }
+
+        .lp-user-pill {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            height: 32px;
+            padding: 0 9px 0 4px;
+            border-radius: 999px;
+            border: 1px solid rgba(148, 163, 184, 0.35);
+            color: #e2e8f0;
+            background: rgba(15, 23, 42, 0.7);
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .lp-user-pill:hover {
+            border-color: rgba(148, 163, 184, 0.56);
+            background: rgba(30, 41, 59, 0.8);
+        }
+
+        .lp-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(160deg, #3b82f6, #9333ea);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+        }
+
+        .lp-user-menu {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            min-width: 220px;
+            padding: 8px;
+            border-radius: 12px;
+            border: 1px solid rgba(148, 163, 184, 0.36);
+            background: rgba(15, 23, 42, 0.95);
+            box-shadow: 0 20px 34px rgba(2, 6, 23, 0.45);
+            backdrop-filter: blur(12px);
+        }
+
+        .lp-user-menu[hidden] {
+            display: none;
+        }
+
+        .lp-user-menu-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            height: 34px;
+            border-radius: 8px;
+            font-size: 12px;
+            font-weight: 600;
+            color: #e2e8f0;
+            border: 0;
+            background: transparent;
+            padding: 0 10px;
+            white-space: nowrap;
+        }
+
+        .lp-user-menu-item:hover {
+            background: rgba(51, 65, 85, 0.8);
+            color: #ffffff;
+        }
+
+        .lp-user-menu-item.is-disabled {
+            opacity: 0.58;
+            pointer-events: none;
+        }
+
+        .lp-mobile-hide {
+            display: inline-flex;
+        }
+
+        @media (max-width: 1160px) {
+            .lp-context {
+                display: none;
+            }
+        }
+
+        @media (max-width: 980px) {
+            .lp-adminbar__center {
+                justify-content: flex-start;
+            }
+
+            .lp-hide-md {
+                display: none;
+            }
+        }
+
+        @media (max-width: 760px) {
+            body.lp-topbar-visible {
+                padding-top: calc(var(--lp-topbar-height) + 12px);
+            }
+
+            .lp-adminbar {
+                gap: 8px;
+                padding-inline: 8px;
+            }
         }
     </style>
 </head>
-<body class="antialiased">
+<body class="antialiased {{ auth()->check() ? 'lp-topbar-visible' : '' }}">
     <!-- Toast Container -->
     <!-- Toast Container -->
     <div id="toast-container" class="fixed top-5 right-5 z-50 flex flex-col gap-2"></div>
+
+    @auth
+        @php
+            $authUser = auth()->user();
+            $ownerId = optional($landing->workspace)->user_id;
+            $canManageLanding = $authUser && $ownerId && ((int) $authUser->id === (int) $ownerId);
+            $workspaceName = optional($landing->workspace)->name ?? 'Workspace';
+            $allPages = $landing->relationLoaded('pages') ? $landing->pages : $landing->pages()->get();
+            $landingEditPage = $allPages->firstWhere('type', 'index') ?? $allPages->first();
+            $checkoutEditPage = $allPages->firstWhere('type', 'checkout');
+            $thankyouEditPage = $allPages->firstWhere('type', 'thankyou');
+            $pageState = strtolower((string) ($page->status ?: $landing->status ?: 'draft'));
+            $statusLabel = $pageState === 'published' ? 'Published' : 'Draft';
+            $statusClass = $pageState === 'published' ? 'lp-badge--published' : 'lp-badge--draft';
+            if (request()->route()?->getName() === 'landings.preview') {
+                $statusLabel = $pageState === 'published' ? 'Preview' : 'Draft Preview';
+                $statusClass = 'lp-badge--preview';
+            }
+
+            $publicUrl = $page->type === 'index'
+                ? ($landing->is_main ? route('public.home') : route('public.page', $landing->slug))
+                : ($landing->is_main ? url('/' . $page->slug) : route('public.landing.page', [$landing->slug, $page->slug]));
+            $previewUrl = route('landings.preview', [$landing, $page]);
+            $avatarInitials = collect(explode(' ', trim((string) ($authUser->name ?? 'U'))))
+                ->filter()
+                ->map(fn($part) => \Illuminate\Support\Str::upper(\Illuminate\Support\Str::substr($part, 0, 1)))
+                ->take(2)
+                ->implode('');
+            if ($avatarInitials === '') {
+                $avatarInitials = 'U';
+            }
+            $pageTypeLabel = match((string) $page->type) {
+                'index' => 'Landing',
+                'checkout' => 'Checkout',
+                'thankyou' => 'Thank You',
+                default => ucfirst((string) $page->type),
+            };
+        @endphp
+
+        <div id="lp-adminbar" class="lp-adminbar" data-role="{{ $canManageLanding ? 'admin' : 'viewer' }}">
+            <div class="lp-adminbar__left">
+                <div class="lp-brand-chip">
+                    <span class="lp-brand-dot" aria-hidden="true"></span>
+                    <span>Landing Builder</span>
+                </div>
+                <div class="lp-context">
+                    <strong>{{ $workspaceName }}</strong>
+                    <span>/</span>
+                    <span class="lp-context-name">{{ $landing->name }}</span>
+                    <span>/</span>
+                    <span class="lp-context-name">{{ $page->name ?? $pageTypeLabel }}</span>
+                    <span class="lp-badge {{ $statusClass }}">{{ $statusLabel }}</span>
+                </div>
+            </div>
+
+            <div class="lp-adminbar__center">
+                <nav class="lp-nav" aria-label="Funnel navigation">
+                    @if($canManageLanding && $landingEditPage)
+                        <a class="lp-tab {{ $page->type === 'index' ? 'is-active' : '' }}" href="{{ route('landings.pages.edit', [$landing, $landingEditPage]) }}">Landing</a>
+                    @else
+                        <span class="lp-tab {{ $page->type === 'index' ? 'is-active' : '' }}">Landing</span>
+                    @endif
+
+                    @if($canManageLanding && $checkoutEditPage)
+                        <a class="lp-tab {{ $page->type === 'checkout' ? 'is-active' : '' }}" href="{{ route('landings.pages.edit', [$landing, $checkoutEditPage]) }}">Checkout</a>
+                    @else
+                        <span class="lp-tab {{ $page->type === 'checkout' ? 'is-active' : '' }}">Checkout</span>
+                    @endif
+
+                    @if($canManageLanding && $thankyouEditPage)
+                        <a class="lp-tab {{ $page->type === 'thankyou' ? 'is-active' : '' }}" href="{{ route('landings.pages.edit', [$landing, $thankyouEditPage]) }}">Thank You</a>
+                    @else
+                        <span class="lp-tab {{ $page->type === 'thankyou' ? 'is-active' : '' }}">Thank You</span>
+                    @endif
+
+                    @if($canManageLanding)
+                        <a class="lp-tab lp-hide-md" href="{{ route('leads.index', ['landing' => $landing->id]) }}">Leads</a>
+                        <a class="lp-tab lp-hide-md" href="{{ route('analytics.index', ['landing' => $landing->id]) }}">Analytics</a>
+                    @endif
+                </nav>
+            </div>
+
+            <div class="lp-adminbar__right">
+                <a class="lp-btn lp-btn--ghost" href="{{ $previewUrl }}" target="_blank" rel="noopener noreferrer">Preview</a>
+
+                @if($canManageLanding)
+                    <a class="lp-btn lp-btn--secondary" href="{{ route('landings.pages.edit', [$landing, $page]) }}">Edit</a>
+
+                    @if($landing->status === 'published')
+                        <form method="POST" action="{{ route('landings.unpublish', $landing) }}">
+                            @csrf
+                            <button type="submit" class="lp-btn lp-btn--danger">Unpublish</button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{ route('landings.publish', $landing) }}">
+                            @csrf
+                            <button type="submit" class="lp-btn lp-btn--primary">Publish</button>
+                        </form>
+                    @endif
+
+                    <a class="lp-btn lp-btn--ghost lp-hide-md" href="{{ route('landings.edit', $landing) }}">Settings</a>
+                @endif
+
+                <div class="lp-user-wrap">
+                    <button type="button" class="lp-user-pill" data-lp-toggle="lp-user-menu" aria-label="Open user menu">
+                        <span class="lp-avatar">{{ $avatarInitials }}</span>
+                        <span class="lp-mobile-hide">{{ $authUser->name }}</span>
+                    </button>
+                    <div id="lp-user-menu" class="lp-user-menu" hidden>
+                        <div class="lp-user-menu-item is-disabled">{{ $canManageLanding ? 'Admin' : 'Viewer' }}</div>
+                        <button type="button" class="lp-user-menu-item" data-copy="{{ $publicUrl }}" data-copy-label="Copy Page URL">Copy Page URL</button>
+                        <button type="button" class="lp-user-menu-item" data-copy="{{ $previewUrl }}" data-copy-label="Copy Preview URL">Copy Preview URL</button>
+                        @if($canManageLanding)
+                            <form method="POST" action="{{ route('landings.pages.duplicate', [$landing, $page]) }}">
+                                @csrf
+                                <button type="submit" class="lp-user-menu-item">Duplicate Page</button>
+                            </form>
+                            <a href="{{ route('landings.pages.edit', [$landing, $page]) }}#history" class="lp-user-menu-item">Revisions / History</a>
+                            <a href="{{ route('ai-generator.index') }}" class="lp-user-menu-item">AI Actions</a>
+                            <a href="{{ route('dashboard') }}" class="lp-user-menu-item">Open Dashboard</a>
+                            <a href="{{ route('settings.index') }}" class="lp-user-menu-item">Account Settings</a>
+                        @endif
+                        <form method="POST" action="{{ route('logout') }}">
+                            @csrf
+                            <button type="submit" class="lp-user-menu-item">Logout</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    @endauth
 
     @if($landing->enable_cart)
     <div x-data="shoppingCart()" x-cloak class="relative z-50">
@@ -370,9 +849,15 @@
         @endif
     @endif
 
-    <script>
-        {!! $page->js !!}
-    </script>
+    @if(!empty($page->js))
+        @if(str_contains($page->js, '<script'))
+            {!! $page->js !!}
+        @else
+            <script>
+                {!! $page->js !!}
+            </script>
+        @endif
+    @endif
 
     <!-- Facebook Pixel -->
     @if($landing->settings && $landing->settings->fb_pixel_id)
@@ -418,6 +903,7 @@
     <!-- Session Recording (rrweb injected dynamically by controller) -->
     <script src="/js/countdown.js" defer></script>
     <script src="/js/analytics.js?v={{ filemtime(public_path('js/analytics.js')) }}" defer></script>
+    <script src="/js/exit-intent.js" defer></script>
 
     <!-- Settings & WhatsApp Application -->
     @php
@@ -586,6 +1072,78 @@
                 });
             }
     </script>
+
+    @auth
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const topbar = document.getElementById('lp-adminbar');
+            if (!topbar) return;
+
+            const closeMenus = () => {
+                topbar.querySelectorAll('.lp-user-menu').forEach(menu => {
+                    menu.hidden = true;
+                });
+            };
+
+            topbar.querySelectorAll('[data-lp-toggle]').forEach(button => {
+                button.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    const targetId = button.getAttribute('data-lp-toggle');
+                    const target = document.getElementById(targetId);
+                    if (!target) return;
+
+                    const willOpen = target.hidden;
+                    closeMenus();
+                    target.hidden = !willOpen;
+                });
+            });
+
+            topbar.querySelectorAll('[data-copy]').forEach(button => {
+                button.addEventListener('click', async function () {
+                    const value = button.getAttribute('data-copy') || '';
+                    if (!value) return;
+
+                    const originalLabel = button.getAttribute('data-copy-label') || button.textContent.trim();
+                    const notify = (label) => {
+                        button.textContent = label;
+                        setTimeout(() => {
+                            button.textContent = originalLabel;
+                        }, 1300);
+                    };
+
+                    try {
+                        if (navigator.clipboard && navigator.clipboard.writeText) {
+                            await navigator.clipboard.writeText(value);
+                        } else {
+                            const input = document.createElement('input');
+                            input.value = value;
+                            document.body.appendChild(input);
+                            input.select();
+                            document.execCommand('copy');
+                            document.body.removeChild(input);
+                        }
+                        notify('Copied');
+                    } catch (error) {
+                        notify('Copy failed');
+                    }
+                });
+            });
+
+            document.addEventListener('click', function (event) {
+                if (!topbar.contains(event.target)) {
+                    closeMenus();
+                }
+            });
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape') {
+                    closeMenus();
+                }
+            });
+        });
+    </script>
+    @endauth
 
     {{-- Floating WhatsApp Button --}}
     @if($wsSettings && $wsSettings->whatsapp_enabled && !empty($wsSettings->whatsapp_phone))
