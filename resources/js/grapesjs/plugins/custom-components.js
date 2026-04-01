@@ -363,8 +363,6 @@ export default function customComponentsPlugin(editor, opts = {}) {
                 .hidden-details,
                 .toggle-body,
                 .card-details,
-                .panel-content,
-                .tab-content,
                 [data-toggle-target],
                 [data-collapse-target] {
                     display:       block   !important;

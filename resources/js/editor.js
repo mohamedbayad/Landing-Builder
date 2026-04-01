@@ -20,6 +20,7 @@ import exitIntentPlugin from './grapesjs/plugins/exit-intent';
 import deviceVisibilityPlugin from './grapesjs/plugins/device-visibility';
 import advancedEditingControlsPlugin from './grapesjs/plugins/advanced-editing-controls';
 import editorAnimationSafeModePlugin from './grapesjs/plugins/editor-animation-safe-mode';
+import lpSliderPlugin from './grapesjs/plugins/lp-slider';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -189,6 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
             deviceVisibilityPlugin,
             advancedEditingControlsPlugin,
             editorAnimationSafeModePlugin,
+            lpSliderPlugin,
             (editor, opts) => {
                 console.log('--- GRAPESJS-ICONS PLUGIN INITIALIZATION ---(INTERCEPTED)');
                 console.log('Received options:', opts);
@@ -232,6 +234,7 @@ document.addEventListener('DOMContentLoaded', () => {
             [CustomComponents]: {},
             [CanvasInteractionControl]: {},
             [editorAnimationSafeModePlugin]: {},
+            [lpSliderPlugin]: {},
         }
     });
 
@@ -336,6 +339,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const canvasDoc = editor.Canvas.getDocument();
         const canvasHead = canvasDoc.head;
         const canvasBody = canvasDoc.body;
+        canvasDoc.documentElement.setAttribute('data-gjs-editor-canvas', 'true');
+        if (canvasDoc.defaultView) {
+            canvasDoc.defaultView.__GJS_EDITOR_MODE = true;
+        }
 
         const injectEditorSolutionFallbackCss = () => {
             if (canvasDoc.getElementById('editor-solution-fallback-css')) {

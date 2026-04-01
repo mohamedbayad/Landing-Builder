@@ -17,6 +17,11 @@
 (function () {
     'use strict';
 
+    // Do not run frontend popup behavior inside GrapesJS canvas/editor mode.
+    if (window.__GJS_EDITOR_MODE || document.documentElement.hasAttribute('data-gjs-editor-canvas')) {
+        return;
+    }
+
     const popups = document.querySelectorAll('[data-exit-intent]');
     if (!popups.length) return;
 

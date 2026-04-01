@@ -158,6 +158,7 @@ Use semantic sections with `id` and `data-section` attributes. Clean, semantic H
 - **Do NOT** create forms without `action="/api/forms/submit"` — leads won't be captured
 - **Do NOT** use multiple `<h1>` tags on the same page — bad for SEO
 - **Do NOT** link images with external URLs — download and store locally
+- **Do NOT** output slider/carousel sections as monolithic HTML blobs without `lp-slider` markers/classes
 - **ALWAYS** put all JavaScript in the `js` field, not inline
 - **ALWAYS** put external scripts/fonts in `custom_head`
 
@@ -275,3 +276,64 @@ Every section should follow this pattern:
 - Outer `<section>` = background, vertical spacing
 - Inner `<div>` = container, horizontal padding, max-width
 - Content elements = clean, editable, properly tagged
+
+### LP Slider / Gallery Contract (`lp-slider`)
+
+When a section is a gallery, logo strip, testimonial carousel, product showcase slider, or UGC visual rail, output it with the `lp-slider` component contract.
+
+**Required markers:**
+- `data-component="lp-slider"`
+- `data-gjs-type="lp-slider"` (or builder-recognized component hint)
+- `.lp-slider` root class
+
+**Required structure:**
+- `.lp-slider__track` container
+- Repeated `.lp-slider__slide`
+- `.lp-slider__image` in each slide
+- Optional `.lp-slider__caption`
+
+```html
+<section id="social-proof" data-section="social-proof" class="py-16 bg-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="lp-slider"
+         data-component="lp-slider"
+         data-gjs-type="lp-slider"
+         data-preset="social-proof"
+         data-slides-desktop="4"
+         data-slides-tablet="2"
+         data-slides-mobile="1"
+         data-space-between="14"
+         data-arrows="true"
+         data-dots="true"
+         data-autoplay="true"
+         data-loop="true">
+      <div class="lp-slider__track">
+        <div class="lp-slider__slide">
+          <img class="lp-slider__image" src="/storage/..." alt="Customer result 1" loading="lazy">
+          <div class="lp-slider__caption">Real customer result #1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+**Preset mapping rules:**
+- logos section -> `data-preset="logos"`
+- testimonial carousel -> `data-preset="testimonials"`
+- product gallery slider -> `data-preset="product-showcase"`
+- UGC/social proof slider -> `data-preset="social-proof"`
+- generic image gallery -> `data-preset="gallery"`
+
+**Responsive behavior attributes to include:**
+- `data-slides-desktop`, `data-slides-tablet`, `data-slides-mobile`
+- `data-space-between`
+- `data-arrows`, `data-dots`
+- `data-autoplay`, `data-autoplay-delay`, `data-loop`, `data-speed`
+- `data-pause-on-hover`, `data-draggable`, `data-center-mode`, `data-initial-slide`
+
+**Asset + serialization rules:**
+- Use managed assets only (uploaded media, imported ZIP assets, stored AI-generated assets)
+- Avoid temporary remote placeholders in final builder output
+- Keep slider node hierarchy stable for save/load/export/import
+- Keep marker attributes intact so plugin detection survives template reuse

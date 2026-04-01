@@ -328,7 +328,7 @@ Every section has a defined purpose, conversion role, and anti-patterns. The AI 
 ### BEFORE & AFTER (Conditional)
 - **Purpose:** Visual proof of transformation.
 - **Conversion Role:** Belief — the most powerful proof for transformation products.
-- **Must:** Side-by-side or slider. "Before" desaturated, "After" bright and positive. Real results.
+- **Must:** Side-by-side or slider. If slider is used, follow the `lp-slider` component contract in **STEP 7**. "Before" desaturated, "After" bright and positive. Real results.
 - **Must NOT:** Use obviously fake or AI-generated comparisons. Show unrealistic results.
 - **Include WHEN:** Product produces a VISIBLE transformation (skin, cleaning, home improvement).
 
@@ -492,6 +492,99 @@ Use ONLY if legitimate. Choose ONE:
 | COD | "Pay cash when your package arrives" + delivery badge |
 | WhatsApp | "Tap to order on WhatsApp" + green WhatsApp icon |
 | Lead Gen | "100% Free — No Card Required" |
+
+---
+
+## STEP 7 — Slider Component Compatibility Contract (`lp-slider`)
+
+When a section needs slider/carousel behavior, output it as a **builder component**, not generic carousel HTML.
+
+### Section Triggers (must use `lp-slider`)
+
+Use `lp-slider` markup for these intents:
+
+- Image gallery
+- Logo strip / brand logos
+- Testimonial carousel
+- Product image showcase
+- UGC/social proof visual slider
+- Before/after slider variant
+
+### Mandatory Markers and Structure
+
+Every slider section must include:
+
+- Component marker: `data-component="lp-slider"`
+- GrapesJS component hint: `data-gjs-type="lp-slider"` (or equivalent component type hint used by the builder)
+- Stable wrapper class: `.lp-slider`
+- Stable children: `.lp-slider__track` -> repeated `.lp-slider__slide` -> `.lp-slider__image`
+- Optional caption node: `.lp-slider__caption`
+
+Use this structural pattern (adapt values by context):
+
+```html
+<section id="social-proof" data-section="social-proof" class="py-16 bg-white">
+  <div class="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div class="lp-slider"
+         data-component="lp-slider"
+         data-gjs-type="lp-slider"
+         data-preset="social-proof"
+         data-slides-desktop="4"
+         data-slides-tablet="2"
+         data-slides-mobile="1"
+         data-space-between="14"
+         data-autoplay="true"
+         data-loop="true">
+      <div class="lp-slider__track">
+        <div class="lp-slider__slide">
+          <img class="lp-slider__image" src="/storage/..." alt="Customer result 1">
+          <div class="lp-slider__caption">Real customer result #1</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+```
+
+### Intent -> Preset Mapping
+
+Map section intent to `data-preset`:
+
+| Section Intent | Required Preset |
+|---|---|
+| Gallery | `gallery` |
+| Logos | `logos` |
+| Testimonials | `testimonials` |
+| Product images | `product-showcase` |
+| UGC / Social proof | `social-proof` |
+
+### Responsive and Behavior Attributes
+
+Slider sections must expose builder-editable behavior through attributes:
+
+- `data-slides-desktop`, `data-slides-tablet`, `data-slides-mobile`
+- `data-space-between`
+- `data-arrows`, `data-dots`
+- `data-autoplay`, `data-autoplay-delay`, `data-loop`, `data-speed`
+- `data-pause-on-hover`, `data-draggable`, `data-center-mode`, `data-initial-slide`
+- `data-image-fit`, `data-ratio`, `data-custom-height`, `data-border-radius`, `data-shadow`, `data-lazy`
+
+### Editability and Serialization Rules
+
+- Slider HTML must remain block-structured and component-detectable after save/load/export/import
+- Do not flatten slider content into a single text blob
+- Keep each slide as a repeated `.lp-slider__slide` node with image/caption children
+- Keep marker attributes stable between AI generation and builder edits
+
+### Asset Rules for Slider Sections
+
+- Use managed builder assets (`/storage/...`, uploaded media, imported ZIP assets, AI-generated assets stored in platform media)
+- Avoid temporary/unsafe remote image URLs in final output
+- Keep `alt` text on all `.lp-slider__image` nodes
+
+### Forbidden Pattern
+
+- Do NOT generate monolithic "carousel blob" HTML with random classes and no component markers
 
 ---
 
