@@ -471,6 +471,31 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
 
+        const injectExternalSliderTouchRuntime = () => {
+            const frameDoc = editor.Canvas.getDocument();
+            const existing = frameDoc.getElementById('external-slider-touch-runtime-js');
+            if (existing) {
+                if (existing.dataset.loaded === 'true') return Promise.resolve();
+                return new Promise((resolve) => {
+                    existing.addEventListener('load', () => resolve(), { once: true });
+                    existing.addEventListener('error', () => resolve(), { once: true });
+                });
+            }
+
+            return new Promise((resolve) => {
+                const script = frameDoc.createElement('script');
+                script.id = 'external-slider-touch-runtime-js';
+                script.src = '/js/external-slider-touch-runtime.js';
+                script.async = true;
+                script.onload = () => {
+                    script.dataset.loaded = 'true';
+                    resolve();
+                };
+                script.onerror = () => resolve();
+                frameDoc.head.appendChild(script);
+            });
+        };
+
         const canvasDoc = editor.Canvas.getDocument();
         const canvasHead = canvasDoc.head;
         const canvasBody = canvasDoc.body;
@@ -541,11 +566,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     overflow-x: auto !important;
                     overflow-y: visible !important;
                     -webkit-overflow-scrolling: touch !important;
+                    overscroll-behavior-x: contain !important;
+                    overscroll-behavior-y: auto !important;
+                    touch-action: pan-y pinch-zoom !important;
                 }
 
                 html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is(.swiper, .swiper-container, .slick-list, .splide__track, .glide__track, [data-slider-viewport], [data-carousel-viewport]) {
                     overflow-x: auto !important;
                     overflow-y: visible !important;
+                    overscroll-behavior-x: contain !important;
                 }
 
                 html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_TRACK_ATTR}="true"], .swiper-wrapper, .slick-track, .splide__list, .glide__slides, .keen-slider, [data-slider-track], [data-carousel-track]) {
@@ -557,6 +586,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     width: max-content !important;
                     min-width: 100% !important;
                     will-change: auto !important;
+                    touch-action: pan-x pan-y pinch-zoom !important;
+                    overscroll-behavior-x: contain !important;
                 }
 
                 html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_SLIDE_ATTR}="true"], .swiper-slide, .slick-slide, .splide__slide, .glide__slide, .keen-slider__slide, [data-slide]) {
@@ -566,6 +597,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     max-width: 100% !important;
                     height: auto !important;
                     transform: none !important;
+                    min-height: 0 !important;
                 }
 
                 html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_SLIDE_ATTR}="true"], .swiper-slide, .slick-slide, .splide__slide, .glide__slide, .keen-slider__slide, [data-slide]) > * {
@@ -786,10 +818,17 @@ document.addEventListener('DOMContentLoaded', () => {
             } catch {
                 // no-op
             }
+
+            try {
+                frameWin.ExternalSliderTouchRuntime?.refresh?.();
+            } catch (error) {
+                console.warn('[GrapesJS] Failed to refresh external slider touch runtime', error);
+            }
         };
 
         runInjectedTemplateScripts(templateHeadScripts, canvasHead)
             .then(() => runInjectedTemplateScripts(bodyScripts, canvasBody))
+            .then(() => injectExternalSliderTouchRuntime())
             .then(() => {
             // Many imported templates register logic on DOMContentLoaded.
             // Scripts are injected after frame load, so fire synthetic events.

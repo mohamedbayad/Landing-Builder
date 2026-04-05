@@ -902,6 +902,7 @@
 
     <!-- Session Recording (rrweb injected dynamically by controller) -->
     <script src="/js/countdown.js" defer></script>
+    <script src="/js/external-slider-touch-runtime.js" defer></script>
     <script src="/js/lp-slider-runtime.js" defer></script>
     <script src="/js/analytics.js?v={{ filemtime(public_path('js/analytics.js')) }}" defer></script>
     <script src="/js/exit-intent.js" defer></script>
