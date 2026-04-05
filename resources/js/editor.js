@@ -21,6 +21,8 @@ import deviceVisibilityPlugin from './grapesjs/plugins/device-visibility';
 import advancedEditingControlsPlugin from './grapesjs/plugins/advanced-editing-controls';
 import editorAnimationSafeModePlugin from './grapesjs/plugins/editor-animation-safe-mode';
 import lpSliderPlugin from './grapesjs/plugins/lp-slider';
+import backgroundPlugin from './grapesjs/plugins/background';
+import htmlBlockPlugin from './grapesjs/plugins/html-block';
 
 document.addEventListener('DOMContentLoaded', () => {
 
@@ -188,6 +190,8 @@ document.addEventListener('DOMContentLoaded', () => {
             aiAssistantPlugin,
             exitIntentPlugin,
             deviceVisibilityPlugin,
+            htmlBlockPlugin,
+            backgroundPlugin,
             advancedEditingControlsPlugin,
             editorAnimationSafeModePlugin,
             lpSliderPlugin,
@@ -233,12 +237,139 @@ document.addEventListener('DOMContentLoaded', () => {
             [SidebarContentEditing]: {},
             [CustomComponents]: {},
             [CanvasInteractionControl]: {},
+            [backgroundPlugin]: {},
+            [htmlBlockPlugin]: {},
             [editorAnimationSafeModePlugin]: {},
             [lpSliderPlugin]: {},
         }
     });
 
     const hiddenCss = document.getElementById('gjs-css');
+    const SLIDER_PROTECTED_ATTR = 'data-gjs-protected-slider';
+    const EXTERNAL_SLIDER_ATTR = 'data-gjs-external-slider';
+    const EXTERNAL_SLIDER_FALLBACK_ATTR = 'data-gjs-external-slider-fallback';
+    const EXTERNAL_SLIDER_INIT_ATTR = 'data-gjs-external-slider-init';
+    const EXTERNAL_SLIDER_TRACK_ATTR = 'data-gjs-external-slider-track';
+    const EXTERNAL_SLIDER_SLIDE_ATTR = 'data-gjs-external-slider-slide';
+
+    const isManagedLpSliderRoot = (el) => {
+        if (!el || el.nodeType !== 1) return false;
+        return el.matches?.(
+            '[data-slider-source="builder"], [data-component="builder-slider"], [data-gjs-type="builder-slider"], [data-component="lp-slider"][data-slider-version][data-lp-slides], [data-gjs-type="lp-slider"][data-slider-version][data-lp-slides], .lp-slider[data-slider-version][data-lp-slides]'
+        );
+    };
+
+    const findThirdPartySliderRoots = (doc) => {
+        if (!doc?.body) return [];
+
+        const candidates = new Set();
+        const addCandidate = (el) => {
+            if (!el || el.nodeType !== 1 || isManagedLpSliderRoot(el)) return;
+
+            let root = el.closest?.('.swiper, .swiper-container, .slick-slider, .splide, .keen-slider, .glide, [data-slider], [data-carousel]');
+            if (!root) {
+                if (el.matches?.('.swiper-wrapper, .slick-track, .splide__track, .splide__list')) {
+                    root = el.parentElement;
+                } else if (el.matches?.('[class*="slider"], [class*="carousel"]')) {
+                    root = el;
+                }
+            }
+            if (!root || root === doc.body || isManagedLpSliderRoot(root)) return;
+
+            const hasSignal =
+                root.querySelector('.swiper-wrapper > .swiper-slide, .slick-track > .slick-slide, .splide__list > .splide__slide, .splide__track > .splide__list > .splide__slide') ||
+                root.matches?.('.swiper, .swiper-container, .slick-slider, .splide, .keen-slider, .glide, [data-slider], [data-carousel]');
+            if (hasSignal) candidates.add(root);
+        };
+
+        doc.querySelectorAll('.swiper, .swiper-container, .swiper-wrapper, .swiper-slide, .slick-slider, .slick-track, .slick-slide, .splide, .splide__track, .splide__list, .splide__slide, .keen-slider, .glide, [data-slider], [data-carousel], [class*="slider"], [class*="carousel"]').forEach(addCandidate);
+
+        const roots = Array.from(candidates);
+        return roots.filter((root) => !roots.some((other) => other !== root && other.contains(root)));
+    };
+
+    const markExternalSliderRoot = (root, { protectForParsing = false } = {}) => {
+        if (!root || root.nodeType !== 1 || isManagedLpSliderRoot(root)) return false;
+
+        root.setAttribute(EXTERNAL_SLIDER_ATTR, 'true');
+
+        if (!protectForParsing) {
+            return true;
+        }
+
+        const existingType = root.getAttribute('data-gjs-type');
+        if (existingType && existingType !== 'raw') {
+            return false;
+        }
+
+        root.setAttribute(SLIDER_PROTECTED_ATTR, 'true');
+        root.setAttribute('data-gjs-type', 'raw');
+        root.setAttribute('data-gjs-editable', 'false');
+        root.setAttribute('data-gjs-droppable', 'false');
+        root.setAttribute('data-gjs-hoverable', 'true');
+        root.setAttribute('data-gjs-highlightable', 'true');
+        root.setAttribute('data-gjs-layerable', 'true');
+        return true;
+    };
+
+    const markExternalSlidersInDocument = (doc, options = {}) => {
+        const roots = findThirdPartySliderRoots(doc).filter((root) => !isManagedLpSliderRoot(root));
+        let protectedCount = 0;
+        roots.forEach((root) => {
+            const protectedRoot = markExternalSliderRoot(root, options);
+            if (options.protectForParsing && protectedRoot) {
+                protectedCount += 1;
+            }
+        });
+        return { roots, protectedCount };
+    };
+
+    const isolateThirdPartySliders = (rawHtml) => {
+        const html = String(rawHtml || '');
+        if (!html.trim()) {
+            return { html, protectedCount: 0 };
+        }
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const { protectedCount } = markExternalSlidersInDocument(doc, { protectForParsing: true });
+
+        return {
+            html: doc.body.innerHTML,
+            protectedCount,
+        };
+    };
+
+    const sanitizeProtectedSliderHtmlForSave = (rawHtml) => {
+        const html = String(rawHtml || '');
+        if (!html.trim()) return html;
+
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const protectedRoots = doc.querySelectorAll(`[${SLIDER_PROTECTED_ATTR}]`);
+        protectedRoots.forEach((root) => {
+            root.removeAttribute(SLIDER_PROTECTED_ATTR);
+            root.removeAttribute('data-gjs-type');
+            root.removeAttribute('data-gjs-editable');
+            root.removeAttribute('data-gjs-droppable');
+            root.removeAttribute('data-gjs-hoverable');
+            root.removeAttribute('data-gjs-highlightable');
+            root.removeAttribute('data-gjs-layerable');
+        });
+
+        doc.querySelectorAll(`[${EXTERNAL_SLIDER_ATTR}]`).forEach((root) => {
+            root.removeAttribute(EXTERNAL_SLIDER_ATTR);
+            root.removeAttribute(EXTERNAL_SLIDER_FALLBACK_ATTR);
+            root.removeAttribute(EXTERNAL_SLIDER_INIT_ATTR);
+        });
+
+        doc.querySelectorAll(`[${EXTERNAL_SLIDER_TRACK_ATTR}]`).forEach((node) => {
+            node.removeAttribute(EXTERNAL_SLIDER_TRACK_ATTR);
+        });
+        doc.querySelectorAll(`[${EXTERNAL_SLIDER_SLIDE_ATTR}]`).forEach((node) => {
+            node.removeAttribute(EXTERNAL_SLIDER_SLIDE_ATTR);
+        });
+
+        return doc.body.innerHTML;
+    };
 
     // Load initial content
     // FIX: Check if JSON is actually valid and has pages/styles, otherwise fall back to HTML
@@ -253,7 +384,11 @@ document.addEventListener('DOMContentLoaded', () => {
         editor.loadProjectData(projectData);
     } else if (hiddenContainer && hiddenContainer.innerHTML.trim().length > 0) {
         // Fallback to HTML if JSON is empty/invalid
-        editor.setComponents(hiddenContainer.innerHTML);
+        const isolated = isolateThirdPartySliders(hiddenContainer.innerHTML);
+        if (isolated.protectedCount > 0) {
+            console.log(`[GrapesJS] Protected ${isolated.protectedCount} third-party slider root(s) from component parsing`);
+        }
+        editor.setComponents(isolated.html);
 
         // Fallback to CSS
         if (hiddenCss && hiddenCss.innerHTML.trim().length > 0) {
@@ -394,6 +529,119 @@ document.addEventListener('DOMContentLoaded', () => {
             canvasHead.appendChild(style);
         };
 
+        const injectExternalSliderFallbackCss = () => {
+            if (canvasDoc.getElementById('editor-external-slider-fallback-css')) {
+                return;
+            }
+
+            const style = canvasDoc.createElement('style');
+            style.id = 'editor-external-slider-fallback-css';
+            style.textContent = `
+                html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"] {
+                    overflow-x: auto !important;
+                    overflow-y: visible !important;
+                    -webkit-overflow-scrolling: touch !important;
+                }
+
+                html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is(.swiper, .swiper-container, .slick-list, .splide__track, .glide__track, [data-slider-viewport], [data-carousel-viewport]) {
+                    overflow-x: auto !important;
+                    overflow-y: visible !important;
+                }
+
+                html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_TRACK_ATTR}="true"], .swiper-wrapper, .slick-track, .splide__list, .glide__slides, .keen-slider, [data-slider-track], [data-carousel-track]) {
+                    display: flex !important;
+                    flex-wrap: nowrap !important;
+                    align-items: stretch !important;
+                    gap: var(--gjs-ext-slider-gap, 16px) !important;
+                    transform: none !important;
+                    width: max-content !important;
+                    min-width: 100% !important;
+                    will-change: auto !important;
+                }
+
+                html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_SLIDE_ATTR}="true"], .swiper-slide, .slick-slide, .splide__slide, .glide__slide, .keen-slider__slide, [data-slide]) {
+                    float: none !important;
+                    flex: 0 0 var(--gjs-ext-slide-width, min(340px, 82vw)) !important;
+                    width: var(--gjs-ext-slide-width, min(340px, 82vw)) !important;
+                    max-width: 100% !important;
+                    height: auto !important;
+                    transform: none !important;
+                }
+
+                html[data-gjs-editor-canvas="true"] [${EXTERNAL_SLIDER_ATTR}="true"][${EXTERNAL_SLIDER_FALLBACK_ATTR}="true"] :is([${EXTERNAL_SLIDER_SLIDE_ATTR}="true"], .swiper-slide, .slick-slide, .splide__slide, .glide__slide, .keen-slider__slide, [data-slide]) > * {
+                    width: 100% !important;
+                }
+            `;
+            canvasHead.appendChild(style);
+        };
+
+        const parseJsonAttribute = (el, attrNames = []) => {
+            if (!el || !Array.isArray(attrNames)) return null;
+
+            for (const attrName of attrNames) {
+                const raw = el.getAttribute(attrName);
+                if (!raw || typeof raw !== 'string') continue;
+                try {
+                    const parsed = JSON.parse(raw.trim());
+                    if (parsed && typeof parsed === 'object') {
+                        return parsed;
+                    }
+                } catch {
+                    // ignore malformed JSON attributes
+                }
+            }
+
+            return null;
+        };
+
+        const pickExternalSliderTrack = (root) => {
+            if (!root || root.nodeType !== 1) return null;
+
+            const knownTrack = root.querySelector(
+                '.swiper-wrapper, .slick-track, .splide__list, .glide__slides, .keen-slider, [data-slider-track], [data-carousel-track]'
+            );
+            if (knownTrack) return knownTrack;
+
+            const directChildren = Array.from(root.children || []).filter((el) => el && el.nodeType === 1);
+            if (directChildren.length > 1) {
+                return root;
+            }
+
+            const candidates = Array.from(root.querySelectorAll(':scope > *'))
+                .filter((el) => el && el.nodeType === 1);
+
+            return candidates.find((candidate) => {
+                const children = Array.from(candidate.children || []).filter((el) => el.nodeType === 1);
+                return children.length > 1;
+            }) || null;
+        };
+
+        const tagExternalSliderTrackAndSlides = (root) => {
+            root.querySelectorAll(`[${EXTERNAL_SLIDER_TRACK_ATTR}]`).forEach((node) => {
+                node.removeAttribute(EXTERNAL_SLIDER_TRACK_ATTR);
+            });
+            root.querySelectorAll(`[${EXTERNAL_SLIDER_SLIDE_ATTR}]`).forEach((node) => {
+                node.removeAttribute(EXTERNAL_SLIDER_SLIDE_ATTR);
+            });
+
+            const track = pickExternalSliderTrack(root);
+            if (!track) return false;
+
+            track.setAttribute(EXTERNAL_SLIDER_TRACK_ATTR, 'true');
+            const knownSlides = Array.from(
+                track.querySelectorAll(':scope > .swiper-slide, :scope > .slick-slide, :scope > .splide__slide, :scope > .glide__slide, :scope > .keen-slider__slide, :scope > [data-slide]')
+            );
+            const slides = knownSlides.length > 0
+                ? knownSlides
+                : Array.from(track.children || []).filter((el) => el && el.nodeType === 1);
+
+            slides.forEach((slide) => {
+                slide.setAttribute(EXTERNAL_SLIDER_SLIDE_ATTR, 'true');
+            });
+
+            return slides.length > 1;
+        };
+
         // INJECT CUSTOM HEAD (Template styles/links). Script tags are extracted
         // and executed via DOM APIs (insertAdjacentHTML does not execute scripts).
         let templateHeadScripts = [];
@@ -433,15 +681,124 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
 
-        
+        const refreshImportedSliders = () => {
+            const frameWin = canvasDoc.defaultView;
+            if (!frameWin) return;
+
+            const roots = markExternalSlidersInDocument(canvasDoc).roots;
+            roots.forEach((root) => {
+                let isInitialized = false;
+                root.setAttribute(EXTERNAL_SLIDER_ATTR, 'true');
+
+                try {
+                    if (root.swiper && typeof root.swiper.update === 'function') {
+                        root.swiper.update();
+                        isInitialized = true;
+                    }
+                } catch (error) {
+                    console.warn('[GrapesJS] Failed to refresh Swiper in editor', error);
+                }
+
+                try {
+                    if (!isInitialized && root.matches?.('.swiper, .swiper-container') && typeof frameWin.Swiper === 'function' && !root.swiper) {
+                        const swiperOptions = parseJsonAttribute(root, ['data-swiper-options', 'data-swiper', 'data-swiper-config']);
+                        if (swiperOptions) {
+                            new frameWin.Swiper(root, swiperOptions);
+                            if (root.swiper && typeof root.swiper.update === 'function') {
+                                root.swiper.update();
+                                root.setAttribute(EXTERNAL_SLIDER_INIT_ATTR, 'swiper');
+                                isInitialized = true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[GrapesJS] Failed to initialize Swiper in editor', error);
+                }
+
+                try {
+                    if (root.splide && typeof root.splide.refresh === 'function') {
+                        root.splide.refresh();
+                        isInitialized = true;
+                    }
+                } catch (error) {
+                    console.warn('[GrapesJS] Failed to refresh Splide in editor', error);
+                }
+
+                try {
+                    if (!isInitialized && root.matches?.('.splide') && typeof frameWin.Splide === 'function' && !root.splide) {
+                        const splideOptions = parseJsonAttribute(root, ['data-splide', 'data-splide-options', 'data-splide-config']);
+                        if (splideOptions) {
+                            const splide = new frameWin.Splide(root, splideOptions);
+                            splide.mount?.();
+                            const hasSplideInstance = !!root.splide || root.classList.contains('is-initialized') || root.classList.contains('splide--initialized');
+                            if (hasSplideInstance) {
+                                root.setAttribute(EXTERNAL_SLIDER_INIT_ATTR, 'splide');
+                                isInitialized = true;
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[GrapesJS] Failed to initialize Splide in editor', error);
+                }
+
+                try {
+                    const jq = frameWin.jQuery || frameWin.$;
+                    if (jq && typeof jq.fn?.slick === 'function') {
+                        const instance = jq(root);
+                        if (instance.hasClass('slick-initialized')) {
+                            instance.slick('setPosition');
+                            isInitialized = true;
+                        } else if (!isInitialized && root.matches?.('.slick-slider')) {
+                            const slickOptions = parseJsonAttribute(root, ['data-slick', 'data-slick-options', 'data-slick-config']);
+                            if (slickOptions) {
+                                instance.slick(slickOptions);
+                                if (instance.hasClass('slick-initialized')) {
+                                    instance.slick('setPosition');
+                                    root.setAttribute(EXTERNAL_SLIDER_INIT_ATTR, 'slick');
+                                    isInitialized = true;
+                                }
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.warn('[GrapesJS] Failed to refresh or initialize Slick in editor', error);
+                }
+
+                if (isInitialized) {
+                    root.removeAttribute(EXTERNAL_SLIDER_FALLBACK_ATTR);
+                    root.querySelectorAll(`[${EXTERNAL_SLIDER_TRACK_ATTR}]`).forEach((node) => {
+                        node.removeAttribute(EXTERNAL_SLIDER_TRACK_ATTR);
+                    });
+                    root.querySelectorAll(`[${EXTERNAL_SLIDER_SLIDE_ATTR}]`).forEach((node) => {
+                        node.removeAttribute(EXTERNAL_SLIDER_SLIDE_ATTR);
+                    });
+                } else {
+                    root.setAttribute(EXTERNAL_SLIDER_FALLBACK_ATTR, 'true');
+                    const hasMultiSlides = tagExternalSliderTrackAndSlides(root);
+                    if (!hasMultiSlides) {
+                        root.removeAttribute(EXTERNAL_SLIDER_FALLBACK_ATTR);
+                    }
+                }
+            });
+
+            try {
+                frameWin.dispatchEvent(new Event('resize'));
+            } catch {
+                // no-op
+            }
+        };
+
         runInjectedTemplateScripts(templateHeadScripts, canvasHead)
             .then(() => runInjectedTemplateScripts(bodyScripts, canvasBody))
             .then(() => {
             // Many imported templates register logic on DOMContentLoaded.
             // Scripts are injected after frame load, so fire synthetic events.
             injectEditorSolutionFallbackCss();
+            injectExternalSliderFallbackCss();
             canvasDoc.dispatchEvent(new Event('DOMContentLoaded', { bubbles: true }));
             canvasDoc.defaultView?.dispatchEvent(new Event('load'));
+            refreshImportedSliders();
+            setTimeout(refreshImportedSliders, 220);
 
             // Fallback: force-reveal blocks that depend on JS-added .active class.
             canvasDoc.querySelectorAll('.reveal').forEach(el => el.classList.add('active'));
@@ -749,7 +1106,8 @@ const totalScripts = templateHeadScripts.length + bodyScripts.length;
         
         btnSave.addEventListener('click', async () => {
             const htmlRaw = editor.getHtml();
-            const html = editor.runCommand('animation-safe:prepare-html-export', { html: htmlRaw }) || htmlRaw;
+            const animationSafeHtml = editor.runCommand('animation-safe:prepare-html-export', { html: htmlRaw }) || htmlRaw;
+            const html = sanitizeProtectedSliderHtmlForSave(animationSafeHtml);
             const css = editor.getCss();
             const json = editor.getProjectData();
 

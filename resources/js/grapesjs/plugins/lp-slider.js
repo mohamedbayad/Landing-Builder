@@ -2,6 +2,9 @@ export default function lpSliderPlugin(editor, opts = {}) {
     const CATEGORY = opts.blockCategory || 'Landing Page Elements';
     const TRACK_CLASS = 'lp-slider__track swiper-wrapper';
     const SLIDE_CLASS = 'lp-slider__slide swiper-slide';
+    const TRACK_SELECTOR = '[data-slider-track], .lp-slider__track, .swiper-wrapper, .splide__track, .splide__list, .slick-track';
+    const SLIDE_SELECTOR = '[data-slider-slide], .lp-slider__slide, .swiper-slide, .splide__slide, .slick-slide';
+    const DIRECT_SLIDE_SELECTOR = ':scope > [data-slider-slide], :scope > .lp-slider__slide, :scope > .swiper-slide, :scope > .splide__slide, :scope > .slick-slide';
     const EDITOR_STYLE_ID = 'lp-slider-editor-style';
     const RUNTIME_SCRIPT_ID = 'lp-slider-runtime-script';
     const SLIDES_MODAL_STYLE_ID = 'lp-slider-slides-modal-style';
@@ -50,16 +53,64 @@ export default function lpSliderPlugin(editor, opts = {}) {
     };
 
     const STYLE_DEFAULTS = { 'data-image-fit': 'cover', 'data-ratio': '4:5', 'data-custom-height': '360', 'data-border-radius': '16', 'data-shadow': 'medium', 'data-overlay': 'false', 'data-caption-align': 'left', 'data-lazy': 'true' };
+    const isLpSliderRootElement = (el) => {
+        if (!el || el.nodeType !== 1) return false;
+        const source = el.getAttribute?.('data-slider-source');
+        const dataComponent = el.getAttribute?.('data-component');
+        const dataGjsType = el.getAttribute?.('data-gjs-type');
+        const version = el.getAttribute?.('data-slider-version');
+        const hasLegacySlidesPayload = !!el.getAttribute?.('data-lp-slides');
+        const hasClass = el.classList?.contains('lp-slider');
+        // Strict contract: require explicit markers.
+        // Prevent hijacking third-party sliders that happen to use `.lp-slider` class names.
+        if (source === 'builder') return true;
+        if (dataComponent === 'builder-slider') return true;
+        if (dataGjsType === 'builder-slider') return true;
+        // Backward compatibility for older builder sliders saved with legacy marker names.
+        if (dataComponent === 'lp-slider' && version && hasLegacySlidesPayload) return true;
+        if (dataGjsType === 'lp-slider' && version && hasLegacySlidesPayload) return true;
+        if (hasClass && version && hasLegacySlidesPayload) return true;
+        return false;
+    };
+    const BEHAVIOR_PRESET_KEYS = new Set([
+        'data-slides-desktop',
+        'data-slides-tablet',
+        'data-slides-mobile',
+        'data-space-between',
+        'data-gap',
+        'data-autoplay',
+        'data-autoplay-delay',
+        'data-loop',
+        'data-arrows',
+        'data-dots',
+        'data-smooth-scroll',
+        'data-speed',
+        'data-draggable',
+        'data-center-mode',
+        'data-initial-slide',
+        'data-pause-on-hover',
+        'data-nav-position',
+    ]);
 
-    const normalizeSlides = (slides) => (Array.isArray(slides) ? slides : []).map((slide, idx) => {
+    const sanitizeSlides = (slides, withFallback = true) => (Array.isArray(slides) ? slides : []).map((slide, idx) => {
         const s = slide || {};
+        const src = String(s.src || '').trim();
+        const alt = String(s.alt || '').trim();
         return {
-            src: String(s.src || '').trim() || placeholder(`Slide ${idx + 1}`),
-            alt: String(s.alt || '').trim() || `Slide ${idx + 1}`,
+            src: withFallback ? (src || placeholder(`Slide ${idx + 1}`)) : src,
+            alt: withFallback ? (alt || `Slide ${idx + 1}`) : alt,
             caption: String(s.caption || '').trim(),
             href: String(s.href || '').trim(),
         };
     });
+    const normalizeSlides = (slides) => sanitizeSlides(slides, true);
+    const normalizeSlidesRaw = (slides) => sanitizeSlides(slides, false);
+
+    const pickPresetAttrs = (presetAttrs, behaviorOnly = true) => {
+        const entries = Object.entries(presetAttrs || {});
+        if (!behaviorOnly) return Object.fromEntries(entries);
+        return Object.fromEntries(entries.filter(([key]) => BEHAVIOR_PRESET_KEYS.has(key)));
+    };
 
     const findSlider = (cmp) => {
         let current = cmp;
@@ -75,8 +126,9 @@ export default function lpSliderPlugin(editor, opts = {}) {
     const ensureRootAttrs = (cmp) => {
         const attrs = { ...(cmp.getAttributes() || {}) };
         attrs.class = Array.from(new Set(`${attrs.class || ''} lp-slider swiper`.trim().split(/\s+/).filter(Boolean))).join(' ');
-        attrs['data-gjs-type'] = 'lp-slider';
-        attrs['data-component'] = 'lp-slider';
+        attrs['data-gjs-type'] = 'builder-slider';
+        attrs['data-component'] = 'builder-slider';
+        attrs['data-slider-source'] = attrs['data-slider-source'] || 'builder';
         attrs['data-slider-version'] = '1.0.0';
         attrs['data-nav-position'] = attrs['data-nav-position'] || 'outside';
         attrs['data-thumbnails'] = attrs['data-thumbnails'] || 'placeholder';
@@ -95,14 +147,15 @@ export default function lpSliderPlugin(editor, opts = {}) {
     const readSlidesFromMarkup = (cmp) => {
         const html = cmp.toHTML ? cmp.toHTML() : '';
         if (!html) return [];
+        const imageSelector = '[data-slider-image], .lp-slider__image, img';
         const doc = new DOMParser().parseFromString(html, 'text/html');
-        const track = doc.querySelector('[data-slider-track], .lp-slider__track');
+        const track = doc.querySelector(TRACK_SELECTOR);
         if (!track) return [];
-        const directSlides = Array.from(track.querySelectorAll(':scope > [data-slider-slide], :scope > .lp-slider__slide'));
-        const slides = directSlides.length ? directSlides : Array.from(track.querySelectorAll('[data-slider-slide], .lp-slider__slide'));
-        return normalizeSlides(slides.map((slideEl, idx) => ({
-            src: slideEl.querySelector('[data-slider-image], .lp-slider__image, img')?.getAttribute('src') || '',
-            alt: slideEl.querySelector('[data-slider-image], .lp-slider__image, img')?.getAttribute('alt') || `Slide ${idx + 1}`,
+        const directSlides = Array.from(track.querySelectorAll(DIRECT_SLIDE_SELECTOR));
+        const slides = directSlides.length ? directSlides : Array.from(track.querySelectorAll(SLIDE_SELECTOR));
+        return normalizeSlidesRaw(slides.map((slideEl, idx) => ({
+            src: slideEl.querySelector(imageSelector)?.getAttribute('src') || '',
+            alt: slideEl.querySelector(imageSelector)?.getAttribute('alt') || `Slide ${idx + 1}`,
             caption: slideEl.querySelector('.lp-slider__caption')?.textContent?.trim() || '',
             href: slideEl.querySelector('a[href]')?.getAttribute('href') || '',
         })));
@@ -114,6 +167,7 @@ export default function lpSliderPlugin(editor, opts = {}) {
             tagName: 'img',
             attributes: {
                 class: 'lp-slider__image',
+                'data-lp-managed': 'true',
                 'data-slider-image': 'true',
                 src: slide.src,
                 alt: slide.alt || `Slide ${idx + 1}`,
@@ -122,9 +176,9 @@ export default function lpSliderPlugin(editor, opts = {}) {
         };
         const mediaChildren = [img];
         if (bool(attrs['data-overlay'])) {
-            mediaChildren.push({ type: 'default', tagName: 'div', attributes: { class: 'lp-slider__overlay', 'aria-hidden': 'true' } });
+            mediaChildren.push({ type: 'default', tagName: 'div', attributes: { class: 'lp-slider__overlay', 'data-lp-managed': 'true', 'aria-hidden': 'true' } });
         }
-        const media = { type: 'default', tagName: 'div', attributes: { class: 'lp-slider__media' }, components: mediaChildren };
+        const media = { type: 'default', tagName: 'div', attributes: { class: 'lp-slider__media', 'data-lp-managed': 'true' }, components: mediaChildren };
         const children = [];
         if (bool(attrs['data-enable-links']) && slide.href) {
             children.push({ type: 'link', tagName: 'a', attributes: { class: 'lp-slider__link', href: slide.href, target: '_self', rel: 'noopener' }, components: [media] });
@@ -132,7 +186,7 @@ export default function lpSliderPlugin(editor, opts = {}) {
             children.push(media);
         }
         if (bool(attrs['data-enable-captions']) && slide.caption) {
-            children.push({ type: 'text', tagName: 'div', attributes: { class: 'lp-slider__caption' }, content: slide.caption });
+            children.push({ type: 'text', tagName: 'div', attributes: { class: 'lp-slider__caption', 'data-lp-managed': 'true' }, content: slide.caption });
         }
         return { type: 'default', tagName: 'div', attributes: { class: SLIDE_CLASS, 'data-slider-slide': 'true', 'data-slide-index': String(idx) }, components: children };
     };
@@ -152,36 +206,68 @@ export default function lpSliderPlugin(editor, opts = {}) {
         }
     };
 
-    const syncSlider = (cmp) => {
+    const ensureControlNode = (cmp, selector, nodeFactory) => {
+        if (cmp.find(selector).length) return;
+        const collection = cmp.components?.();
+        if (collection?.add) {
+            collection.add(nodeFactory());
+            return;
+        }
+        if (cmp.append) cmp.append(nodeFactory());
+    };
+
+    const syncSlider = (cmp, optsArg = {}) => {
+        const { rebuildSlides = false, fallbackSlides = [] } = optsArg;
         const attrs = cmp.getAttributes() || {};
         const slides = normalizeSlides(cmp.get('lpSlides'));
-        const safeSlides = slides.length > 0 ? slides : normalizeSlides(PRESETS.gallery.slides);
+        const fallback = normalizeSlides(fallbackSlides).length ? normalizeSlides(fallbackSlides) : normalizeSlides(PRESETS.gallery.slides);
+        const safeSlides = slides.length > 0 ? slides : fallback;
         cmp.__lpSliderSyncing = true;
         ensureRootAttrs(cmp);
         const gap = String((attrs['data-space-between'] ?? attrs['data-gap'] ?? '24'));
-        cmp.addAttributes({ 'data-lp-slides': JSON.stringify(safeSlides), 'data-slide-count': String(safeSlides.length) });
         cmp.addAttributes({ 'data-space-between': gap, 'data-gap': gap });
-        cmp.components([
-            { type: 'default', tagName: 'div', attributes: { class: TRACK_CLASS, 'data-slider-track': 'true' }, components: safeSlides.map((s, idx) => slideToNode(s, idx, attrs)) },
-            { type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--prev', type: 'button', 'aria-label': attrs['data-prev-label'] || 'Previous slide' }, content: '&#8249;' },
-            { type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--next', type: 'button', 'aria-label': attrs['data-next-label'] || 'Next slide' }, content: '&#8250;' },
-            { type: 'default', tagName: 'div', attributes: { class: 'lp-slider__dots' } },
-        ]);
+        const hasTrack = cmp.find(TRACK_SELECTOR).length > 0;
+        if (rebuildSlides || !hasTrack) {
+            cmp.components([
+                { type: 'default', tagName: 'div', attributes: { class: TRACK_CLASS, 'data-slider-track': 'true' }, components: safeSlides.map((s, idx) => slideToNode(s, idx, attrs)) },
+                { type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--prev', type: 'button', 'aria-label': attrs['data-prev-label'] || 'Previous slide' }, content: '&#8249;' },
+                { type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--next', type: 'button', 'aria-label': attrs['data-next-label'] || 'Next slide' }, content: '&#8250;' },
+                { type: 'default', tagName: 'div', attributes: { class: 'lp-slider__dots' } },
+            ]);
+        } else {
+            ensureControlNode(cmp, '.lp-slider__arrow--prev', () => ({ type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--prev', type: 'button' }, content: '&#8249;' }));
+            ensureControlNode(cmp, '.lp-slider__arrow--next', () => ({ type: 'default', tagName: 'button', attributes: { class: 'lp-slider__arrow lp-slider__arrow--next', type: 'button' }, content: '&#8250;' }));
+            ensureControlNode(cmp, '.lp-slider__dots', () => ({ type: 'default', tagName: 'div', attributes: { class: 'lp-slider__dots' } }));
+            cmp.find('.lp-slider__arrow--prev').forEach((node) => node.addAttributes({ 'aria-label': attrs['data-prev-label'] || 'Previous slide' }));
+            cmp.find('.lp-slider__arrow--next').forEach((node) => node.addAttributes({ 'aria-label': attrs['data-next-label'] || 'Next slide' }));
+        }
+        const serializedSlides = normalizeSlidesRaw(readSlidesFromMarkup(cmp));
+        const effectiveSlides = serializedSlides.length ? serializedSlides : safeSlides;
+        cmp.set('lpSlides', effectiveSlides, { silent: true });
+        cmp.addAttributes({
+            'data-lp-slides': JSON.stringify(effectiveSlides),
+            'data-slide-count': String(effectiveSlides.length),
+        });
         cmp.__lpSliderSyncing = false;
     };
 
     const applyPreset = (cmp, presetKey, replaceSlides = false) => {
         const key = PRESETS[presetKey] ? presetKey : 'gallery';
         const preset = PRESETS[key];
+        const preserveDesign = bool(cmp.getAttributes()?.['data-preserve-card-design'], true);
+        const behaviorOnly = preserveDesign && !replaceSlides;
+        const presetAttrs = pickPresetAttrs(preset.attrs, behaviorOnly);
         cmp.__lpSliderSyncing = true;
-        cmp.addAttributes({ ...(cmp.getAttributes() || {}), 'data-preset': key, ...preset.attrs });
+        cmp.addAttributes({ ...(cmp.getAttributes() || {}), 'data-preset': key, ...presetAttrs });
         cmp.__lpSliderSyncing = false;
-        if (replaceSlides || normalizeSlides(cmp.get('lpSlides')).length === 0) {
+        if (replaceSlides) {
             cmp.set('lpSlides', normalizeSlides(preset.slides));
-        } else {
-            syncSlider(cmp);
+            syncSlider(cmp, { rebuildSlides: true, fallbackSlides: preset.slides });
             refreshRuntime(cmp);
+            return;
         }
+        syncSlider(cmp, { rebuildSlides: false });
+        refreshRuntime(cmp);
     };
 
     const openAssets = (onSelect) => {
@@ -607,7 +693,8 @@ export default function lpSliderPlugin(editor, opts = {}) {
             const next = normalizeSlides(slides);
             cmp.set('lpSlides', next);
             cmp.addAttributes({ 'data-lp-slides': JSON.stringify(next) });
-            syncSlider(cmp);
+            // Slide manager is an explicit layout/content action, so rebuilding is expected here.
+            syncSlider(cmp, { rebuildSlides: true });
             refreshRuntime(cmp);
             closeModal();
         });
@@ -620,19 +707,35 @@ export default function lpSliderPlugin(editor, opts = {}) {
     const renderPresetModal = (cmp) => {
         const root = document.createElement('div');
         root.style.cssText = 'font-family:Inter,Arial,sans-serif;color:#e5e7eb;min-width:min(760px,90vw);';
-        root.innerHTML = `<p style="margin:0 0 12px;font-size:13px;color:#9ca3af;">Apply a slider preset for section intent.</p><div data-slot="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;"></div><div style="display:flex;justify-content:flex-end;margin-top:14px;"><button data-action="close" type="button" style="border:1px solid #4b5563;background:transparent;color:#e5e7eb;padding:8px 14px;border-radius:8px;cursor:pointer;">Close</button></div>`;
+        root.innerHTML = `
+            <p style="margin:0 0 8px;font-size:13px;color:#9ca3af;">Preset changes update slider behavior only (speed, autoplay, navigation, responsive settings).</p>
+            <p style="margin:0 0 12px;font-size:12px;color:#7f8db0;">With "Preserve Custom Card Design" enabled, preset switching keeps your current slide/card HTML and styles untouched. Use "Replace Layout" only when you intentionally want to overwrite slide content.</p>
+            <div data-slot="grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;"></div>
+            <div style="display:flex;justify-content:flex-end;margin-top:14px;">
+                <button data-action="close" type="button" style="border:1px solid #4b5563;background:transparent;color:#e5e7eb;padding:8px 14px;border-radius:8px;cursor:pointer;">Close</button>
+            </div>
+        `;
         const grid = root.querySelector('[data-slot="grid"]');
         Object.keys(PRESETS).forEach((key) => {
-            const btn = document.createElement('button');
-            btn.type = 'button';
-            btn.style.cssText = 'text-align:left;border:1px solid #374151;border-radius:10px;background:#111827;color:#f9fafb;padding:10px;cursor:pointer;';
-            btn.innerHTML = `<strong style="display:block;font-size:13px;margin-bottom:4px;">${key}</strong><span style="font-size:11px;color:#9ca3af;">Desktop slides: ${PRESETS[key].attrs['data-slides-desktop'] || '1'}</span>`;
-            btn.addEventListener('click', () => {
+            const card = document.createElement('div');
+            card.style.cssText = 'border:1px solid #374151;border-radius:10px;background:#111827;color:#f9fafb;padding:10px;';
+            card.innerHTML = `
+                <strong style="display:block;font-size:13px;margin-bottom:4px;">${key}</strong>
+                <span style="display:block;font-size:11px;color:#9ca3af;margin-bottom:10px;">Desktop slides: ${PRESETS[key].attrs['data-slides-desktop'] || '1'}</span>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                    <button data-action="behavior" type="button" style="border:1px solid #4f46e5;background:#4f46e5;color:#fff;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:11px;">Apply Behavior</button>
+                    <button data-action="template" type="button" style="border:1px solid #6b7280;background:transparent;color:#e5e7eb;padding:6px 10px;border-radius:8px;cursor:pointer;font-size:11px;">Replace Layout</button>
+                </div>
+            `;
+            card.querySelector('[data-action="behavior"]')?.addEventListener('click', () => {
                 applyPreset(cmp, key, false);
-                refreshRuntime(cmp);
                 editor.Modal.close();
             });
-            grid.appendChild(btn);
+            card.querySelector('[data-action="template"]')?.addEventListener('click', () => {
+                applyPreset(cmp, key, true);
+                editor.Modal.close();
+            });
+            grid.appendChild(card);
         });
         root.querySelector('[data-action="close"]')?.addEventListener('click', () => editor.Modal.close());
         editor.Modal.setTitle('Apply Slider Preset');
@@ -643,7 +746,7 @@ export default function lpSliderPlugin(editor, opts = {}) {
     const resetStyle = (cmp) => {
         cmp.setStyle({});
         cmp.addAttributes({ ...(cmp.getAttributes() || {}), ...STYLE_DEFAULTS });
-        syncSlider(cmp);
+        syncSlider(cmp, { rebuildSlides: false });
         refreshRuntime(cmp);
     };
 
@@ -656,45 +759,32 @@ export default function lpSliderPlugin(editor, opts = {}) {
             style.id = EDITOR_STYLE_ID;
             style.textContent = `
                 .lp-slider.gjs-selected { outline:2px dashed #6366f1!important; }
-                .gjs-cv-canvas .lp-slider,
-                html[data-lp-slider-editor] .lp-slider,
-                html[data-gjs-editor-canvas] .lp-slider {
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"],
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"],
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] {
                     overflow-x: auto !important;
                     overflow-y: visible !important;
                     -webkit-overflow-scrolling: touch;
                 }
-                .gjs-cv-canvas .lp-slider [data-slider-track],
-                .gjs-cv-canvas .lp-slider .lp-slider__track,
-                html[data-lp-slider-editor] .lp-slider [data-slider-track],
-                html[data-lp-slider-editor] .lp-slider .lp-slider__track,
-                html[data-gjs-editor-canvas] .lp-slider [data-slider-track],
-                html[data-gjs-editor-canvas] .lp-slider .lp-slider__track {
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"] [data-slider-track],
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"] .lp-slider__track,
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"] [data-slider-track],
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"] .lp-slider__track,
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] [data-slider-track],
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] .lp-slider__track {
                     min-height: 40px;
-                    display: flex !important;
-                    gap: 16px !important;
-                    transform: none !important;
-                    animation: none !important;
-                    transition: none !important;
-                    overflow: visible !important;
-                    width: max-content !important;
                 }
-                .gjs-cv-canvas .lp-slider [data-slider-slide],
-                .gjs-cv-canvas .lp-slider .lp-slider__slide,
-                html[data-lp-slider-editor] .lp-slider [data-slider-slide],
-                html[data-lp-slider-editor] .lp-slider .lp-slider__slide,
-                html[data-gjs-editor-canvas] .lp-slider [data-slider-slide],
-                html[data-gjs-editor-canvas] .lp-slider .lp-slider__slide {
-                    flex: 0 0 auto !important;
-                    width: 260px !important;
-                    opacity: 1 !important;
-                    visibility: visible !important;
-                    transform: none !important;
-                    animation: none !important;
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"] [data-slider-slide],
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"] .lp-slider__slide,
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"] [data-slider-slide],
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"] .lp-slider__slide,
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] [data-slider-slide],
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] .lp-slider__slide {
                     pointer-events: auto !important;
                 }
-                .gjs-cv-canvas .lp-slider .lp-slider__caption,
-                html[data-lp-slider-editor] .lp-slider .lp-slider__caption,
-                html[data-gjs-editor-canvas] .lp-slider .lp-slider__caption { pointer-events: none; }
+                .gjs-cv-canvas .lp-slider[data-lp-mode="editor"] .lp-slider__caption,
+                html[data-lp-slider-editor] .lp-slider[data-lp-mode="editor"] .lp-slider__caption,
+                html[data-gjs-editor-canvas] .lp-slider[data-lp-mode="editor"] .lp-slider__caption { pointer-events: none; }
             `;
             doc.head.appendChild(style);
         }
@@ -710,7 +800,9 @@ export default function lpSliderPlugin(editor, opts = {}) {
 
     const TRAITS = [
         { type: 'button', name: 'lp-edit-slides', text: 'Edit Slides', full: true, command: () => editor.runCommand('lp-slider:edit-slides'), category: 'Content' },
-        { type: 'select', name: 'data-preset', label: 'Preset', options: [{ id: 'gallery', name: 'Gallery' }, { id: 'logos', name: 'Logos' }, { id: 'testimonials', name: 'Testimonials' }, { id: 'product-showcase', name: 'Product Showcase' }, { id: 'social-proof', name: 'Social Proof / UGC' }], category: 'Content' },
+        { type: 'select', name: 'data-preset', label: 'Preset (Behavior Only)', options: [{ id: 'gallery', name: 'Gallery' }, { id: 'logos', name: 'Logos' }, { id: 'testimonials', name: 'Testimonials' }, { id: 'product-showcase', name: 'Product Showcase' }, { id: 'social-proof', name: 'Social Proof / UGC' }], category: 'Content' },
+        { type: 'checkbox', name: 'data-preserve-card-design', label: 'Preserve Custom Card Design', valueTrue: 'true', valueFalse: 'false', category: 'Content' },
+        { type: 'button', name: 'lp-replace-template', text: 'Replace With Preset Template', full: true, command: () => editor.runCommand('lp-slider:apply-preset-template'), category: 'Content' },
         { type: 'checkbox', name: 'data-enable-captions', label: 'Captions', valueTrue: 'true', valueFalse: 'false', category: 'Content' },
         { type: 'checkbox', name: 'data-enable-links', label: 'Links', valueTrue: 'true', valueFalse: 'false', category: 'Content' },
         { type: 'checkbox', name: 'data-lightbox', label: 'Lightbox', valueTrue: 'true', valueFalse: 'false', category: 'Content' },
@@ -759,11 +851,18 @@ export default function lpSliderPlugin(editor, opts = {}) {
             const cmp = getSliderTarget(ed, optsArg);
             if (!cmp) return;
             if (optsArg.preset) {
-                applyPreset(cmp, optsArg.preset, false);
-                refreshRuntime(cmp);
+                applyPreset(cmp, optsArg.preset, Boolean(optsArg.replaceTemplate));
                 return;
             }
             renderPresetModal(cmp);
+        },
+    });
+    editor.Commands.add('lp-slider:apply-preset-template', {
+        run(ed, sender, optsArg = {}) {
+            const cmp = getSliderTarget(ed, optsArg);
+            if (!cmp) return;
+            const key = optsArg.preset || cmp.getAttributes()?.['data-preset'] || 'gallery';
+            applyPreset(cmp, key, true);
         },
     });
     editor.Commands.add('lp-slider:reset-style', {
@@ -777,9 +876,7 @@ export default function lpSliderPlugin(editor, opts = {}) {
     editor.DomComponents.addType('lp-slider', {
         isComponent(el) {
             if (!el || el.nodeType !== 1) return false;
-            if (el.classList?.contains('lp-slider')) return { type: 'lp-slider' };
-            if (el.getAttribute?.('data-component') === 'lp-slider') return { type: 'lp-slider' };
-            if (el.getAttribute?.('data-gjs-type') === 'lp-slider') return { type: 'lp-slider' };
+            if (isLpSliderRootElement(el)) return { type: 'lp-slider' };
             return false;
         },
         model: {
@@ -793,16 +890,19 @@ export default function lpSliderPlugin(editor, opts = {}) {
                 traits: TRAITS,
                 toolbar: [
                     { attributes: { class: 'fa fa-images', title: 'Edit Slides' }, command: 'lp-slider:edit-slides' },
-                    { attributes: { class: 'fa fa-sliders', title: 'Apply Preset' }, command: 'lp-slider:apply-preset' },
+                    { attributes: { class: 'fa fa-sliders', title: 'Apply Preset (Behavior)' }, command: 'lp-slider:apply-preset' },
+                    { attributes: { class: 'fa fa-refresh', title: 'Replace With Preset Template' }, command: 'lp-slider:apply-preset-template' },
                     { attributes: { class: 'fa fa-clone', title: 'Duplicate Component' }, command: 'tlb-clone' },
                     { attributes: { class: 'fa fa-undo', title: 'Reset Style' }, command: 'lp-slider:reset-style' },
                 ],
                 attributes: {
                     class: 'lp-slider swiper',
-                    'data-gjs-type': 'lp-slider',
-                    'data-component': 'lp-slider',
+                    'data-gjs-type': 'builder-slider',
+                    'data-component': 'builder-slider',
+                    'data-slider-source': 'builder',
                     'data-slider-version': '1.0.0',
                     'data-preset': 'gallery',
+                    'data-preserve-card-design': 'true',
                     ...PRESETS.gallery.attrs,
                     ...STYLE_DEFAULTS,
                     'data-pause-on-hover': 'true',
@@ -825,27 +925,25 @@ export default function lpSliderPlugin(editor, opts = {}) {
             init() {
                 ensureRootAttrs(this);
                 const attrs = this.getAttributes() || {};
-                const fromModel = normalizeSlides(this.get('lpSlides'));
+                const fromModel = normalizeSlidesRaw(this.get('lpSlides'));
                 const fromAttr = normalizeSlides(jparse(attrs['data-lp-slides']));
-                const fromMarkup = normalizeSlides(readSlidesFromMarkup(this));
-                // Priority: explicit model state -> existing markup -> serialized attr fallback.
-                // This prevents default placeholder attrs from overriding real imported slides.
-                const parsed = fromModel.length ? fromModel : (fromMarkup.length ? fromMarkup : fromAttr);
+                const fromMarkup = normalizeSlidesRaw(readSlidesFromMarkup(this));
+                // Existing markup should always win in editor to prevent replacing real cards with placeholders.
+                const parsed = fromMarkup.length ? fromMarkup : (fromModel.length ? fromModel : fromAttr);
                 this.set('lpSlides', parsed.length ? parsed : normalizeSlides(PRESETS.gallery.slides), { silent: true });
-                syncSlider(this);
+                syncSlider(this, { rebuildSlides: !fromMarkup.length });
                 this.on('change:lpSlides', () => {
                     if (this.__lpSliderSyncing) return;
-                    syncSlider(this);
+                    syncSlider(this, { rebuildSlides: true });
                     refreshRuntime(this);
                 });
                 this.on('change:attributes:data-preset', () => {
                     if (this.__lpSliderSyncing) return;
                     applyPreset(this, this.getAttributes()?.['data-preset'] || 'gallery', false);
-                    refreshRuntime(this);
                 });
                 this.on('change:attributes', () => {
                     if (this.__lpSliderSyncing) return;
-                    syncSlider(this);
+                    syncSlider(this, { rebuildSlides: false });
                     refreshRuntime(this);
                 });
             },

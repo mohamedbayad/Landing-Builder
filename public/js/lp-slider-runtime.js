@@ -1,5 +1,7 @@
 (function () {
-    const SELECTOR = '.lp-slider[data-component="lp-slider"], .lp-slider[data-gjs-type="lp-slider"], [data-component="lp-slider"], [data-gjs-type="lp-slider"]';
+    const SELECTOR = '[data-slider-source="builder"], [data-component="builder-slider"], [data-gjs-type="builder-slider"], .lp-slider[data-component="lp-slider"][data-slider-version][data-lp-slides], .lp-slider[data-gjs-type="lp-slider"][data-slider-version][data-lp-slides], [data-component="lp-slider"][data-slider-version][data-lp-slides], [data-gjs-type="lp-slider"][data-slider-version][data-lp-slides]';
+    const TRACK_SELECTOR = '[data-slider-track], .lp-slider__track, .swiper-wrapper, .splide__track, .splide__list';
+    const SLIDE_SELECTOR = '[data-slider-slide], .lp-slider__slide, .swiper-slide, .splide__slide';
     const SWIPER_JS = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js';
     const SWIPER_CSS = 'https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css';
     const SPLIDE_JS = 'https://cdn.jsdelivr.net/npm/@splidejs/splide@4/dist/js/splide.min.js';
@@ -192,6 +194,7 @@
         const dots = bool(el.getAttribute('data-dots'), true);
         const smoothScroll = bool(el.getAttribute('data-smooth-scroll'), false);
         const pauseOnHover = bool(el.getAttribute('data-pause-on-hover'), true);
+        const preserveCardDesign = bool(el.getAttribute('data-preserve-card-design'), true);
         return {
             speed,
             loop,
@@ -206,6 +209,7 @@
             dots,
             smoothScroll,
             pauseOnHover,
+            preserveCardDesign,
         };
     }
 
@@ -329,8 +333,14 @@
     }
 
     function ensureStructure(el) {
-        const track = el.querySelector('[data-slider-track], .lp-slider__track');
+        let track = el.querySelector(TRACK_SELECTOR);
         if (!track) return null;
+
+        if (track.classList.contains('splide__track')) {
+            const list = track.querySelector(':scope > .splide__list');
+            if (list) track = list;
+        }
+
         if (track.getAttribute('data-slider-track') !== 'true') {
             track.setAttribute('data-slider-track', 'true');
         }
@@ -345,9 +355,9 @@
         track.classList.add('lp-slider__track');
         track.classList.remove('lp-slider--native-track');
         track.classList.add('swiper-wrapper');
-        let slides = Array.from(track.children).filter((child) => child.nodeType === 1 && (child.matches?.('[data-slider-slide], .lp-slider__slide') || child.classList.contains('swiper-slide')));
+        let slides = Array.from(track.children).filter((child) => child.nodeType === 1 && child.matches?.(SLIDE_SELECTOR));
         if (!slides.length) {
-            slides = Array.from(track.querySelectorAll('[data-slider-slide], .lp-slider__slide')).filter((slide) => slide !== track);
+            slides = Array.from(track.querySelectorAll(SLIDE_SELECTOR)).filter((slide) => slide !== track);
             slides.forEach((slide) => {
                 if (slide.parentElement !== track) {
                     track.appendChild(slide);
@@ -359,7 +369,7 @@
             if (slide.getAttribute('data-slider-slide') !== 'true') {
                 slide.setAttribute('data-slider-slide', 'true');
             }
-            const image = slide.querySelector('[data-slider-image], .lp-slider__image, img');
+            const image = slide.querySelector('[data-slider-image], .lp-slider__image');
             if (image) image.classList.add('lp-slider__image');
             if (image && image.getAttribute('data-slider-image') !== 'true') {
                 image.setAttribute('data-slider-image', 'true');
@@ -417,7 +427,7 @@
             track.style.removeProperty('margin');
             track.style.removeProperty('padding');
             track.style.removeProperty('animation');
-            track.querySelectorAll('[data-slider-slide], .lp-slider__slide').forEach((slide) => {
+            track.querySelectorAll(SLIDE_SELECTOR).forEach((slide) => {
                 slide.style.removeProperty('flex');
                 slide.style.removeProperty('width');
                 slide.style.removeProperty('min-width');
@@ -439,6 +449,7 @@
         const align = el.getAttribute('data-caption-align') || 'left';
         const lazy = bool(el.getAttribute('data-lazy'), true);
         const overlay = bool(el.getAttribute('data-overlay'), false);
+        const preserveCardDesign = bool(el.getAttribute('data-preserve-card-design'), true);
 
         const shadowMap = {
             none: 'none',
@@ -448,7 +459,9 @@
         };
         const ratioMap = { '1:1': '1 / 1', '4:5': '4 / 5', '16:9': '16 / 9' };
 
-        el.querySelectorAll('.lp-slider__media').forEach((media) => {
+        if (preserveCardDesign) return;
+
+        el.querySelectorAll('.lp-slider__media[data-lp-managed="true"]').forEach((media) => {
             media.style.borderRadius = `${radius}px`;
             media.style.boxShadow = shadowMap[shadow] || shadowMap.medium;
             if (ratio === 'custom') {
@@ -469,11 +482,11 @@
             }
             if (!overlay) media.querySelectorAll('.lp-slider__overlay').forEach((n) => n.remove());
         });
-        el.querySelectorAll('.lp-slider__image').forEach((img) => {
+        el.querySelectorAll('.lp-slider__image[data-lp-managed="true"]').forEach((img) => {
             img.style.objectFit = fit;
             img.setAttribute('loading', lazy ? 'lazy' : 'eager');
         });
-        el.querySelectorAll('.lp-slider__caption').forEach((cap) => {
+        el.querySelectorAll('.lp-slider__caption[data-lp-managed="true"]').forEach((cap) => {
             cap.style.textAlign = align;
         });
     }
@@ -538,7 +551,7 @@
             slide.style.removeProperty('opacity');
             slide.style.removeProperty('visibility');
         });
-        track.querySelectorAll('[data-slider-image], .lp-slider__image, img').forEach((img) => {
+        track.querySelectorAll('[data-slider-image], .lp-slider__image').forEach((img) => {
             img.style.removeProperty('transform');
             img.style.removeProperty('transition');
             img.style.removeProperty('animation');
@@ -609,7 +622,7 @@
     }
 
     function initSwiper(el) {
-        clearTransientState(el, el.querySelector('[data-slider-track], .lp-slider__track'));
+        clearTransientState(el, el.querySelector(TRACK_SELECTOR));
         el.setAttribute('data-lp-mode', 'preview');
 
         const opts = parseSliderAttributes(el);
@@ -804,7 +817,7 @@
 
     function observe() {
         if (window.__lpSliderObserver) return;
-        const ATTRS = ['data-speed', 'data-loop', 'data-slides-desktop', 'data-slides-tablet', 'data-slides-mobile', 'data-space-between', 'data-gap', 'data-autoplay', 'data-center-mode', 'data-initial-slide', 'data-arrows', 'data-dots', 'data-slide-count', 'data-preset', 'data-smooth-scroll'];
+        const ATTRS = ['data-speed', 'data-loop', 'data-slides-desktop', 'data-slides-tablet', 'data-slides-mobile', 'data-space-between', 'data-gap', 'data-autoplay', 'data-center-mode', 'data-initial-slide', 'data-arrows', 'data-dots', 'data-slide-count', 'data-preset', 'data-smooth-scroll', 'data-preserve-card-design'];
         const observer = new MutationObserver((mutations) => {
             const nodes = [];
             mutations.forEach((m) => {
