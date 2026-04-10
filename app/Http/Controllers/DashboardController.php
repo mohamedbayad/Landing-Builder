@@ -85,7 +85,14 @@ class DashboardController extends Controller
 
         // ===== TRAFFIC SOURCES & DEVICES (Via Service) =====
         $breakdowns = $this->analytics->getBreakdowns($chartLandingIds, $chartStart, $chartEnd);
-        $trafficSources = $breakdowns['sources_pct'];
+        $trafficSourcesRaw = $breakdowns['sources_pct'];
+        // Dashboard shows a simplified 4-source donut where Paid + Social are combined as "Paid Ads".
+        $trafficSources = [
+            'Direct' => $trafficSourcesRaw['Direct'] ?? 0,
+            'Social' => round(($trafficSourcesRaw['Social'] ?? 0) + ($trafficSourcesRaw['Paid'] ?? 0), 1),
+            'Search' => $trafficSourcesRaw['Search'] ?? 0,
+            'Referral' => $trafficSourcesRaw['Referral'] ?? 0,
+        ];
         $deviceDistribution = $breakdowns['devices'];
 
         // ===== CHART DATA (Via Service) =====

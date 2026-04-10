@@ -120,7 +120,7 @@
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <span class="w-3 h-3 rounded-full bg-pink-500"></span>
-                                    <span class="text-sm text-gray-600 dark:text-gray-300">Social</span>
+                                    <span class="text-sm text-gray-600 dark:text-gray-300">Paid Ads</span>
                                     <span class="ml-auto text-sm font-semibold text-gray-900 dark:text-white">{{ $trafficSources['Social'] }}%</span>
                                 </div>
                                 <div class="flex items-center gap-2">

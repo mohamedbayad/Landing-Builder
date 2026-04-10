@@ -111,7 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
         new Chart(sourcesCtx, {
             type: 'doughnut',
             data: {
-                labels: ['Direct', 'Social', 'Search', 'Referral'],
+                labels: ['Direct', 'Paid Ads', 'Search', 'Referral'],
                 datasets: [{
                     data: [
                         chartData.trafficSources.Direct,
