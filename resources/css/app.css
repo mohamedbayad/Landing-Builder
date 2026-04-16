@@ -2,6 +2,52 @@
 @tailwind components;
 @tailwind utilities;
 
+/* =========================================
+   Professional Design System – Base Layer
+   ========================================= */
+
+@layer base {
+    :root {
+        --radius: 0.5rem;
+        --transition-fast: 120ms ease;
+        --transition-base: 200ms ease;
+    }
+
+    html {
+        -webkit-font-smoothing: antialiased;
+        -moz-osx-font-smoothing: grayscale;
+        text-rendering: optimizeLegibility;
+    }
+
+    /* Refined global scrollbar */
+    ::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    ::-webkit-scrollbar-thumb {
+        background: rgba(156, 163, 175, 0.35);
+        border-radius: 99px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+        background: rgba(156, 163, 175, 0.6);
+    }
+    .dark ::-webkit-scrollbar-thumb {
+        background: rgba(255,255,255,0.1);
+    }
+    .dark ::-webkit-scrollbar-thumb:hover {
+        background: rgba(255,255,255,0.18);
+    }
+
+    /* Selection */
+    ::selection {
+        background: rgba(249, 115, 22, 0.25);
+        color: inherit;
+    }
+}
+
 /* GrapesJS Dark Theme Overrides */
 .gjs-one-bg {
     background-color: #2e2e2e !important;
@@ -160,3 +206,204 @@
 
 /* Ensure properties are NOT forced block, to allow toggling */
 /* We remove the previous override */
+
+/* ========================================
+   Professional Dashboard Custom Utilities
+   ======================================== */
+
+/* Scrollbar Hide */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Sidebar Drawer Transition */
+.sidebar-drawer {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sidebar-drawer.closed {
+    transform: translateX(-100%);
+}
+[dir="rtl"] .sidebar-drawer.closed {
+    transform: translateX(100%);
+}
+
+/* Sidebar Overlay */
+.sidebar-overlay {
+    transition: opacity 0.25s ease;
+}
+
+/* Active Nav Indicator (left-border accent stripe) */
+.nav-active-indicator {
+    position: relative;
+}
+.nav-active-indicator::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    height: 60%;
+    width: 3px;
+    border-radius: 0 3px 3px 0;
+    background: linear-gradient(180deg, #FB923C, #F97316);
+}
+[dir="rtl"] .nav-active-indicator::before {
+    left: auto;
+    right: 0;
+    border-radius: 3px 0 0 3px;
+}
+
+/* Responsive Table Card View (mobile) */
+.table-responsive-card {
+    display: block;
+}
+@media (max-width: 639px) {
+    .table-responsive-card thead { display: none; }
+    .table-responsive-card tbody tr {
+        display: block;
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+        border-radius: 0.75rem;
+        border: 1px solid #e5e7eb;
+    }
+    .dark .table-responsive-card tbody tr {
+        border-color: #374151;
+    }
+    .table-responsive-card tbody td {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0.375rem 0;
+        border: none !important;
+    }
+    .table-responsive-card tbody td::before {
+        content: attr(data-label);
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        color: #6b7280;
+        margin-right: 1rem;
+        flex-shrink: 0;
+    }
+    .dark .table-responsive-card tbody td::before {
+        color: #9ca3af;
+    }
+}
+
+/* ========================================
+   Professional Component Enhancements
+   ======================================== */
+
+/* Fade-in animation for page content */
+.page-fade-in {
+    animation: pageFadeIn 0.2s ease-out;
+}
+@keyframes pageFadeIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* Focus ring – globally consistent */
+*:focus-visible {
+    outline: 2px solid #F97316;
+    outline-offset: 2px;
+}
+
+/* Card base – light & dark */
+.pro-card {
+    background: #fff;
+    border-radius: 0.75rem;
+    border: 1px solid #F3F4F6;
+    box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+.dark .pro-card {
+    background: #161B22;
+    border-color: rgba(255,255,255,0.06);
+    box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+}
+.pro-card:hover {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+    transform: translateY(-1px);
+}
+.dark .pro-card:hover {
+    box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+}
+
+/* Stat number – tabular nums for clean alignment */
+.stat-number {
+    font-variant-numeric: tabular-nums;
+    font-feature-settings: "tnum";
+    letter-spacing: -0.02em;
+}
+
+/* Badge - refined */
+.badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.2rem 0.55rem;
+    font-size: 0.7rem;
+    font-weight: 600;
+    border-radius: 99px;
+    letter-spacing: 0.01em;
+}
+
+/* Table refinements */
+.pro-table th {
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: #6B7280;
+}
+.dark .pro-table th {
+    color: #6B7280;
+}
+.pro-table td {
+    font-size: 0.875rem;
+    color: #374151;
+}
+.dark .pro-table td {
+    color: #D1D5DB;
+}
+
+/* Sidebar nav section label */
+.nav-section-label {
+    font-size: 0.65rem;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: rgba(255,255,255,0.25);
+    padding: 0 0.75rem;
+    margin: 1.25rem 0 0.375rem;
+    user-select: none;
+}
+
+/* Input – refined focus glow */
+input:focus, textarea:focus, select:focus {
+    box-shadow: 0 0 0 3px rgba(249,115,22,0.12) !important;
+}
+
+/* Button – smooth press */
+button:active {
+    transform: translateY(1px);
+}
+
+/* Link hover underline animation */
+.link-animated {
+    position: relative;
+    text-decoration: none;
+}
+.link-animated::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: -1px;
+    width: 0;
+    height: 1px;
+    background: currentColor;
+    transition: width 0.2s ease;
+}
+.link-animated:hover::after {
+    width: 100%;
+}

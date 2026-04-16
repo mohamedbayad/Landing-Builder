@@ -2,16 +2,16 @@
     <x-slot name="header">
         <div class="flex items-center justify-between">
             <div>
-                <h2 class="font-bold text-2xl text-gray-900 dark:text-white leading-tight tracking-tight">
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
                     Who's Online
                 </h2>
                 <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Real-time visitor activity & geographic breakdown</p>
             </div>
             <div class="flex items-center gap-3">
                 <span class="text-xs text-gray-400 dark:text-gray-500">
-                    Auto-refresh in <span id="refresh-countdown" class="font-mono font-bold text-indigo-600 dark:text-indigo-400">60</span>s
+                    Auto-refresh in <span id="refresh-countdown" class="font-mono font-bold text-brand-orange">60</span>s
                 </span>
-                <button onclick="refreshNow()" id="manual-refresh-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-all shadow-sm" title="Refresh Now">
+                <button onclick="refreshNow()" id="manual-refresh-btn" class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-white dark:bg-[#161B22] border border-gray-200 dark:border-white/[0.06] rounded-lg hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-all shadow-sm" title="Refresh Now">
                     <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                     </svg>
@@ -26,8 +26,8 @@
 
             {{-- Loading Overlay --}}
             <div id="loading-overlay" class="hidden fixed inset-0 z-40 bg-gray-900/10 dark:bg-gray-900/30 backdrop-blur-sm flex items-center justify-center">
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 flex items-center gap-3 border border-gray-200 dark:border-gray-700">
-                    <svg class="w-5 h-5 animate-spin text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <div class="bg-white dark:bg-[#161B22] rounded-xl shadow-xl p-6 flex items-center gap-3 border border-gray-200 dark:border-white/[0.06]">
+                    <svg class="w-5 h-5 animate-spin text-brand-orange" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                         <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -39,7 +39,7 @@
             <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
 
                 {{-- Total Online Card --}}
-                <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
+                <div class="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.06] overflow-hidden">
                     <div class="p-8 flex flex-col items-center justify-center h-full min-h-[280px] relative">
                         {{-- Background Gradient --}}
                         <div class="absolute inset-0 bg-gradient-to-br from-emerald-50/80 to-transparent dark:from-emerald-900/10 dark:to-transparent"></div>
@@ -49,9 +49,9 @@
                             <div class="relative inline-flex mb-6">
                                 <span class="flex h-4 w-4 absolute -top-1 -right-1">
                                     <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                                    <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white dark:border-gray-800"></span>
+                                    <span class="relative inline-flex rounded-full h-4 w-4 bg-emerald-500 border-2 border-white dark:border-[#161B22]"></span>
                                 </span>
-                                <div class="p-5 rounded-2xl bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 dark:text-emerald-400 shadow-sm">
+                                <div class="p-5 rounded-xl bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 shadow-sm">
                                     <svg class="h-10 w-10" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
                                     </svg>
@@ -61,7 +61,7 @@
                             <h3 class="text-6xl font-extrabold text-gray-900 dark:text-white tracking-tight" id="total-online-count">
                                 {{ $totalOnline }}
                             </h3>
-                            <p class="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-3 uppercase tracking-widest">
+                            <p class="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-3 uppercase tracking-wider">
                                 Live Now
                             </p>
                             <p class="text-xs text-gray-400 dark:text-gray-500 mt-2" id="last-updated-text">
@@ -72,11 +72,11 @@
                 </div>
 
                 {{-- ApexChart Donut (Top 5 Locations) --}}
-                <div class="lg:col-span-2 bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700">
+                <div class="lg:col-span-2 bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.06]">
                     <div class="p-6">
                         <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Top Locations</h3>
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400">
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Top Locations</h3>
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-semibold bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-400">
                                 Top 5
                             </span>
                         </div>
@@ -87,19 +87,19 @@
             </div>
 
             {{-- Location Breakdown Table --}}
-            <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-100 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-800/50 flex justify-between items-center">
+            <div class="bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.06] overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 dark:border-white/[0.06] bg-gray-50/50 dark:bg-white/[0.02] flex justify-between items-center">
                     <div class="flex items-center gap-3">
-                        <h3 class="text-lg font-bold text-gray-900 dark:text-white">Location Breakdown</h3>
-                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400" id="location-count-badge">
+                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Location Breakdown</h3>
+                        <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-400" id="location-count-badge">
                             {{ $locations->count() }} {{ Str::plural('location', $locations->count()) }}
                         </span>
                     </div>
                 </div>
 
                 <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-100 dark:divide-gray-700" id="locations-table">
-                        <thead class="bg-gray-50 dark:bg-gray-700/50">
+                    <table class="min-w-full divide-y divide-gray-100 dark:divide-white/[0.06]" id="locations-table">
+                        <thead class="bg-gray-50 dark:bg-white/[0.02]">
                             <tr>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Country</th>
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">City</th>
@@ -107,12 +107,12 @@
                                 <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider w-1/3">Distribution</th>
                             </tr>
                         </thead>
-                        <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700" id="locations-tbody">
+                        <tbody class="bg-white dark:bg-[#161B22] divide-y divide-gray-100 dark:divide-white/[0.06]" id="locations-tbody">
                             @forelse($locations as $loc)
-                                <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                                <tr class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center gap-3">
-                                            <div class="w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs border border-indigo-100 dark:border-indigo-800/50 flex-shrink-0">
+                                            <div class="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs border border-orange-100 dark:border-orange-500/20 flex-shrink-0">
                                                 {{ substr($loc->country === 'Unknown' ? 'UN' : $loc->country, 0, 2) }}
                                             </div>
                                             <span class="text-sm font-semibold text-gray-900 dark:text-white">
@@ -130,13 +130,13 @@
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">
-                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                        <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
                                             {{ $loc->count }} {{ Str::plural('visitor', $loc->count) }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="flex items-center gap-3">
-                                            <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                            <div class="flex-1 bg-gray-200 dark:bg-white/[0.06] rounded-full h-2 overflow-hidden">
                                                 <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-700" style="width: {{ round(($loc->count / max($totalOnline, 1)) * 100) }}%"></div>
                                             </div>
                                             <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 w-10 text-right">{{ round(($loc->count / max($totalOnline, 1)) * 100) }}%</span>
@@ -200,11 +200,11 @@
                 series: series.length > 0 ? series : [1],
                 labels: labels.length > 0 ? labels : ['No visitors'],
                 colors: series.length > 0
-                    ? ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
+                    ? ['#F97316', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6']
                     : ['#e5e7eb'],
                 stroke: {
                     width: 2,
-                    colors: [isDark ? '#1f2937' : '#ffffff']
+                    colors: [isDark ? '#161B22' : '#ffffff']
                 },
                 dataLabels: {
                     enabled: false
@@ -316,10 +316,10 @@
                 const plural = loc.count === 1 ? 'visitor' : 'visitors';
 
                 html += `
-                    <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50 transition-colors">
+                    <tr class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
-                                <div class="w-9 h-9 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 flex items-center justify-center font-bold text-xs border border-indigo-100 dark:border-indigo-800/50 flex-shrink-0">
+                                <div class="w-9 h-9 rounded-full bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 flex items-center justify-center font-bold text-xs border border-orange-100 dark:border-orange-500/20 flex-shrink-0">
                                     ${initial}
                                 </div>
                                 <span class="text-sm font-semibold text-gray-900 dark:text-white">${country}</span>
@@ -335,13 +335,13 @@
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap text-right">
-                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-900/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                            <span class="inline-flex items-center px-2.5 py-1 rounded-lg text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-500/20">
                                 ${loc.count} ${plural}
                             </span>
                         </td>
                         <td class="px-6 py-4 whitespace-nowrap">
                             <div class="flex items-center gap-3">
-                                <div class="flex-1 bg-gray-200 dark:bg-gray-700 rounded-full h-2 overflow-hidden">
+                                <div class="flex-1 bg-gray-200 dark:bg-white/[0.06] rounded-full h-2 overflow-hidden">
                                     <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full transition-all duration-700" style="width: ${pct}%"></div>
                                 </div>
                                 <span class="text-xs font-semibold text-gray-500 dark:text-gray-400 w-10 text-right">${pct}%</span>

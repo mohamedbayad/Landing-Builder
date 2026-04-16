@@ -1,68 +1,68 @@
 <x-app-layout>
     <x-slot name="header">
-        <h2 class="font-semibold text-xl text-gray-800 dark:text-gray-200 leading-tight">
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
             {{ __('AI Landing Page Studio') }}
         </h2>
     </x-slot>
 
     <div class="py-4 h-full flex flex-col">
         <div class="max-w-screen-2xl mx-auto sm:px-6 lg:px-8 h-[calc(100vh-140px)] w-full flex gap-6">
-            
+
             <!-- Left Panel: Input Configuration -->
-            <div class="w-1/3 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 font-bold text-gray-800 dark:text-gray-200">
-                    Product Details
+            <div class="w-1/3 bg-white dark:bg-[#161B22] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.06] flex flex-col overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 dark:border-white/[0.06]">
+                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white">Product Details</h3>
                 </div>
                 <div class="p-6 overflow-y-auto flex-1 custom-scrollbar">
                     <form id="ai-generator-form" class="space-y-4">
                         @csrf
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Name <span class="text-red-500">*</span></label>
                             <input type="text" name="product_name" id="product_name" required
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm"
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange"
                                 placeholder="e.g. Alcedo Blood Pressure Monitor">
                             <p id="product_name_error" class="hidden text-xs text-red-500 mt-1">Product name is required</p>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Image <span class="text-red-500">*</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Image <span class="text-red-500">*</span></label>
                             <input type="file" name="product_image" id="product_image" accept="image/*" required
-                                class="mt-1 block w-full text-sm text-gray-900 border border-gray-300 rounded-lg cursor-pointer bg-gray-50 dark:text-gray-400 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:placeholder-gray-400">
+                                class="block w-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-lg cursor-pointer bg-gray-50 dark:bg-[#0D1117] focus:outline-none px-3 py-2">
                             <p id="product_image_error" class="hidden text-xs text-red-500 mt-1">Product image is required</p>
                         </div>
-                        
+
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Description <span class="text-xs text-gray-500">(Optional)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Description <span class="text-xs text-gray-500">(Optional)</span></label>
                             <textarea name="description" id="description" rows="4"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm"
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange"
                                 placeholder="Describe the main features and benefits..."></textarea>
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Target Audience <span class="text-xs text-gray-500">(Optional)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target Audience <span class="text-xs text-gray-500">(Optional)</span></label>
                             <input type="text" name="audience" id="audience"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm"
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange"
                                 placeholder="e.g. Seniors, Health-conscious individuals">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Offer / Price <span class="text-xs text-gray-500">(Optional)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Offer / Price <span class="text-xs text-gray-500">(Optional)</span></label>
                             <input type="text" name="offer" id="offer"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm"
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange"
                                 placeholder="e.g. $49.99 (50% Off)">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Call to Action (CTA) <span class="text-xs text-gray-500">(Optional)</span></label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Call to Action (CTA) <span class="text-xs text-gray-500">(Optional)</span></label>
                             <input type="text" name="cta" id="cta"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm"
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange"
                                 placeholder="e.g. Get Yours Now">
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Language</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Language</label>
                             <select name="language" id="language"
-                                class="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-200 sm:text-sm">
+                                class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange">
                                 <option value="English">English</option>
                                 <option value="Spanish">Spanish</option>
                                 <option value="French">French</option>
@@ -71,41 +71,41 @@
                     </form>
                 </div>
                 <!-- Bottom Action -->
-                <div class="px-6 py-4 border-t border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                <div class="px-6 py-4 border-t border-gray-100 dark:border-white/[0.06] bg-gray-50 dark:bg-white/[0.02]">
                     <button type="button" id="btn-generate"
-                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
-                        <svg id="spinner" class="animate-spin -ml-1 mr-3 h-5 w-5 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        class="w-full inline-flex justify-center items-center gap-2 px-4 py-2.5 bg-brand-orange text-white rounded-lg text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm focus:outline-none focus:ring-2 focus:ring-brand-orange/20">
+                        <svg id="spinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
                         Generate Landing Page
                     </button>
                     <button type="button" id="btn-publish"
-                        class="mt-3 w-full hidden flex justify-center py-2 px-4 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition-colors">
+                        class="mt-3 w-full hidden inline-flex justify-center items-center gap-2 px-4 py-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/8 transition-all">
                         Publish to Builder
                     </button>
                 </div>
             </div>
 
             <!-- Right Panel: Preview -->
-            <div class="w-2/3 bg-gray-100 dark:bg-gray-950 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex flex-col overflow-hidden relative">
-                <div class="px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex justify-between items-center">
-                    <span class="font-bold text-gray-800 dark:text-gray-200">Live Preview</span>
+            <div class="w-2/3 bg-gray-50 dark:bg-[#0D1117] rounded-xl shadow-sm border border-gray-100 dark:border-white/[0.06] flex flex-col overflow-hidden relative">
+                <div class="px-6 py-4 border-b border-gray-100 dark:border-white/[0.06] bg-white dark:bg-[#161B22] flex justify-between items-center">
+                    <span class="text-sm font-semibold text-gray-900 dark:text-white">Live Preview</span>
                     <span id="preview-status" class="text-xs text-gray-500 dark:text-gray-400">Awaiting input...</span>
                 </div>
 
                 <!-- ░░░ PROGRESS BAR ZONE ░░░ -->
-                <div id="progress-zone" class="hidden px-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+                <div id="progress-zone" class="hidden px-0 bg-white dark:bg-[#161B22] border-b border-gray-100 dark:border-white/[0.06]">
                     <!-- Track -->
-                    <div class="w-full h-1.5 bg-gray-200 dark:bg-gray-700">
+                    <div class="w-full h-1.5 bg-gray-200 dark:bg-white/[0.06]">
                         <div id="progress-bar"
-                             class="h-full rounded-r-full bg-gradient-to-r from-indigo-500 to-violet-500 transition-all duration-700 ease-out"
+                             class="h-full rounded-r-full bg-gradient-to-r from-brand-orange to-orange-400 transition-all duration-700 ease-out"
                              style="width: 0%">
                         </div>
                     </div>
                     <!-- Step label + % -->
                     <div class="flex items-center justify-between px-6 py-2">
-                        <span id="progress-step" class="text-xs font-medium text-indigo-600 dark:text-indigo-400 flex items-center gap-1.5">
+                        <span id="progress-step" class="text-xs font-medium text-brand-orange flex items-center gap-1.5">
                             <svg class="animate-spin w-3 h-3" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
@@ -119,34 +119,34 @@
 
                 <div class="flex-1 overflow-hidden relative bg-white" id="preview-wrapper">
                     <!-- Skeleton Loader (shown while pending/processing) -->
-                    <div id="skeleton-overlay" class="hidden absolute inset-0 z-20 bg-white dark:bg-gray-900 p-8 overflow-hidden">
+                    <div id="skeleton-overlay" class="hidden absolute inset-0 z-20 bg-white dark:bg-[#0D1117] p-8 overflow-hidden">
                         <div class="space-y-5 animate-pulse">
-                            <div class="h-10 bg-gray-200 dark:bg-gray-700 rounded-xl w-3/4 mx-auto"></div>
-                            <div class="h-6 bg-gray-100 dark:bg-gray-800 rounded-lg w-1/2 mx-auto"></div>
-                            <div class="h-56 bg-gray-200 dark:bg-gray-700 rounded-2xl w-full mt-4"></div>
+                            <div class="h-10 bg-gray-200 dark:bg-white/[0.06] rounded-xl w-3/4 mx-auto"></div>
+                            <div class="h-6 bg-gray-100 dark:bg-white/[0.04] rounded-lg w-1/2 mx-auto"></div>
+                            <div class="h-56 bg-gray-200 dark:bg-white/[0.06] rounded-2xl w-full mt-4"></div>
                             <div class="grid grid-cols-3 gap-4 mt-2">
-                                <div class="h-24 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
-                                <div class="h-24 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
-                                <div class="h-24 bg-gray-100 dark:bg-gray-800 rounded-xl"></div>
+                                <div class="h-24 bg-gray-100 dark:bg-white/[0.04] rounded-xl"></div>
+                                <div class="h-24 bg-gray-100 dark:bg-white/[0.04] rounded-xl"></div>
+                                <div class="h-24 bg-gray-100 dark:bg-white/[0.04] rounded-xl"></div>
                             </div>
-                            <div class="h-8 bg-gray-200 dark:bg-gray-700 rounded-xl w-1/3 mx-auto mt-4"></div>
+                            <div class="h-8 bg-gray-200 dark:bg-white/[0.06] rounded-xl w-1/3 mx-auto mt-4"></div>
                             <div class="space-y-3 mt-2">
-                                <div class="h-3 bg-gray-100 dark:bg-gray-800 rounded w-full"></div>
-                                <div class="h-3 bg-gray-100 dark:bg-gray-800 rounded w-5/6"></div>
-                                <div class="h-3 bg-gray-100 dark:bg-gray-800 rounded w-4/6"></div>
+                                <div class="h-3 bg-gray-100 dark:bg-white/[0.04] rounded w-full"></div>
+                                <div class="h-3 bg-gray-100 dark:bg-white/[0.04] rounded w-5/6"></div>
+                                <div class="h-3 bg-gray-100 dark:bg-white/[0.04] rounded w-4/6"></div>
                             </div>
                         </div>
                     </div>
 
                     <!-- Error Banner -->
-                    <div id="error-banner" class="hidden absolute inset-0 z-20 flex items-center justify-center bg-white dark:bg-gray-900">
+                    <div id="error-banner" class="hidden absolute inset-0 z-20 flex items-center justify-center bg-white dark:bg-[#0D1117]">
                         <div class="text-center max-w-sm">
                             <div class="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
                                 <svg class="w-8 h-8 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                             </div>
-                            <h3 class="text-base font-bold text-gray-800 dark:text-gray-100 mb-1">Generation Failed</h3>
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-white mb-1">Generation Failed</h3>
                             <p id="error-message" class="text-sm text-gray-500 dark:text-gray-400"></p>
-                            <button onclick="location.reload()" class="mt-4 px-4 py-2 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">Try Again</button>
+                            <button onclick="location.reload()" class="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-brand-orange text-white rounded-lg text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm">Try Again</button>
                         </div>
                     </div>
 
@@ -154,30 +154,30 @@
                     <iframe id="preview-frame" class="w-full h-full border-0 hidden" sandbox="allow-same-origin allow-scripts"></iframe>
 
                     <!-- Granular Element Floating Menu -->
-                    <div id="element-menu" class="absolute hidden bg-white dark:bg-gray-800 shadow-xl border border-gray-200 dark:border-gray-700 rounded-lg p-1 z-50 flex flex-col gap-1 min-w-[140px] animate-in fade-in zoom-in duration-200">
-                        <button id="btn-regen-element" class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/40 rounded transition-colors group">
-                            <svg class="w-4 h-4 text-indigo-500 group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
+                    <div id="element-menu" class="absolute hidden bg-white dark:bg-[#161B22] shadow-xl border border-gray-100 dark:border-white/[0.06] rounded-xl p-1 z-50 flex flex-col gap-1 min-w-[140px] animate-in fade-in zoom-in duration-200">
+                        <button id="btn-regen-element" class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-orange-50 dark:hover:bg-orange-500/10 rounded-lg transition-colors group">
+                            <svg class="w-4 h-4 text-brand-orange group-hover:rotate-180 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
                             Regenerate
                         </button>
-                        <button id="btn-comment-element" class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/40 rounded transition-colors group">
+                        <button id="btn-comment-element" class="flex items-center gap-2 px-3 py-1.5 text-sm text-gray-700 dark:text-gray-200 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-lg transition-colors group">
                             <svg class="w-4 h-4 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"></path></svg>
                             Add Comment
                         </button>
                     </div>
 
                     <!-- Comment Dialog -->
-                    <div id="comment-dialog" class="absolute hidden bg-white dark:bg-gray-800 shadow-2xl border border-indigo-200 dark:border-indigo-900 rounded-xl p-4 z-50 w-72 animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <label class="block text-xs font-bold text-indigo-600 dark:text-indigo-400 uppercase tracking-wider mb-2">Instruction for AI</label>
-                        <textarea id="element-comment" rows="3" class="w-full text-sm rounded-lg border-gray-200 dark:border-gray-700 dark:bg-gray-900 dark:text-gray-200 focus:ring-indigo-500 focus:border-indigo-500 mb-3" placeholder="e.g. Make this more emotional and personal..."></textarea>
+                    <div id="comment-dialog" class="absolute hidden bg-white dark:bg-[#161B22] shadow-2xl border border-gray-100 dark:border-white/[0.06] rounded-xl p-4 z-50 w-72 animate-in fade-in slide-in-from-bottom-2 duration-300">
+                        <label class="block text-xs font-semibold text-brand-orange uppercase tracking-wider mb-2">Instruction for AI</label>
+                        <textarea id="element-comment" rows="3" class="w-full text-sm rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#0D1117] dark:text-gray-200 focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange mb-3" placeholder="e.g. Make this more emotional and personal..."></textarea>
                         <div class="flex justify-end gap-2">
                             <button id="btn-cancel-comment" class="px-3 py-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">Cancel</button>
-                            <button id="btn-submit-comment" class="px-4 py-1.5 text-xs bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 font-medium">Apply &amp; Regenerate</button>
+                            <button id="btn-submit-comment" class="px-4 py-1.5 text-xs bg-brand-orange text-white rounded-lg hover:bg-brand-orange-600 font-semibold transition-all">Apply &amp; Regenerate</button>
                         </div>
                     </div>
 
                     <!-- Overlay for regeneration loader -->
-                    <div id="regen-overlay" class="absolute inset-0 bg-white/70 dark:bg-gray-900/70 backdrop-blur-sm hidden flex-col items-center justify-center z-40">
-                        <svg class="animate-spin h-8 w-8 text-indigo-600 mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <div id="regen-overlay" class="absolute inset-0 bg-white/70 dark:bg-[#0D1117]/70 backdrop-blur-sm hidden flex-col items-center justify-center z-40">
+                        <svg class="animate-spin h-8 w-8 text-brand-orange mb-2" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                             <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                             <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -188,7 +188,7 @@
 
         </div>
     </div>
-    
+
     <style>
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }
         .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
@@ -197,7 +197,7 @@
 
         /* Highlight for selected elements in preview */
         .selected-element-highlight {
-            outline: 3px solid #6366f1 !important;
+            outline: 3px solid #F97316 !important;
             outline-offset: 4px !important;
             border-radius: 4px !important;
             cursor: pointer !important;
@@ -226,7 +226,7 @@
             const previewFrame = document.getElementById('preview-frame');
             const regenOverlay = document.getElementById('regen-overlay');
             const regenText = document.getElementById('regen-text');
-            
+
             const elementMenu = document.getElementById('element-menu');
             const commentDialog = document.getElementById('comment-dialog');
             const btnRegenElement = document.getElementById('btn-regen-element');
@@ -241,14 +241,14 @@
 
             // Make the button constantly enabled to prevent JS blocking issues
             btnGenerate.disabled = false;
-            
+
             btnGenerate.addEventListener('click', async function(e) {
                 e.preventDefault();
                 let isValid = true;
-                
+
                 if (document.getElementById('product_name').value.trim() === '') isValid = false;
                 if (document.getElementById('product_image').files.length === 0) isValid = false;
-                if(!isValid) return; 
+                if(!isValid) return;
 
                 btnGenerate.disabled = true;
                 spinner.classList.remove('hidden');
@@ -279,7 +279,7 @@
 
                     const initData = await response.json();
                     const taskId = initData.task_id;
-                    
+
                     // Start Polling
                     pollGenerationStatus(taskId);
 
@@ -287,10 +287,10 @@
                     console.error('Error generating:', error);
                     previewStatus.textContent = 'Error during generation';
                     alert('Generation Error: ' + error.message);
-                    
+
                     document.getElementById('progress-zone').classList.add('hidden');
                     document.getElementById('skeleton-overlay').classList.add('hidden');
-                    
+
                     btnGenerate.disabled = false;
                     spinner.classList.add('hidden');
                 }
@@ -302,14 +302,14 @@
 
                 // Step label map
                 const stepLabel = (pct) => {
-                    if (pct <= 5)  return '⚙️ Initializing...';
-                    if (pct <= 20) return '🔍 Analyzing product image...';
-                    if (pct <= 40) return '🔬 Running product research...';
-                    if (pct <= 55) return '🧠 Building page context...';
-                    if (pct <= 75) return '✍️ Generating landing page HTML...';
-                    if (pct <= 90) return '🖼️ Processing assets & images...';
-                    if (pct < 100) return '✅ Finalizing...';
-                    return '🎉 Done!';
+                    if (pct <= 5)  return 'Initializing...';
+                    if (pct <= 20) return 'Analyzing product image...';
+                    if (pct <= 40) return 'Running product research...';
+                    if (pct <= 55) return 'Building page context...';
+                    if (pct <= 75) return 'Generating landing page HTML...';
+                    if (pct <= 90) return 'Processing assets & images...';
+                    if (pct < 100) return 'Finalizing...';
+                    return 'Done!';
                 };
 
                 const updateProgress = (pct) => {
@@ -342,7 +342,7 @@
 
                             // Animate to 100%
                             updateProgress(100);
-                            previewStatus.textContent = 'Generation complete ✓';
+                            previewStatus.textContent = 'Generation complete';
 
                             setTimeout(() => {
                                 // Hide progress UI
@@ -438,12 +438,12 @@
                 let globalCss = '';
                 let globalJs = '';
                 let globalHead = '';
-                
+
                 let parsedSections = data.sections || [];
 
                 if (parsedSections.length > 0) {
                     parsedSections.forEach((sec, index) => {
-                        let htmlContent = sec.html_content || sec.html_css || sec.html || ""; 
+                        let htmlContent = sec.html_content || sec.html_css || sec.html || "";
                         let secId = sec.id || `section_${index}`;
 
                         // Inject granular editability metadata into the HTML content
@@ -488,12 +488,12 @@
                         if (content.custom_head) globalHead += content.custom_head + "\n";
 
                         sectionsHtml += `
-                            <div class="ai-section hover:ring-2 hover:ring-indigo-400 hover:ring-inset relative group transition-all duration-200" data-id="${secId}">
+                            <div class="ai-section hover:ring-2 hover:ring-orange-400 hover:ring-inset relative group transition-all duration-200" data-id="${secId}">
                                 ${htmlContent}
                                 <div class="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                                    <button onclick="window.parent.regenerateSection('${secId}')" class="bg-indigo-600/90 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs shadow-lg hover:bg-indigo-700 flex items-center gap-1.5 font-medium">
+                                    <button onclick="window.parent.regenerateSection('${secId}')" class="bg-brand-orange/90 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs shadow-lg hover:bg-brand-orange flex items-center gap-1.5 font-medium">
                                         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path></svg>
-                                        Section 
+                                        Section
                                     </button>
                                 </div>
                             </div>
@@ -523,12 +523,12 @@
                         <style>
                             body { margin: 0; padding: 0; }
                             [data-editable="true"]:hover {
-                                outline: 2px dashed #6366f1 !important;
+                                outline: 2px dashed #F97316 !important;
                                 outline-offset: 2px !important;
                                 cursor: cell !important;
                             }
                             .selected-element {
-                                outline: 3px solid #6366f1 !important;
+                                outline: 3px solid #F97316 !important;
                                 outline-offset: 4px !important;
                                 border-radius: 4px !important;
                             }
@@ -539,23 +539,23 @@
                         ${sectionsHtml}
                         <script>
                             ${globalJs}
-                            
+
                             // Handle Granular Selection
                             document.body.addEventListener('click', function(e) {
                                 const editable = e.target.closest('[data-editable="true"]');
                                 if (editable) {
                                     e.preventDefault();
                                     e.stopPropagation();
-                                    
+
                                     // Remove previous highlights
                                     document.querySelectorAll('.selected-element').forEach(el => el.classList.remove('selected-element'));
-                                    
+
                                     // Highlight new
                                     editable.classList.add('selected-element');
-                                    
+
                                     // Get element rect for positioning
                                     const rect = editable.getBoundingClientRect();
-                                    
+
                                     // Send to parent
                                     window.parent.onElementSelected({
                                         id: editable.getAttribute('data-element-id'),
@@ -578,7 +578,7 @@
 
             window.onElementSelected = function(data) {
                 selectedElementData = data;
-                
+
                 // Position the floating menu. The elementMenu is position: absolute inside the relative preview-wrapper.
                 // data.rect gives coords relative to the iframe's visible viewport.
                 // We do not need the frame's bounding rect, just the data.rect.
@@ -587,7 +587,7 @@
 
                 elementMenu.style.top = `${topPos}px`;
                 elementMenu.style.left = `${leftPos}px`;
-                
+
                 elementMenu.classList.remove('hidden');
                 commentDialog.classList.add('hidden');
             };
@@ -623,7 +623,7 @@
                 regenOverlay.classList.remove('hidden');
                 regenOverlay.classList.add('flex');
                 regenText.textContent = `Regenerating ${selectedElementData.type}...`;
-                
+
                 try {
                     const response = await fetch('/ai-generator/regenerate-element', {
                         method: 'POST',
@@ -643,20 +643,12 @@
 
                     if(!response.ok) throw new Error('Regeneration failed');
                     const res = await response.json();
-                    
-                    // Simple logic: re-generate whole page for now but we could do surgical swap
-                    // For a robust studio, we re-run main gen with this hint or just swap HTML.
-                    // For the sake of the task, we re-render with the new element data if provided.
-                    // (Real implementation would be more surgical)
+
                     alert('Element updated successfully! Applying change...');
-                    
-                    // Mock update in local data
+
                     const sectionId = selectedElementData.id.split('_')[0];
                     const sectionIndex = currentLandingData.sections.findIndex(s => s.id === sectionId);
                     if (sectionIndex > -1) {
-                        // Assuming the AI returned the new snippet
-                        // In reality, we'd replace the specific innerHTML.
-                        // For this demo, let's refresh the whole section.
                         currentLandingData.sections[sectionIndex].html = res.data.html || currentLandingData.sections[sectionIndex].html;
                         renderPreview(currentLandingData);
                     }
@@ -674,7 +666,7 @@
                 regenOverlay.classList.remove('hidden');
                 regenOverlay.classList.add('flex');
                 regenText.textContent = `Regenerating ${sectionId} section...`;
-                
+
                 try {
                     const response = await fetch('/ai-generator/regenerate', {
                         method: 'POST',
@@ -692,7 +684,7 @@
 
                     if(!response.ok) throw new Error('Regeneration failed');
                     const responseData = await response.json();
-                    
+
                     const sectionIndex = currentLandingData.sections.findIndex(s => s.id === sectionId);
                     if(sectionIndex > -1) {
                         currentLandingData.sections[sectionIndex] = responseData.data;

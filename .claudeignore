@@ -1,0 +1,10 @@
+echo "node_modules/
+vendor/
+.git/
+storage/
+public/
+dist/
+*.log
+_patch*.cjs
+_replace*.cjs
+*.ps1" > .claudeignore

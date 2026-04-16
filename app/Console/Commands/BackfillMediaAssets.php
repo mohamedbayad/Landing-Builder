@@ -62,9 +62,15 @@ class BackfillMediaAssets extends Command
             $count = 0;
 
             foreach ($allFiles as $file) {
-                // Filter images
-                $mime = mime_content_type($file->getPathname());
-                if (!str_starts_with($mime, 'image/')) {
+                $mime = (string) @mime_content_type($file->getPathname());
+                $extension = strtolower((string) pathinfo($file->getFilename(), PATHINFO_EXTENSION));
+                $isSupportedAsset = str_starts_with($mime, 'image/')
+                    || str_starts_with($mime, 'video/')
+                    || str_starts_with($mime, 'audio/')
+                    || str_starts_with($mime, 'model/')
+                    || in_array($extension, ['glb', 'gltf', 'obj', 'fbx', 'stl', 'usdz', 'json', 'bin', 'wasm', 'woff', 'woff2', 'ttf', 'otf', 'css', 'js', 'mjs', 'pdf'], true);
+
+                if (!$isSupportedAsset) {
                     continue;
                 }
 
@@ -82,7 +88,9 @@ class BackfillMediaAssets extends Command
 
                 // Create
                 try {
-                    $dimensions = @getimagesize($file->getPathname());
+                    $dimensions = str_starts_with($mime, 'image/')
+                        ? @getimagesize($file->getPathname())
+                        : null;
                     
                     MediaAsset::create([
                         'user_id' => $userId,

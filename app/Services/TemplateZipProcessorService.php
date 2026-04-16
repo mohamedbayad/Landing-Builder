@@ -379,10 +379,15 @@ class TemplateZipProcessorService
             }
 
             try {
-                $mime = mime_content_type($fullPath);
-                
-                // Only index images
-                if (!str_starts_with($mime, 'image/')) {
+                $mime = (string) @mime_content_type($fullPath);
+                $extension = strtolower((string) pathinfo($fullPath, PATHINFO_EXTENSION));
+                $isSupportedAsset = str_starts_with($mime, 'image/')
+                    || str_starts_with($mime, 'video/')
+                    || str_starts_with($mime, 'audio/')
+                    || str_starts_with($mime, 'model/')
+                    || in_array($extension, ['glb', 'gltf', 'obj', 'fbx', 'stl', 'usdz', 'json', 'bin', 'wasm', 'woff', 'woff2', 'ttf', 'otf', 'css', 'js', 'mjs', 'pdf'], true);
+
+                if (!$isSupportedAsset) {
                     continue;
                 }
                 
@@ -398,7 +403,7 @@ class TemplateZipProcessorService
                 // Get dimensions (optimistic)
                 $width = null;
                 $height = null;
-                if ($size < 20 * 1048576) { // Limit dimension check to 20MB files
+                if (str_starts_with($mime, 'image/') && $size < 20 * 1048576) { // Limit dimension check to 20MB files
                     try {
                          $dimensions = @getimagesize($fullPath);
                          if ($dimensions) {
@@ -441,7 +446,7 @@ class TemplateZipProcessorService
             }
         }
         
-        Log::info("Indexed {$count} images for Landing #{$landingId}");
+        Log::info("Indexed {$count} assets for Landing #{$landingId}");
     }
 
     /**

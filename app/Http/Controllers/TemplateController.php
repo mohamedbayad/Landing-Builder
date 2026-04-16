@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Template;
 use App\Models\Landing;
 use App\Models\LandingPage;
+use App\Models\MediaAsset;
 use App\Models\TemplatePage;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -227,12 +228,7 @@ class TemplateController extends Controller
 
         // 3. Process Content (From JSON)
         $structure = $template->structure;
-        if (is_string($structure)) {
-             $structure = json_decode($structure, true);
-        }
-        if (empty($assetBaseUrl)) {
-            $assetBaseUrl = $this->inferAssetBaseUrlFromStructure(is_array($structure) ? $structure : []);
-        }
+        [$structure, $assetBaseUrl] = $this->normalizeRemoteStructurePayload($template, $structure, $assetBaseUrl);
         
         $html = $structure['html'] ?? '<h1>Empty Template</h1>';
         $css = $structure['css'] ?? '';
@@ -249,15 +245,15 @@ class TemplateController extends Controller
         $html = $processed['html'];
         $extractedJs = $processed['body_scripts'] ?? '';
 
-        // Merge extracted body scripts with any existing JS
+        // Merge extracted body scripts only if they are not already included.
         if (!empty($extractedJs)) {
-            $js = $js . "\n" . $extractedJs;
+            $js = $this->appendUniqueBlock($js, $extractedJs);
         }
 
         // Process Head Assets (CSS/JS from custom_head)
         $customHead = trim((string) ($structure['custom_head'] ?? ''));
         if (!empty($processed['head_assets'])) {
-            $customHead = trim($customHead . "\n" . $processed['head_assets']);
+            $customHead = $this->appendUniqueBlock($customHead, (string) $processed['head_assets']);
         }
         if (!empty($customHead)) {
             $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
@@ -449,16 +445,7 @@ class TemplateController extends Controller
         $assetBaseUrl = $template->asset_base_url ?? null;
 
         $structure = $template->structure;
-        if (is_string($structure)) {
-            $structure = json_decode($structure, true);
-        }
-        if (!is_array($structure)) {
-            $structure = [];
-        }
-
-        if (empty($assetBaseUrl)) {
-            $assetBaseUrl = $this->inferAssetBaseUrlFromStructure($structure);
-        }
+        [$structure, $assetBaseUrl] = $this->normalizeRemoteStructurePayload($template, $structure, $assetBaseUrl);
 
         $fullStoragePath = storage_path("app/public/landings/{$landing->uuid}/assets");
         $baseStoragePath = "landings/{$landing->uuid}/assets";
@@ -469,12 +456,12 @@ class TemplateController extends Controller
         $js = (string) ($structure['js'] ?? '');
         $extractedJs = $processed['body_scripts'] ?? '';
         if (!empty($extractedJs)) {
-            $js = trim($js . "\n" . $extractedJs);
+            $js = $this->appendUniqueBlock($js, $extractedJs);
         }
 
         $customHead = trim((string) ($structure['custom_head'] ?? ''));
         if (!empty($processed['head_assets'])) {
-            $customHead = trim($customHead . "\n" . $processed['head_assets']);
+            $customHead = $this->appendUniqueBlock($customHead, (string) $processed['head_assets']);
         }
         if (!empty($customHead)) {
             $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
@@ -569,6 +556,297 @@ class TemplateController extends Controller
             return $template->{$field} ?? $default;
         }
         return $default;
+    }
+
+    private function appendUniqueBlock(string $existing, string $candidate): string
+    {
+        $left = trim($existing);
+        $right = trim($candidate);
+
+        if ($right === '') {
+            return $left;
+        }
+
+        if ($left === '') {
+            return $right;
+        }
+
+        if (str_contains($left, $right)) {
+            return $left;
+        }
+
+        $leftComparable = $this->normalizeForDedupCompare($left);
+        $rightComparable = $this->normalizeForDedupCompare($right);
+        if ($rightComparable !== '' && str_contains($leftComparable, $rightComparable)) {
+            return $left;
+        }
+
+        return $left . "\n" . $right;
+    }
+
+    private function normalizeForDedupCompare(string $value): string
+    {
+        $normalized = preg_replace('/<script\\b[^>]*>/i', '', $value);
+        $normalized = preg_replace('/<\\/script>/i', '', (string) $normalized);
+        $normalized = preg_replace('/\\s+/', ' ', (string) $normalized);
+        return trim((string) $normalized);
+    }
+
+    /**
+     * Backward/forward compatible parser for remote template payloads.
+     * Supports both legacy structure.html/css/js/custom_head and the new
+     * raw_html_content + structure.assets format.
+     */
+    protected function normalizeRemoteStructurePayload(object $template, $structure, ?string $assetBaseUrl): array
+    {
+        if (is_string($structure)) {
+            $structure = json_decode($structure, true);
+        }
+
+        if (!is_array($structure)) {
+            $structure = [];
+        }
+
+        $assets = array_values(array_filter((array) ($structure['assets'] ?? []), 'is_array'));
+        $html = trim((string) ($structure['html'] ?? ''));
+        $rawHtml = trim((string) ($template->raw_html_content ?? ''));
+        $css = (string) ($structure['css'] ?? '');
+        $js = (string) ($structure['js'] ?? '');
+        $customHead = (string) ($structure['custom_head'] ?? '');
+
+        if ($assets !== []) {
+            $fromAssets = $this->extractLegacyFieldsFromAssets($assets);
+            if (trim($css) === '') {
+                $css = $fromAssets['css'];
+            }
+            if (trim($js) === '') {
+                $js = $fromAssets['js'];
+            }
+            if (trim($customHead) === '') {
+                $customHead = $fromAssets['custom_head'];
+            }
+        }
+
+        // For new payloads, always prefer raw_html_content when assets exist.
+        // This avoids duplicating scripts/styles when structure.html is already compiled.
+        if ($assets !== [] && $rawHtml !== '') {
+            $html = $rawHtml;
+        } elseif ($html === '' && $rawHtml !== '') {
+            $html = $rawHtml;
+        }
+
+        $structure['html'] = $html;
+        $structure['css'] = $css;
+        $structure['js'] = $js;
+        $structure['custom_head'] = $customHead;
+        $structure['assets'] = $assets;
+
+        if (empty($assetBaseUrl) && !empty($template->storage_path)) {
+            $licensingUrl = (string) config('services.licensing.url', env('LICENSING_SERVER_URL', ''));
+            $parsed = parse_url($licensingUrl);
+            if (!empty($parsed['scheme']) && !empty($parsed['host'])) {
+                $origin = $parsed['scheme'] . '://' . $parsed['host'];
+                if (!empty($parsed['port'])) {
+                    $origin .= ':' . $parsed['port'];
+                }
+
+                $assetBaseUrl = rtrim($origin, '/') . '/storage/' . trim((string) $template->storage_path, '/') . '/';
+            }
+        }
+
+        if (empty($assetBaseUrl)) {
+            $assetBaseUrl = $this->inferAssetBaseUrlFromStructure($structure);
+        }
+
+        return [$structure, $assetBaseUrl];
+    }
+
+    protected function injectAssetsIntoHtml(string $html, array $assets): string
+    {
+        $originalHtml = $html;
+        $headTags = [];
+        $bodyTags = [];
+
+        foreach ($assets as $asset) {
+            $tag = $this->buildInjectedAssetTag(
+                (string) ($asset['type'] ?? ''),
+                trim((string) ($asset['content'] ?? ''))
+            );
+
+            if ($tag === null) {
+                continue;
+            }
+
+            $position = ((string) ($asset['position'] ?? 'head')) === 'body' ? 'body' : 'head';
+            if ($position === 'head') {
+                $headTags[] = $tag;
+            } else {
+                $bodyTags[] = $tag;
+            }
+        }
+
+        if (!empty($headTags)) {
+            $html = str_replace('</head>', implode("\n", $headTags) . "\n</head>", $html);
+        }
+
+        if (!empty($bodyTags)) {
+            $html = str_replace('</body>', implode("\n", $bodyTags) . "\n</body>", $html);
+        }
+
+        // Fragment fallback: if no closing tags exist, keep assets reachable.
+        if (!empty($headTags) && stripos($originalHtml, '</head>') === false) {
+            $html = implode("\n", $headTags) . "\n" . $html;
+        }
+
+        if (!empty($bodyTags) && stripos($originalHtml, '</body>') === false) {
+            $html .= "\n" . implode("\n", $bodyTags);
+        }
+
+        return $html;
+    }
+
+    protected function extractLegacyFieldsFromAssets(array $assets): array
+    {
+        $cssParts = [];
+        $jsParts = [];
+        $headParts = [];
+
+        foreach ($assets as $asset) {
+            $type = (string) ($asset['type'] ?? '');
+            $position = ((string) ($asset['position'] ?? 'head')) === 'body' ? 'body' : 'head';
+            $content = trim((string) ($asset['content'] ?? ''));
+
+            if ($content === '') {
+                continue;
+            }
+
+            if ($type === 'css') {
+                if ($this->containsHtmlSnippet($content, ['link', 'style'])) {
+                    $headParts[] = $content;
+                    continue;
+                }
+
+                if ($this->looksLikeUrlSnippet($content)) {
+                    $headParts[] = '<link rel="stylesheet" href="' . e($content) . '">';
+                    continue;
+                }
+
+                $cssParts[] = $content;
+                continue;
+            }
+
+            if ($type === 'js') {
+                if ($this->containsHtmlSnippet($content, ['script'])) {
+                    if ($position === 'head') {
+                        $headParts[] = $content;
+                    } else {
+                        $jsParts[] = $content;
+                    }
+                    continue;
+                }
+
+                if ($this->looksLikeUrlSnippet($content)) {
+                    $tag = '<script src="' . e($content) . '"></script>';
+                    if ($position === 'head') {
+                        $headParts[] = $tag;
+                    } else {
+                        $jsParts[] = $tag;
+                    }
+                    continue;
+                }
+
+                if ($position === 'head') {
+                    $headParts[] = "<script>\n{$content}\n</script>";
+                } else {
+                    $jsParts[] = $content;
+                }
+            }
+        }
+
+        return [
+            'css' => implode("\n\n", array_filter($cssParts)),
+            'js' => implode("\n\n", array_filter($jsParts)),
+            'custom_head' => implode("\n", array_filter($headParts)),
+        ];
+    }
+
+    protected function buildInjectedAssetTag(string $type, string $content): ?string
+    {
+        if ($content === '') {
+            return null;
+        }
+
+        if ($type === 'css') {
+            if ($this->containsHtmlSnippet($content, ['link', 'style'])) {
+                return $content;
+            }
+
+            if ($this->looksLikeUrlSnippet($content)) {
+                return '<link rel="stylesheet" href="' . e($content) . '">';
+            }
+
+            return "<style>\n{$content}\n</style>";
+        }
+
+        if ($type === 'js') {
+            if ($this->containsHtmlSnippet($content, ['script'])) {
+                return $content;
+            }
+
+            if ($this->looksLikeUrlSnippet($content)) {
+                return '<script src="' . e($content) . '"></script>';
+            }
+
+            return "<script>\n{$content}\n</script>";
+        }
+
+        return null;
+    }
+
+    protected function containsHtmlSnippet(string $content, array $tags): bool
+    {
+        foreach ($tags as $tag) {
+            if (preg_match('/<\s*' . preg_quote($tag, '/') . '\b/i', $content) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function looksLikeUrlSnippet(string $content): bool
+    {
+        $value = trim($content);
+        if ($value === '') {
+            return false;
+        }
+
+        if (str_contains($value, "\n") || str_contains($value, "\r")) {
+            return false;
+        }
+        if (str_contains($value, '{') || str_contains($value, '}')) {
+            return false;
+        }
+        if (str_starts_with($value, '/*')) {
+            return false;
+        }
+        if (str_starts_with($value, '/') && isset($value[1]) && in_array($value[1], ['*', '/'], true)) {
+            return false;
+        }
+
+        if (filter_var($value, FILTER_VALIDATE_URL)) {
+            return true;
+        }
+
+        if (preg_match('#^(//|/|\\./|\\.\\./)[^\\s<>"\']+$#', $value) !== 1) {
+            return false;
+        }
+
+        if (str_starts_with($value, '//') && preg_match('#^//[A-Za-z0-9]#', $value) !== 1) {
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -905,14 +1183,107 @@ class TemplateController extends Controller
             $relativePath = "{$baseStoragePath}/{$filename}";
             $absolutePath = $fullStoragePath . '/' . $filename;
 
-            if (File::exists($absolutePath)) return Storage::url($relativePath);
+            if (File::exists($absolutePath)) {
+                $this->registerImportedMediaAsset($landing, $relativePath, $filename, $mimeType, (int) filesize($absolutePath));
+                return Storage::url($relativePath);
+            }
 
             Storage::disk('public')->put($relativePath, $content);
+            $this->registerImportedMediaAsset($landing, $relativePath, $filename, $mimeType, strlen($content));
             return Storage::url($relativePath);
         } catch (\Exception $e) {
             Log::warning("Failed to download asset: $url - " . $e->getMessage());
         }
         return null;
+    }
+
+    protected function registerImportedMediaAsset(Landing $landing, string $relativePath, string $filename, ?string $mimeType, int $size): void
+    {
+        try {
+            $absolutePath = storage_path('app/public/' . ltrim($relativePath, '/'));
+            $normalizedMime = strtolower(trim((string) explode(';', (string) $mimeType)[0]));
+
+            if ($normalizedMime === '' && File::exists($absolutePath)) {
+                $detectedMime = @mime_content_type($absolutePath);
+                if (is_string($detectedMime) && $detectedMime !== '') {
+                    $normalizedMime = strtolower($detectedMime);
+                }
+            }
+
+            if ($normalizedMime === '' || $normalizedMime === 'application/octet-stream') {
+                $ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
+                $normalizedMime = $this->guessMimeTypeFromExtension($ext) ?? $normalizedMime;
+            }
+
+            $width = null;
+            $height = null;
+            if ($normalizedMime && str_starts_with($normalizedMime, 'image/') && $normalizedMime !== 'image/svg+xml' && File::exists($absolutePath)) {
+                $dimensions = @getimagesize($absolutePath);
+                $width = $dimensions ? ($dimensions[0] ?? null) : null;
+                $height = $dimensions ? ($dimensions[1] ?? null) : null;
+            }
+
+            $ownerId = (int) ($landing->workspace->user_id ?? Auth::id());
+
+            MediaAsset::updateOrCreate(
+                [
+                    'landing_id' => $landing->id,
+                    'relative_path' => $relativePath,
+                ],
+                [
+                    'user_id' => $ownerId ?: Auth::id(),
+                    'filename' => $filename,
+                    'disk' => 'public',
+                    'mime_type' => $normalizedMime ?: null,
+                    'size' => max($size, 0),
+                    'width' => $width,
+                    'height' => $height,
+                    'source' => 'import',
+                ]
+            );
+        } catch (\Throwable $e) {
+            Log::warning('Failed to register imported media asset', [
+                'landing_id' => $landing->id,
+                'relative_path' => $relativePath,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    protected function guessMimeTypeFromExtension(string $ext): ?string
+    {
+        return match (strtolower($ext)) {
+            'jpg', 'jpeg' => 'image/jpeg',
+            'png' => 'image/png',
+            'gif' => 'image/gif',
+            'webp' => 'image/webp',
+            'svg' => 'image/svg+xml',
+            'avif' => 'image/avif',
+            'mp4' => 'video/mp4',
+            'webm' => 'video/webm',
+            'mov' => 'video/quicktime',
+            'avi' => 'video/x-msvideo',
+            'mkv' => 'video/x-matroska',
+            'mp3' => 'audio/mpeg',
+            'wav' => 'audio/wav',
+            'ogg' => 'audio/ogg',
+            'glb' => 'model/gltf-binary',
+            'gltf' => 'model/gltf+json',
+            'obj' => 'model/obj',
+            'fbx' => 'application/octet-stream',
+            'stl' => 'model/stl',
+            'usdz' => 'model/vnd.usdz+zip',
+            'woff' => 'font/woff',
+            'woff2' => 'font/woff2',
+            'ttf' => 'font/ttf',
+            'otf' => 'font/otf',
+            'wasm' => 'application/wasm',
+            'json' => 'application/json',
+            'js', 'mjs' => 'application/javascript',
+            'css' => 'text/css',
+            'pdf' => 'application/pdf',
+            default => null,
+        };
     }
 
     protected function downloadWithRetry($url, &$mimeType = null, $maxRetries = 2)
