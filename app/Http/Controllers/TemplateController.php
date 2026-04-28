@@ -151,7 +151,7 @@ class TemplateController extends Controller
 
             $zipPath = $request->file('template_zip')->store('builder-templates/zips');
 
-            $template = DB::transaction(function () use ($validated, $user, $slug, $storageDirectory, $zipPath, $thumbnailPath, $pages) {
+            $template = DB::transaction(function () use ($validated, $user, $slug, $storageDirectory, $zipPath, $thumbnailPath, $pages, $allowedEmails) {
                 $template = Template::create([
                     'owner_user_id' => $user->id,
                     'name' => $validated['name'],
