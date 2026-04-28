@@ -25,10 +25,10 @@
                         </div>
 
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Image <span class="text-red-500">*</span></label>
-                            <input type="file" name="product_image" id="product_image" accept="image/*" required
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Product Image <span class="text-xs text-gray-500">(Optional)</span></label>
+                            <input type="file" name="product_image" id="product_image" accept="image/*"
                                 class="block w-full text-sm text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-white/10 rounded-lg cursor-pointer bg-gray-50 dark:bg-[#0D1117] focus:outline-none px-3 py-2">
-                            <p id="product_image_error" class="hidden text-xs text-red-500 mt-1">Product image is required</p>
+                            <p id="product_image_error" class="hidden text-xs text-red-500 mt-1">Invalid product image file</p>
                         </div>
 
                         <div>
@@ -247,7 +247,6 @@
                 let isValid = true;
 
                 if (document.getElementById('product_name').value.trim() === '') isValid = false;
-                if (document.getElementById('product_image').files.length === 0) isValid = false;
                 if(!isValid) return;
 
                 btnGenerate.disabled = true;
@@ -303,7 +302,7 @@
                 // Step label map
                 const stepLabel = (pct) => {
                     if (pct <= 5)  return 'Initializing...';
-                    if (pct <= 20) return 'Analyzing product image...';
+                    if (pct <= 20) return 'Analyzing product details...';
                     if (pct <= 40) return 'Running product research...';
                     if (pct <= 55) return 'Building page context...';
                     if (pct <= 75) return 'Generating landing page HTML...';
@@ -330,7 +329,7 @@
                         const pct = data.progress || 0;
 
                         if (data.status === 'pending') {
-                            previewStatus.textContent = 'Queued — waiting for worker...';
+                            previewStatus.textContent = 'Queued - waiting for worker...';
                             updateProgress(pct || 2);
 
                         } else if (data.status === 'processing') {
@@ -380,9 +379,13 @@
 
                         if (attempts >= maxAttempts) {
                             clearInterval(interval);
-                            previewStatus.textContent = 'Timed out — please try again';
+                            previewStatus.textContent = 'Timed out - queue worker may be offline';
                             document.getElementById('progress-zone').classList.add('hidden');
                             document.getElementById('skeleton-overlay').classList.add('hidden');
+                            const errBanner = document.getElementById('error-banner');
+                            const errMsg = document.getElementById('error-message');
+                            errMsg.textContent = 'Generation stayed queued too long. Start queue worker with: php artisan queue:work';
+                            errBanner.classList.remove('hidden');
                             btnGenerate.disabled = false;
                             spinner.classList.add('hidden');
                         }
@@ -700,3 +703,4 @@
         });
     </script>
 </x-app-layout>
+

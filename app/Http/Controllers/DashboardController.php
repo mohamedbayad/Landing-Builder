@@ -10,6 +10,7 @@ use App\Models\LandingPage;
 use App\Models\AnalyticsEvent; // For checkout events if needed
 use App\Models\AnalyticsSession;
 use App\Models\User;
+use App\Models\Subscription;
 use App\Services\AnalyticsService;
 use Carbon\Carbon;
 
@@ -25,10 +26,15 @@ class DashboardController extends Controller
     public function index(Request $request)
     {
         $user = Auth::user();
+        $isSuperAdmin = $user?->hasRole('super-admin') ?? false;
+        $superAdminStats = $isSuperAdmin ? $this->getSuperAdminStats() : null;
         $workspace = $user->workspaces()->first();
 
         if (!$workspace) {
-            return view('dashboard', $this->getEmptyDashboardData());
+            $empty = $this->getEmptyDashboardData();
+            $empty['isSuperAdmin'] = $isSuperAdmin;
+            $empty['superAdminStats'] = $superAdminStats;
+            return view('dashboard', $empty);
         }
 
         $allLandingIds = $workspace->landings()->pluck('id')->toArray();
@@ -143,7 +149,8 @@ class DashboardController extends Controller
             'chartLabels', 'visitsData', 'leadsData',
             'topLandings', 'recentActivity',
             'landings', 'recentOrders', 'recentForms',
-            'onlineUsersCount', 'onlineUsers'
+            'onlineUsersCount', 'onlineUsers',
+            'isSuperAdmin', 'superAdminStats'
         ));
     }
 
@@ -186,6 +193,128 @@ class DashboardController extends Controller
             'topLandings' => collect(), 'recentActivity' => collect(),
             'landings' => collect(), 'recentOrders' => collect(), 'recentForms' => collect(),
             'onlineUsersCount' => 0, 'onlineUsers' => collect(),
+            'isSuperAdmin' => false, 'superAdminStats' => null,
+        ];
+    }
+
+    private function getSuperAdminStats(): array
+    {
+        $activeStatuses = ['active', 'trial'];
+
+        $activeSubscriptions = Subscription::query()
+            ->whereIn('status', $activeStatuses)
+            ->where(function ($query) {
+                $query->whereNull('ends_at')->orWhere('ends_at', '>', now());
+            })
+            ->with('plan:id,name,monthly_price,yearly_price')
+            ->get();
+
+        $allSubscriptions = Subscription::query()
+            ->with('plan:id,name,monthly_price,yearly_price')
+            ->get();
+
+        $mrr = round((float) $activeSubscriptions->sum(function (Subscription $subscription) {
+            if (!$subscription->plan) {
+                return 0;
+            }
+
+            return match ($subscription->billing_cycle) {
+                'monthly' => (float) $subscription->plan->monthly_price,
+                'yearly' => ((float) $subscription->plan->yearly_price) / 12,
+                default => 0,
+            };
+        }), 2);
+
+        $arr = round((float) $activeSubscriptions->sum(function (Subscription $subscription) {
+            if (!$subscription->plan) {
+                return 0;
+            }
+
+            return match ($subscription->billing_cycle) {
+                'monthly' => ((float) $subscription->plan->monthly_price) * 12,
+                'yearly' => (float) $subscription->plan->yearly_price,
+                default => 0,
+            };
+        }), 2);
+
+        $bookedRevenue = round((float) $allSubscriptions->sum(function (Subscription $subscription) {
+            if (!$subscription->plan) {
+                return 0;
+            }
+
+            return match ($subscription->billing_cycle) {
+                'monthly' => (float) $subscription->plan->monthly_price,
+                'yearly' => (float) $subscription->plan->yearly_price,
+                default => 0,
+            };
+        }), 2);
+
+        $totalUsers = User::query()->count();
+        $totalSubscribers = User::query()
+            ->whereHas('roles', fn ($query) => $query->where('slug', 'subscriber'))
+            ->count();
+
+        $activeSubscribers = User::query()
+            ->whereHas('subscriptions', function ($query) use ($activeStatuses) {
+                $query->whereIn('status', $activeStatuses)
+                    ->where(function ($q) {
+                        $q->whereNull('ends_at')->orWhere('ends_at', '>', now());
+                    });
+            })
+            ->count();
+
+        $trialSubscriptions = Subscription::query()->where('status', 'trial')->count();
+        $churnedSubscriptions = Subscription::query()->whereIn('status', ['expired', 'canceled', 'paused'])->count();
+
+        $activeByPlan = $activeSubscriptions
+            ->groupBy(fn (Subscription $subscription) => $subscription->plan?->name ?? 'Unknown plan')
+            ->map(fn ($items, $planName) => [
+                'plan' => $planName,
+                'count' => $items->count(),
+            ])
+            ->sortByDesc('count')
+            ->values()
+            ->take(6);
+
+        $latestSubscribers = User::query()
+            ->whereHas('roles', fn ($query) => $query->where('slug', 'subscriber'))
+            ->with([
+                'subscriptions' => function ($query) {
+                    $query->latest('starts_at')
+                        ->latest('id')
+                        ->with('plan:id,name');
+                },
+            ])
+            ->latest('id')
+            ->take(6)
+            ->get(['id', 'name', 'email', 'created_at'])
+            ->map(function (User $subscriber) {
+                /** @var \App\Models\Subscription|null $latestSub */
+                $latestSub = $subscriber->subscriptions->first();
+                return [
+                    'id' => $subscriber->id,
+                    'name' => $subscriber->name,
+                    'email' => $subscriber->email,
+                    'created_at' => $subscriber->created_at,
+                    'plan' => $latestSub?->plan?->name ?? 'No plan',
+                    'status' => $latestSub?->status ?? 'none',
+                ];
+            });
+
+        return [
+            'kpis' => [
+                'total_users' => $totalUsers,
+                'total_subscribers' => $totalSubscribers,
+                'active_subscribers' => $activeSubscribers,
+                'active_subscriptions' => $activeSubscriptions->count(),
+                'trial_subscriptions' => $trialSubscriptions,
+                'churned_subscriptions' => $churnedSubscriptions,
+                'mrr' => $mrr,
+                'arr' => $arr,
+                'booked_revenue' => $bookedRevenue,
+            ],
+            'active_by_plan' => $activeByPlan,
+            'latest_subscribers' => $latestSubscribers,
         ];
     }
 

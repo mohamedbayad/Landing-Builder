@@ -1,19 +1,46 @@
 <x-app-layout>
+    <x-slot name="topbar">
+        <div class="leading-tight">
+            <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight">Media Library</h1>
+            <p class="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">Manage all your uploaded assets from Templates and Builder.</p>
+        </div>
+    </x-slot>
+
     <div class="py-8 bg-gray-50 dark:bg-[#0D1117] min-h-screen font-sans" x-data="mediaLibrary()">
 
-        <!-- Header -->
+        <!-- Actions -->
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mb-8">
-            <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Media Library</h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Manage all your uploaded assets from Templates and Builder.</p>
-                </div>
+            <div class="flex justify-end">
                 <div>
                     <button @click="$refs.fileInput.click()" class="inline-flex items-center px-4 py-2 bg-brand-orange border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-brand-orange-600 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 transition-all shadow-sm">
                         <svg class="mr-2 -ml-1 h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
                         Upload Asset
                     </button>
-                    <input type="file" x-ref="fileInput" class="hidden" accept="image/*,video/*,audio/*,.glb,.gltf,.obj,.fbx,.stl,.usdz,.json,.bin,.wasm,.woff,.woff2,.ttf,.otf,.css,.js,.mjs,.pdf,.txt" @change="uploadFile($event)">
+                    <input type="file" x-ref="fileInput" class="hidden" multiple accept="image/*,video/*,audio/*,.glb,.gltf,.obj,.fbx,.stl,.usdz,.json,.bin,.wasm,.woff,.woff2,.ttf,.otf,.css,.js,.mjs,.pdf,.txt" @change="uploadFile($event)">
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <div
+                    role="button"
+                    tabindex="0"
+                    @click="$refs.fileInput.click()"
+                    @keydown.enter.prevent="$refs.fileInput.click()"
+                    @keydown.space.prevent="$refs.fileInput.click()"
+                    @dragover.prevent="onDragOver($event)"
+                    @dragleave="onDragLeave($event)"
+                    @drop.prevent="onDrop($event)"
+                    :class="isDragging
+                        ? 'border-brand-orange bg-orange-50/80 dark:bg-brand-orange/10'
+                        : 'border-gray-300 dark:border-white/[0.08] bg-white dark:bg-[#161B22]'"
+                    class="rounded-xl border-2 border-dashed px-6 py-8 text-center transition-colors cursor-pointer">
+                    <p class="text-sm font-semibold text-gray-800 dark:text-gray-100">
+                        Drag & drop files here or click to upload
+                    </p>
+                    <p class="mt-1 text-xs text-gray-500">
+                        Supports multi-file upload (images, video, audio, 3D, docs, code).
+                    </p>
+                    <p x-show="isUploading" class="mt-2 text-xs font-medium text-brand-orange">Uploading...</p>
                 </div>
             </div>
         </div>
@@ -33,6 +60,16 @@
 
                 <!-- Filters Group -->
                 <div class="flex flex-wrap gap-2 w-full md:w-auto">
+                    <select x-model="filters.kind" @change="fetchMedia()" class="rounded-lg border-gray-300 dark:border-white/[0.06] dark:bg-[#0D1117] dark:text-white text-sm py-2 pl-3 pr-8 focus:ring-brand-orange/20 focus:border-brand-orange">
+                        <option value="media">Media Only</option>
+                        <option value="all">All Types</option>
+                        <option value="image">Images</option>
+                        <option value="video">Videos</option>
+                        <option value="audio">Audio</option>
+                        <option value="model">3D Models</option>
+                        <option value="code">Code Files</option>
+                    </select>
+
                     <select x-model="filters.source" @change="fetchMedia()" class="rounded-lg border-gray-300 dark:border-white/[0.06] dark:bg-[#0D1117] dark:text-white text-sm py-2 pl-3 pr-8 focus:ring-brand-orange/20 focus:border-brand-orange">
                         <option value="all">All Sources</option>
                         <option value="manual">Manual Uploads</option>
@@ -144,9 +181,12 @@
         function mediaLibrary() {
             return {
                 isLoading: true,
+                isUploading: false,
+                isDragging: false,
                 assets: [],
                 meta: { current_page: 1, last_page: 1 },
                 filters: {
+                    kind: 'media',
                     search: '',
                     source: 'all',
                     range: '30d'
@@ -183,13 +223,41 @@
                 },
 
                 uploadFile(event) {
-                    const file = event.target.files[0];
-                    if (!file) return;
+                    const files = Array.from(event.target.files || []);
+                    if (!files.length) return;
+                    this.uploadFiles(files).finally(() => {
+                        event.target.value = '';
+                    });
+                },
 
+                onDragOver(event) {
+                    const types = Array.from(event.dataTransfer?.types || []);
+                    if (types.includes('Files')) {
+                        this.isDragging = true;
+                    }
+                },
+
+                onDragLeave(event) {
+                    const currentTarget = event.currentTarget;
+                    const relatedTarget = event.relatedTarget;
+                    if (!currentTarget || !relatedTarget || !currentTarget.contains(relatedTarget)) {
+                        this.isDragging = false;
+                    }
+                },
+
+                onDrop(event) {
+                    this.isDragging = false;
+                    const files = Array.from(event.dataTransfer?.files || []);
+                    if (!files.length) return;
+                    this.uploadFiles(files);
+                },
+
+                uploadFiles(files) {
                     const formData = new FormData();
-                    formData.append('file', file);
+                    files.forEach((file) => formData.append('files[]', file));
+                    this.isUploading = true;
 
-                    fetch('{{ route("media.store") }}', {
+                    return fetch('{{ route("media.store") }}', {
                         method: 'POST',
                         headers: {
                             'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
@@ -203,11 +271,18 @@
                         }
                         return payload;
                     })
-                    .then(asset => {
-                        this.assets.unshift(asset);
-                        event.target.value = '';
+                    .then(payload => {
+                        const uploaded = Array.isArray(payload) ? payload : [payload];
+                        this.assets = [...uploaded, ...this.assets];
+                        if (this.assets.length > 24) {
+                            this.assets = this.assets.slice(0, 24);
+                        }
+                        this.fetchMedia(1);
                     })
-                    .catch(err => alert(err.message || 'Upload failed'));
+                    .catch(err => alert(err.message || 'Upload failed'))
+                    .finally(() => {
+                        this.isUploading = false;
+                    });
                 },
 
                 deleteAsset(asset) {

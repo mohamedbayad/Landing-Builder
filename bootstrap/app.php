@@ -21,9 +21,8 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->alias([
-            'check.license' => \App\Http\Middleware\CheckLicenseMiddleware::class,
-            'license.check' => \App\Http\Middleware\CheckLicenseMiddleware::class,
-            'license.realtime' => \App\Http\Middleware\VerifyLicenseOnRequest::class,
+            'permission' => \App\Http\Middleware\EnsurePermission::class,
+            'subscription.active' => \App\Http\Middleware\EnsureActiveSubscription::class,
         ]);
         
         // CRITICAL: Exclude session recording routes from string manipulation
@@ -39,7 +38,8 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->validateCsrfTokens(except: [
             'api/rec/*',
             'api/record-session/*',
-            'api/track/*'
+            'api/track/*',
+            'f/*',
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

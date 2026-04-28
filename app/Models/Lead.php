@@ -55,6 +55,16 @@ class Lead extends Model
     {
         return $this->belongsTo(LandingPage::class, 'landing_page_id');
     }
+
+    public function emailContacts()
+    {
+        return $this->hasMany(EmailContact::class);
+    }
+
+    public function emailMessages()
+    {
+        return $this->hasMany(EmailMessage::class);
+    }
     
     public function getCustomerNameAttribute()
     {

@@ -28,11 +28,11 @@ class OllamaProvider implements AIProviderInterface
     {
         Log::info("OllamaProvider: Generating text for model {$model}");
         
-        // Note: apiKey is not used by default Ollama, but passed by interface
-        // We can pass options['baseUrl'] if we want to override the default service one
-        
         try {
-            return $this->ollama->generateStructured($prompt, array_merge($options, ['model' => $model]));
+            return $this->ollama->generateStructured(
+                $prompt,
+                array_merge($options, ['model' => $model, 'api_key' => $apiKey])
+            );
         } catch (Exception $e) {
             Log::error("OllamaProvider: Generation failed: " . $e->getMessage());
             throw $e;

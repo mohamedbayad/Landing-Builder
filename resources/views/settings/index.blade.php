@@ -5,25 +5,22 @@
         </h2>
     </x-slot>
 
-    <div class="py-12" x-data="{ tab: '{{ session('activeTab', 'theme') }}' }">
+    <div class="py-12" x-data="{ tab: '{{ session('activeTab', 'theme') }}' }" data-settings-tabs data-initial-tab="{{ session('activeTab', 'theme') }}">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
 
             <!-- Tabs Navigation -->
             <div class="flex space-x-1 rounded-xl bg-gray-100 dark:bg-white/[0.06] p-1 mb-8 overflow-x-auto">
-                <button @click="tab = 'theme'" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'theme', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'theme' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                <button @click="tab = 'theme'" data-settings-tab-btn="theme" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'theme', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'theme' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     Theme & Dashboard
                 </button>
-                <button @click="tab = 'payment'" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'payment', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'payment' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                <button @click="tab = 'payment'" data-settings-tab-btn="payment" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'payment', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'payment' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     Payment & Currency
                 </button>
-                <button @click="tab = 'whatsapp'" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'whatsapp', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'whatsapp' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                <button @click="tab = 'whatsapp'" data-settings-tab-btn="whatsapp" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'whatsapp', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'whatsapp' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     WhatsApp Automation
                 </button>
-                <button @click="tab = 'ai_settings'" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'ai_settings', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'ai_settings' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
+                <button @click="tab = 'ai_settings'" data-settings-tab-btn="ai_settings" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'ai_settings', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'ai_settings' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
                     AI Settings
-                </button>
-                <button @click="tab = 'license'" :class="{ 'bg-white dark:bg-[#161B22] shadow text-gray-900 dark:text-white': tab === 'license', 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200': tab !== 'license' }" class="w-full rounded-lg py-2.5 text-sm font-medium leading-5 transition-all">
-                    License
                 </button>
             </div>
 
@@ -46,7 +43,7 @@
                     @endif
 
                     <!-- TAB: THEME -->
-                    <div x-show="tab === 'theme'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
+                    <div data-settings-tab-panel="theme" x-show="tab === 'theme'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100">
                         <div class="mb-6">
                             <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Theme Configuration</h3>
                             <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Customize dashboard appearance and public page styles.</p>
@@ -337,7 +334,7 @@
                     </div>
 
                     <!-- TAB: PAYMENT -->
-                    <div x-show="tab === 'payment'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
+                    <div data-settings-tab-panel="payment" x-show="tab === 'payment'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
                         <div class="mb-6">
                             <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Payment Gateways & Currency</h3>
                         </div>
@@ -397,7 +394,7 @@
                     </div>
 
                     <!-- TAB: WHATSAPP -->
-                    <div x-show="tab === 'whatsapp'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
+                    <div data-settings-tab-panel="whatsapp" x-show="tab === 'whatsapp'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
                         <form method="POST" action="{{ route('settings.update') }}">
                             @csrf
                             @method('PUT')
@@ -483,7 +480,7 @@
                     </div>
 
                     <!-- TAB: AI SETTINGS -->
-                    <div x-show="tab === 'ai_settings'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
+                    <div data-settings-tab-panel="ai_settings" x-show="tab === 'ai_settings'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
                         <div class="mb-6 flex justify-between items-end">
                             <div>
                                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">AI Configuration</h3>
@@ -491,8 +488,152 @@
                             </div>
                         </div>
 
+                        <div class="bg-gray-50 dark:bg-white/[0.02] rounded-xl border border-gray-200 dark:border-white/[0.06] p-6 mb-8"
+                             x-data="{
+                                ctaType: '{{ old('chatbot_custom_cta_type', $workspace->settings->chatbot_custom_cta_type ?? 'form') }}',
+                                targetPlaceholder() {
+                                    if (this.ctaType === 'whatsapp') return 'Example: +212600000000';
+                                    if (this.ctaType === 'instagram') return 'Example: https://instagram.com/yourbrand';
+                                    if (this.ctaType === 'custom_phone') return 'Example: +212600000000';
+                                    if (this.ctaType === 'custom_link') return 'Example: https://your-offer-link.com';
+                                    return 'No target needed for form CTA';
+                                }
+                             }">
+                            <form method="POST" action="{{ route('settings.update') }}">
+                                @csrf
+                                @method('PUT')
+                                <input type="hidden" name="chatbot_cta_settings_check" value="1">
+
+                                <div class="flex items-start justify-between gap-6">
+                                    <div>
+                                        <h4 class="text-base font-semibold text-gray-900 dark:text-white">Landing Chatbot CTA (Subscriber)</h4>
+                                        <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Configure CTA behavior shown by chatbot only when visitor is conversion-ready.</p>
+                                    </div>
+
+                                    <label class="relative inline-flex items-center cursor-pointer mt-1">
+                                        <input type="checkbox" name="chatbot_custom_cta_enabled" class="sr-only peer" {{ ($workspace->settings->chatbot_custom_cta_enabled ?? false) ? 'checked' : '' }}>
+                                        <div class="w-14 h-7 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-brand-orange/20 dark:peer-focus:ring-brand-orange/30 rounded-full peer dark:bg-white/[0.12] peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-0.5 after:left-[4px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-6 after:w-6 after:transition-all dark:border-white/[0.06] peer-checked:bg-brand-orange"></div>
+                                        <span class="ml-3 text-sm font-medium text-gray-900 dark:text-gray-300">Enable</span>
+                                    </label>
+                                </div>
+
+                                <div class="mt-5">
+                                    <label for="chatbot_custom_cta_text" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        Custom CTA button text
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="chatbot_custom_cta_text"
+                                        name="chatbot_custom_cta_text"
+                                        maxlength="120"
+                                        value="{{ old('chatbot_custom_cta_text', $workspace->settings->chatbot_custom_cta_text ?? '') }}"
+                                        placeholder="Example: Reserve your free strategy call now"
+                                        class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20"
+                                    >
+                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        If empty, chatbot uses automatic CTA text for the selected action.
+                                    </p>
+                                </div>
+
+                                <div class="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
+                                    <div>
+                                        <label for="chatbot_custom_cta_type" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            CTA action type
+                                        </label>
+                                        <select id="chatbot_custom_cta_type" name="chatbot_custom_cta_type" x-model="ctaType" class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <option value="form">Form in LP</option>
+                                            <option value="whatsapp">WhatsApp</option>
+                                            <option value="instagram">Instagram</option>
+                                            <option value="custom_link">Custom URL</option>
+                                            <option value="custom_phone">Custom Phone</option>
+                                        </select>
+                                    </div>
+
+                                    <div>
+                                        <label for="chatbot_custom_cta_landing_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                            Apply CTA on
+                                        </label>
+                                        <select id="chatbot_custom_cta_landing_id" name="chatbot_custom_cta_landing_id" class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <option value="">All landing pages</option>
+                                            @foreach(($workspaceLandings ?? collect()) as $landingItem)
+                                                <option value="{{ $landingItem->id }}" {{ (string) old('chatbot_custom_cta_landing_id', $workspace->settings->chatbot_custom_cta_landing_id ?? '') === (string) $landingItem->id ? 'selected' : '' }}>
+                                                    {{ $landingItem->name }} ({{ $landingItem->slug }})
+                                                </option>
+                                            @endforeach
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="mt-5">
+                                    <label for="chatbot_custom_cta_target" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                        CTA target (URL or phone number)
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="chatbot_custom_cta_target"
+                                        name="chatbot_custom_cta_target"
+                                        maxlength="255"
+                                        value="{{ old('chatbot_custom_cta_target', $workspace->settings->chatbot_custom_cta_target ?? '') }}"
+                                        :placeholder="targetPlaceholder()"
+                                        class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20"
+                                    >
+                                    @error('chatbot_custom_cta_target')
+                                        <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                    @enderror
+                                    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                        Form type does not need target. WhatsApp/Phone expects a number. Instagram/Custom URL expects a valid link.
+                                    </p>
+                                </div>
+
+                                <div class="mt-6 flex justify-end">
+                                    <button type="submit" class="px-6 py-2.5 bg-brand-orange rounded-lg text-white text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm">
+                                        Save Chatbot CTA Settings
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+
+                        @php
+                            $canManageTech = (bool) (auth()->user()?->hasPermission('tech.manage'));
+                        @endphp
+                        @if($canManageTech)
                         <!-- Add New Provider Form -->
-                        <div class="bg-gray-50 dark:bg-white/[0.02] rounded-xl border border-gray-200 dark:border-white/[0.06] p-6 mb-8" x-data="{ openForm: false }">
+                        @php
+                            $providerOptions = \App\Support\AI\ProviderRegistry::optionsForSettingsForm();
+                        @endphp
+                        <div class="bg-gray-50 dark:bg-white/[0.02] rounded-xl border border-gray-200 dark:border-white/[0.06] p-6 mb-8"
+                             x-data='{
+                                openForm: false,
+                                provider: "{{ array_key_first($providerOptions) }}",
+                                baseUrl: "",
+                                providerMeta: @json($providerOptions),
+                                syncProvider(nextProvider) {
+                                    const previousProvider = this.provider;
+                                    const previousSuggested = this.providerMeta?.[previousProvider]?.default_base_url ?? "";
+                                    const shouldAutofillNext = Boolean(this.providerMeta?.[nextProvider]?.autofill_base_url);
+                                    const nextSuggested = this.providerMeta?.[nextProvider]?.default_base_url ?? "";
+
+                                    this.provider = nextProvider;
+
+                                    if (shouldAutofillNext && (this.baseUrl === "" || this.baseUrl === previousSuggested)) {
+                                        this.baseUrl = nextSuggested;
+                                    }
+
+                                    if (!shouldAutofillNext && this.baseUrl === previousSuggested) {
+                                        this.baseUrl = "";
+                                    }
+                                },
+                                apiKeyPlaceholder() {
+                                    return this.providerMeta?.[this.provider]?.api_key_placeholder ?? "sk-...";
+                                },
+                                baseUrlPlaceholder() {
+                                    return this.providerMeta?.[this.provider]?.base_url_placeholder ?? "https://...";
+                                },
+                                helperNote() {
+                                    return this.providerMeta?.[this.provider]?.helper_note ?? "";
+                                }
+                             }'
+                             x-init='syncProvider(provider)'>
                             <button @click="openForm = !openForm" type="button" class="flex items-center text-sm font-semibold text-brand-orange hover:text-brand-orange-600">
                                 <svg class="w-5 h-5 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
                                 Add New AI Provider
@@ -508,20 +649,22 @@
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Provider Type <span class="text-red-500">*</span></label>
-                                            <select name="provider" required class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
-                                                <option value="openai">OpenAI</option>
-                                                <option value="anthropic">Anthropic (Claude)</option>
-                                                <option value="gemini">Google Gemini</option>
-                                                <option value="custom">Custom / Ollama</option>
+                                            <select name="provider" x-model="provider" @change="syncProvider($event.target.value)" required class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                                @foreach($providerOptions as $providerKey => $providerOption)
+                                                    <option value="{{ $providerKey }}">{{ $providerOption['label'] }}</option>
+                                                @endforeach
                                             </select>
+                                            <p x-show="helperNote()" x-text="helperNote()" class="mt-2 text-xs text-gray-500 dark:text-gray-400"></p>
                                         </div>
                                         <div>
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key <span class="text-red-500">*</span></label>
-                                            <input type="password" name="api_key" required placeholder="sk-..." class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">API Key <span x-show="providerMeta?.[provider]?.requires_api_key" class="text-red-500">*</span></label>
+                                            <input type="password" name="api_key" :required="Boolean(providerMeta?.[provider]?.requires_api_key)" :placeholder="apiKeyPlaceholder()" class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <p x-show="provider === 'openrouter'" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Example: sk-or-v1-...</p>
                                         </div>
                                         <div>
                                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Custom Base URL (Optional)</label>
-                                            <input type="url" name="base_url" placeholder="https://..." class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <input type="url" name="base_url" x-model="baseUrl" :placeholder="baseUrlPlaceholder()" class="block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20">
+                                            <p x-show="provider === 'openrouter'" class="mt-2 text-xs text-gray-500 dark:text-gray-400">Suggested base URL: https://openrouter.ai/api/v1</p>
                                         </div>
                                     </div>
                                     <div class="mt-4 flex justify-end">
@@ -536,6 +679,7 @@
                         <div class="space-y-8">
                             @php
                                 $providers = \App\Models\AiProvider::where('workspace_id', $workspace->id)->with('models')->get();
+                                $providerLabels = \App\Support\AI\ProviderRegistry::labels();
                                 $assignments = $workspace->settings->ai_role_assignments ?? [];
                                 $roles = [
                                     'text_generation' => ['label' => 'Text Generation (Copy, Ideas)', 'json_key' => 'text_generation'],
@@ -552,7 +696,7 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 002-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                     </svg>
                                     <h3 class="mt-2 text-sm font-medium text-gray-900 dark:text-white">No AI Providers configured</h3>
-                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a provider (like OpenAI or Anthropic).</p>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Get started by adding a provider (like OpenAI, OpenRouter, or Anthropic).</p>
                                 </div>
                             @else
                                 <form method="POST" action="{{ route('settings.ai.models.roles.update') }}">
@@ -566,7 +710,7 @@
                                                     <h4 class="text-base font-semibold text-gray-900 dark:text-white flex items-center">
                                                         {{ $provider->name }}
                                                         <span class="ml-3 inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">
-                                                            {{ ucfirst($provider->provider) }}
+                                                            {{ $providerLabels[$provider->provider] ?? ucfirst($provider->provider) }}
                                                         </span>
                                                     </h4>
                                                     <p class="text-xs text-gray-500 mt-1 font-mono hover:text-gray-700 cursor-help" title="API Key ending in {{ substr($provider->api_key, -4) }}">
@@ -669,74 +813,53 @@
                                 @method('DELETE')
                             </form>
                         @endforeach
-                    </div>
-
-                    <!-- TAB: LICENSE -->
-                    <div x-show="tab === 'license'" x-transition:enter="transition ease-out duration-300" x-transition:enter-start="opacity-0 transform scale-95" x-transition:enter-end="opacity-100 transform scale-100" style="display: none;">
-                        <div class="mb-6">
-                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">License Management</h3>
-                            <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Activate your license to unlock premium features and templates.</p>
+                        @else
+                        <div class="bg-white dark:bg-[#161B22] border border-gray-200 dark:border-white/[0.06] rounded-xl p-5">
+                            <p class="text-sm text-gray-600 dark:text-gray-300">
+                                AI provider integration and model role assignment are managed by admin/super-admin accounts.
+                            </p>
                         </div>
-
-                        <div class="bg-gray-50 dark:bg-white/[0.02] rounded-xl border border-gray-200 dark:border-white/[0.06] p-6">
-                            <div class="flex items-center justify-between mb-6">
-                                <div>
-                                    <h4 class="text-base font-semibold text-gray-900 dark:text-white">License Status</h4>
-                                    <p class="text-sm text-gray-500">Current status of your installation.</p>
-                                </div>
-                                <span class="px-3 py-1 rounded-full text-sm font-medium {{ ($workspace->settings->license_status === 'active') ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800' }}">
-                                    {{ ucfirst($workspace->settings->license_status ?? 'Inactive') }}
-                                </span>
-                            </div>
-
-                            <div class="mb-4">
-                                @if(session('status') === 'license-activated')
-                                    <div class="p-4 mb-4 text-sm text-green-700 bg-green-100 rounded-lg dark:bg-green-200 dark:text-green-800" role="alert">
-                                        <span class="font-medium">Success!</span> License activated successfully.
-                                    </div>
-                                @endif
-
-                                @if(session('status') === 'license-removed')
-                                    <div class="p-4 mb-4 text-sm text-red-700 bg-red-100 rounded-lg dark:bg-red-200 dark:text-red-800" role="alert">
-                                        <span class="font-medium">Removed!</span> License deactivated.
-                                    </div>
-                                @endif
-                            </div>
-
-                            <form method="POST" action="{{ route('settings.update') }}">
-                                @csrf
-                                @method('PUT')
-
-                                <div class="mb-4">
-                                    <label for="license_key" class="block text-sm font-medium text-gray-700 dark:text-gray-300">License Key</label>
-                                    <input type="text" name="license_key" id="license_key" value="{{ old('license_key', $workspace->settings->license_key) }}" class="mt-1 block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20" placeholder="LICENSE-XXXX-YYYY-ZZZZ">
-                                    @error('license_key')
-                                        <p class="text-red-500 text-xs mt-1">{{ $message }}</p>
-                                    @enderror
-                                    @if(session('error'))
-                                        <p class="text-red-500 text-xs mt-1">{{ session('error') }}</p>
-                                    @endif
-                                </div>
-
-                                <div class="flex justify-between items-center">
-                                    @if($workspace->settings->license_status === 'active')
-                                        <button type="submit" name="remove_license" value="1" class="text-red-500 hover:text-red-700 text-sm font-medium focus:outline-none" onclick="return confirm('Are you sure you want to deactivate and remove this license?');">
-                                            Deactivate License
-                                        </button>
-                                    @else
-                                        <div></div>
-                                    @endif
-
-                                    <button type="submit" class="px-6 py-2.5 bg-brand-orange rounded-lg text-white text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm">
-                                        {{ ($workspace->settings->license_status === 'active') ? 'Update License' : 'Activate License' }}
-                                    </button>
-                                </div>
-                            </form>
-                        </div>
+                        @endif
                     </div>
 
                 </div>
             </div>
         </div>
     </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const root = document.querySelector('[data-settings-tabs]');
+            if (!root) return;
+
+            const buttons = Array.from(root.querySelectorAll('[data-settings-tab-btn]'));
+            const panels = Array.from(root.querySelectorAll('[data-settings-tab-panel]'));
+            if (!buttons.length || !panels.length) return;
+
+            const knownTabs = new Set(buttons.map((btn) => btn.dataset.settingsTabBtn));
+            const requestedTab = root.getAttribute('data-initial-tab') || 'theme';
+            const defaultTab = knownTabs.has(requestedTab) ? requestedTab : 'theme';
+
+            const activateTab = (tabName) => {
+                panels.forEach((panel) => {
+                    const isActive = panel.dataset.settingsTabPanel === tabName;
+                    panel.style.display = isActive ? '' : 'none';
+                });
+
+                buttons.forEach((btn) => {
+                    const isActive = btn.dataset.settingsTabBtn === tabName;
+                    btn.setAttribute('aria-selected', isActive ? 'true' : 'false');
+                });
+            };
+
+            buttons.forEach((btn) => {
+                btn.addEventListener('click', function () {
+                    const tabName = btn.dataset.settingsTabBtn;
+                    if (!tabName) return;
+                    activateTab(tabName);
+                });
+            });
+
+            activateTab(defaultTab);
+        });
+    </script>
 </x-app-layout>

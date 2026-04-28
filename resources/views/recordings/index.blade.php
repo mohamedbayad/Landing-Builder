@@ -1,8 +1,9 @@
 <x-app-layout>
-    <x-slot name="header">
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
-            {{ __('Visitor Recordings') }}
-        </h2>
+    <x-slot name="topbar">
+        <div class="leading-tight">
+            <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight">{{ __('Visitor Recordings') }}</h1>
+            <p class="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">Review captured sessions and replay visitor behavior.</p>
+        </div>
     </x-slot>
 
     <div class="py-8">

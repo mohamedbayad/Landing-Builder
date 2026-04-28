@@ -3,6 +3,8 @@
 namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
+use App\Events\Email\CheckoutCompleted;
+use App\Events\Email\LeadCreated;
 use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Landing;
@@ -94,7 +96,7 @@ class OrderController extends Controller
         ]);
 
         // 5. Create Unified Lead (Linked to Order)
-        $order->lead()->create([
+        $lead = $order->lead()->create([
             'landing_id' => $landing->id,
             'email' => $order->customer_email,
             'status' => 'new',
@@ -107,6 +109,38 @@ class OrderController extends Controller
             'ip_address' => $request->ip(),
             'order_items' => $orderItemsPayload, // Save copy to lead if needed, or rely on order relation
         ]);
+
+        if ($landing->workspace?->user_id) {
+            $preferredCheckoutAutomationId = $landing->settings?->checkout_automation_id;
+
+            event(new CheckoutCompleted(
+                userId: $landing->workspace->user_id,
+                leadId: $lead->id,
+                landingId: $landing->id,
+                landingPageId: $lead->landing_page_id,
+                productId: $product->id ?? null,
+                preferredAutomationId: $preferredCheckoutAutomationId,
+                email: $lead->email,
+                firstName: $lead->first_name,
+                lastName: $lead->last_name,
+                phone: $lead->phone,
+                productName: $product->name ?? null,
+                orderTotal: (float) $lead->amount,
+                data: is_array($lead->data) ? $lead->data : []
+            ));
+
+            event(new LeadCreated(
+                userId: $landing->workspace->user_id,
+                leadId: $lead->id,
+                landingId: $landing->id,
+                landingPageId: $lead->landing_page_id,
+                email: $lead->email,
+                firstName: $lead->first_name,
+                lastName: $lead->last_name,
+                phone: $lead->phone,
+                data: is_array($lead->data) ? $lead->data : []
+            ));
+        }
 
         // 6. Clear Session
         session()->forget('cart');

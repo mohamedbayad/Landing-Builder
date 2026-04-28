@@ -85,10 +85,6 @@ export default function canvasInteractionControlPlugin(editor, opts = {}) {
     function _normalizeClassHiddenState(el) {
         if (!el || !el.classList) return;
 
-        // Keep GSAP sections untouched: their internal visibility/pinning
-        // is handled by editor-animation-safe-mode using data-gsap-section.
-        if (typeof el.closest === 'function' && el.closest('[data-gsap-section], #solution')) return;
-
         // Never force-show modal/drawer/backdrop layers in editor.
         if (_isOverlayLikeElement(el)) return;
 

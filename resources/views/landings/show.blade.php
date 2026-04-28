@@ -32,14 +32,14 @@
         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
 
             @if(session('status'))
-                <div class="mb-5 p-4 rounded-lg bg-green-50 dark:bg-green-500/10 border border-green-100 dark:border-green-500/20 text-sm text-green-700 dark:text-green-400">
+                <x-ui.alert type="success" class="mb-5" dismissible>
                     {{ session('status') }}
-                </div>
+                </x-ui.alert>
             @endif
             @if(session('error'))
-                <div class="mb-5 p-4 rounded-lg bg-red-50 dark:bg-red-500/10 border border-red-100 dark:border-red-500/20 text-sm text-red-700 dark:text-red-400">
+                <x-ui.alert type="error" class="mb-5" dismissible>
                     {{ session('error') }}
-                </div>
+                </x-ui.alert>
             @endif
 
             <div class="bg-white dark:bg-[#161B22] rounded-xl border border-gray-100 dark:border-white/[0.06] shadow-sm overflow-hidden">

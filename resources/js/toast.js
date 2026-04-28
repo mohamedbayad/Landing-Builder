@@ -3,53 +3,46 @@ export class Toast {
         const container = document.getElementById('toast-container');
         if (!container) return;
 
-        const id = 'toast-' + Date.now();
+        const normalizedType = ['success', 'error', 'warning', 'info'].includes(type) ? type : 'info';
+        const id = `toast-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
         const toast = document.createElement('div');
         toast.id = id;
+        toast.setAttribute('role', normalizedType === 'error' ? 'alert' : 'status');
+        toast.setAttribute('aria-live', normalizedType === 'error' ? 'assertive' : 'polite');
 
-        // Base classes
-        let classes = "flex items-center w-full max-w-xs p-4 mb-4 text-gray-500 bg-white rounded-lg shadow dark:text-gray-400 dark:bg-gray-800 transition-all duration-300 transform translate-x-full opacity-0";
+        const icons = {
+            success:
+                '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.704 5.29a1 1 0 010 1.414l-7.25 7.25a1 1 0 01-1.414 0L3.296 9.21a1 1 0 011.414-1.415l4.04 4.04 6.543-6.545a1 1 0 011.414 0z" clip-rule="evenodd" /></svg>',
+            error:
+                '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 114.293 4.293 8 8 0 0118 10zM9 6a1 1 0 012 0v4a1 1 0 11-2 0V6zm1 8a1.25 1.25 0 100-2.5A1.25 1.25 0 0010 14z" clip-rule="evenodd" /></svg>',
+            warning:
+                '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.72-1.36 3.485 0l6.518 11.593c.75 1.334-.213 2.983-1.742 2.983H3.48c-1.53 0-2.492-1.65-1.742-2.983L8.257 3.1zM11 8a1 1 0 10-2 0v3a1 1 0 102 0V8zm-1 7a1.25 1.25 0 100-2.5A1.25 1.25 0 0010 15z" clip-rule="evenodd" /></svg>',
+            info:
+                '<svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M18 10A8 8 0 11.002 10 8 8 0 0118 10zm-8.75-3a.75.75 0 011.5 0v.25a.75.75 0 01-1.5 0V7zm0 2.5a.75.75 0 000 1.5h.5v2a.75.75 0 001.5 0v-2h.5a.75.75 0 000-1.5h-2.5z" clip-rule="evenodd" /></svg>',
+        };
 
-        // Type specific icons/colors (optional, keeping it simple/clean for now)
-        let icon = '';
-        if (type === 'success') {
-            icon = `<div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-green-500 bg-green-100 rounded-lg dark:bg-green-800 dark:text-green-200">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd"></path></svg>
-                    </div>`;
-        } else if (type === 'error') {
-            icon = `<div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-red-500 bg-red-100 rounded-lg dark:bg-red-800 dark:text-red-200">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
-                    </div>`;
-        } else {
-            icon = `<div class="inline-flex items-center justify-center flex-shrink-0 w-8 h-8 text-blue-500 bg-blue-100 rounded-lg dark:bg-blue-800 dark:text-blue-200">
-                        <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"></path></svg>
-                    </div>`;
-        }
+        const safeMessage = this.escapeHtml(String(message ?? ''));
 
-        toast.className = classes;
+        toast.className = `pro-toast pro-toast--${normalizedType}`;
         toast.innerHTML = `
-            ${icon}
-            <div class="ml-3 text-sm font-normal">${message}</div>
-            <button type="button" class="ml-auto -mx-1.5 -my-1.5 bg-white text-gray-400 hover:text-gray-900 rounded-lg focus:ring-2 focus:ring-gray-300 p-1.5 hover:bg-gray-100 inline-flex h-8 w-8 dark:text-gray-500 dark:hover:text-white dark:bg-gray-800 dark:hover:bg-gray-700" data-dismiss-target="#${id}" aria-label="Close" onclick="this.parentElement.remove()">
-                <span class="sr-only">Close</span>
-                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path></svg>
+            <div class="pro-toast__icon">${icons[normalizedType]}</div>
+            <div class="pro-toast__message">${safeMessage}</div>
+            <button type="button" class="pro-toast__close" aria-label="Close notification">
+                <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"></path>
+                </svg>
             </button>
         `;
 
         container.appendChild(toast);
+        const closeButton = toast.querySelector('.pro-toast__close');
+        closeButton?.addEventListener('click', () => this.dismiss(toast));
 
-        // Animate in
-        setTimeout(() => {
-            toast.classList.remove('translate-x-full', 'opacity-0');
-        }, 100);
+        requestAnimationFrame(() => {
+            toast.classList.add('is-visible');
+        });
 
-        // Auto remove
-        setTimeout(() => {
-            toast.classList.add('translate-x-full', 'opacity-0');
-            setTimeout(() => {
-                toast.remove();
-            }, 300);
-        }, duration);
+        window.setTimeout(() => this.dismiss(toast), duration);
     }
 
     static success(message) {
@@ -62,6 +55,25 @@ export class Toast {
 
     static info(message) {
         this.show(message, 'info');
+    }
+
+    static warning(message) {
+        this.show(message, 'warning');
+    }
+
+    static dismiss(toastEl) {
+        if (!toastEl || !toastEl.parentElement) return;
+        toastEl.classList.remove('is-visible');
+        window.setTimeout(() => toastEl.remove(), 220);
+    }
+
+    static escapeHtml(value) {
+        return value
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 }
 

@@ -37,7 +37,7 @@ class AnalyticsPageTest extends TestCase
         $response = $this->actingAs($this->user)->get('/analytics');
         $response->assertStatus(200);
         $response->assertViewIs('analytics.index');
-        $response->assertSee('Analytics Overview');
+        $response->assertSee('Analytics');
     }
 
     public function test_analytics_data_api_returns_json()

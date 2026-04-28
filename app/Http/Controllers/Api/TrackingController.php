@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Events\Email\LeadCreated;
 use App\Http\Controllers\Controller;
 use App\Models\Landing;
 use App\Models\LandingPage;
@@ -54,6 +55,21 @@ class TrackingController extends Controller
             'data' => $validated['data'] ?? [],
             'ip_address' => $request->ip(),
         ]);
+
+        $landing = Landing::query()->find($validated['landing_id']);
+        if ($landing?->workspace?->user_id) {
+            event(new LeadCreated(
+                userId: $landing->workspace->user_id,
+                leadId: $lead->id,
+                landingId: $landing->id,
+                landingPageId: $lead->landing_page_id,
+                email: $lead->email,
+                firstName: $lead->first_name,
+                lastName: $lead->last_name,
+                phone: $lead->phone,
+                data: is_array($lead->data) ? $lead->data : []
+            ));
+        }
 
         return response()->json(['success' => true, 'id' => $lead->id], 201);
     }

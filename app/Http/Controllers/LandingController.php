@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\EmailAutomation;
 use App\Models\Landing;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -53,7 +54,13 @@ class LandingController extends Controller
             abort(403);
         }
 
-        return view('landings.edit', compact('landing'));
+        $automations = EmailAutomation::query()
+            ->where('user_id', Auth::id())
+            ->whereIn('trigger_type', ['form_submitted', 'checkout_completed'])
+            ->orderBy('name')
+            ->get(['id', 'name', 'trigger_type', 'status']);
+
+        return view('landings.edit', compact('landing', 'automations'));
     }
 
     /**
@@ -84,7 +91,27 @@ class LandingController extends Controller
             'cart_y_offset' => 'nullable|integer|min:0',
             'countdown_end_at' => 'nullable|date',
             'countdown_duration_minutes' => 'nullable|integer|min:1',
+            'form_automation_id' => 'nullable|exists:email_automations,id',
+            'checkout_automation_id' => 'nullable|exists:email_automations,id',
         ]);
+
+        foreach (['form_automation_id', 'checkout_automation_id'] as $automationField) {
+            $automationId = $validated[$automationField] ?? null;
+            if (!$automationId) {
+                continue;
+            }
+
+            $belongsToUser = EmailAutomation::query()
+                ->where('id', $automationId)
+                ->where('user_id', Auth::id())
+                ->exists();
+
+            if (!$belongsToUser) {
+                return redirect()->back()->withErrors([
+                    $automationField => 'Selected automation does not belong to your account.',
+                ])->withInput();
+            }
+        }
 
         $landing->update([
             'name' => $validated['name'],
@@ -121,6 +148,8 @@ class LandingController extends Controller
                 'enable_card' => $request->has('enable_card'),
                 'enable_paypal' => $request->has('enable_paypal'),
                 'enable_cod' => $request->has('enable_cod'),
+                'form_automation_id' => $validated['form_automation_id'] ?? null,
+                'checkout_automation_id' => $validated['checkout_automation_id'] ?? null,
             ]
         );
 
@@ -217,8 +246,12 @@ class LandingController extends Controller
         }
 
         $template = Template::create([
+            'owner_user_id' => Auth::id(),
             'name' => $landing->name . ' Template',
+            'slug' => Str::slug($landing->name . '-template-' . Str::random(5)),
             'description' => 'Saved from landing #' . $landing->id,
+            'category' => 'custom',
+            'visibility' => 'private',
             'is_active' => true,
         ]);
 

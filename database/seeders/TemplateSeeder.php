@@ -5,6 +5,7 @@ namespace Database\Seeders;
 use Illuminate\Database\Seeder;
 use App\Models\Template;
 use App\Models\TemplatePage;
+use Illuminate\Support\Str;
 
 class TemplateSeeder extends Seeder
 {
@@ -14,7 +15,10 @@ class TemplateSeeder extends Seeder
         $saas = Template::firstOrCreate(
             ['name' => 'SaaS Startup'],
             [
+                'slug' => 'saas-startup-' . Str::random(4),
                 'description' => 'A modern, high-conversion template for SaaS products.',
+                'category' => 'saas',
+                'visibility' => 'public',
                 'preview_image_path' => '/images/templates/saas-startup.jpg',
                 'is_active' => true,
             ]
@@ -76,7 +80,10 @@ class TemplateSeeder extends Seeder
         $ebook = Template::firstOrCreate(
             ['name' => 'E-book Launch'],
             [
+                'slug' => 'ebook-launch-' . Str::random(4),
                 'description' => 'Perfect for selling digital products and e-books.',
+                'category' => 'digital-products',
+                'visibility' => 'public',
                 'preview_image_path' => '/images/templates/ebook-launch.jpg',
                 'is_active' => true,
             ]
@@ -99,7 +106,10 @@ class TemplateSeeder extends Seeder
         $custom = Template::firstOrCreate(
             ['name' => 'My Custom Template'],
             [
+                'slug' => 'my-custom-template-' . Str::random(4),
                 'description' => 'A blank canvas for your own custom HTML/CSS.',
+                'category' => 'custom',
+                'visibility' => 'public',
                 'preview_image_path' => 'https://placehold.co/600x400?text=Custom+Template', // Placeholder
                 'is_active' => true,
             ]

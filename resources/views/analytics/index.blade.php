@@ -1,21 +1,18 @@
 <x-app-layout>
+    <x-slot name="topbar">
+        <div class="leading-tight">
+            <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight">Analytics</h1>
+            <p class="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">Performance overview &amp; insights</p>
+        </div>
+    </x-slot>
+
     <div class="py-8 bg-gray-50 dark:bg-[#0D1117] min-h-screen font-sans" x-data="analyticsDashboard()">
 
-        <!-- Sticky Header & Filter Bar -->
+        <!-- Sticky Filter Bar -->
         <div class="sticky top-0 z-10 bg-gray-50/95 dark:bg-[#0D1117]/95 backdrop-blur-sm border-b border-gray-200 dark:border-white/[0.06] pb-4 pt-4 px-4 sm:px-6 lg:px-8 transition-all duration-200"
              :class="{'shadow-sm': true}">
 
-            <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-
-                <!-- Title -->
-                <div>
-                    <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
-                        Analytics
-                    </h2>
-                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                        Performance overview &amp; insights
-                    </p>
-                </div>
+            <div class="max-w-7xl mx-auto flex justify-end">
 
                 <!-- Filters -->
                 <div class="flex flex-wrap items-center gap-2 w-full md:w-auto">
@@ -98,6 +95,9 @@
                             <!-- Map Container -->
                             <div class="w-full md:w-2/3 min-h-[300px] relative flex items-center justify-center" id="realtime-map-container" wire:ignore>
                                 <!-- Map SVG injected by D3 -->
+                                <div x-show="mapState.error" class="text-center px-6">
+                                    <p class="text-sm text-gray-500 dark:text-gray-400" x-text="mapState.error"></p>
+                                </div>
                             </div>
 
                             <!-- Internal Country List -->
@@ -207,10 +207,7 @@
                             </div>
                         </div>
                         <div class="mt-4 flex items-center text-xs">
-                            <span class="text-green-500 font-medium flex items-center">
-                                <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                                +12%
-                            </span>
+                            <span class="font-medium" :class="kpiDeltaClass(data.kpi.sessions_change)" x-text="formatSignedPercent(data.kpi.sessions_change)"></span>
                             <span class="text-gray-400 ml-2">vs. previous period</span>
                         </div>
                     </div>
@@ -227,7 +224,7 @@
                             </div>
                         </div>
                         <div class="mt-4 flex items-center text-xs">
-                            <span class="text-gray-400">Unique people tracked</span>
+                            <span class="text-gray-400" x-text="visitorMixLabel()"></span>
                         </div>
                     </div>
 
@@ -243,7 +240,8 @@
                             </div>
                         </div>
                         <div class="mt-4 flex items-center text-xs">
-                            <span class="text-emerald-500 font-medium flex items-center">High Value</span>
+                            <span class="font-medium" :class="kpiDeltaClass(data.kpi.leads_change)" x-text="formatSignedPercent(data.kpi.leads_change)"></span>
+                            <span class="text-gray-400 ml-2">vs. previous period</span>
                         </div>
                     </div>
 
@@ -261,7 +259,8 @@
                             </div>
                         </div>
                         <div class="mt-4 flex items-center text-xs">
-                            <span class="text-gray-400">Avg across landings</span>
+                            <span class="font-medium" :class="kpiDeltaClass(data.kpi.conversion_change)" x-text="formatPointsDelta(data.kpi.conversion_change)"></span>
+                            <span class="text-gray-400 ml-2">vs. previous period</span>
                         </div>
                     </div>
                 </div>
@@ -512,7 +511,7 @@
                 },
                 realtimePoll: null,
                 charts: {},
-                mapState: { rendered: false, svg: null, worldData: null, path: null },
+                mapState: { rendered: false, svg: null, worldData: null, path: null, error: null },
 
                 init() {
                     this.fetchData();
@@ -528,11 +527,40 @@
                 fetchRealtime() {
                     const params = new URLSearchParams({ landing_id: this.filters.landing_id });
                     fetch(`{{ route('analytics.realtime') }}?${params}`)
-                        .then(res => res.json())
+                        .then(async (res) => {
+                            if (!res.ok) {
+                                throw new Error(`Realtime request failed (${res.status})`);
+                            }
+                            return res.json();
+                        })
                         .then(data => {
-                            if (data.error) return;
-                            this.realtimeData = data;
-                            this.updateD3Map(data.countries);
+                            if (data.error) {
+                                throw new Error(data.error);
+                            }
+
+                            const countries = Array.isArray(data.countries) ? data.countries : [];
+                            const minutes = Array.isArray(data.minutes) ? data.minutes : [];
+                            this.realtimeData = {
+                                total: Number(data.total ?? 0),
+                                countries: countries.map((c) => ({
+                                    country: c.country ?? 'Unknown',
+                                    count: Number(c.count ?? 0),
+                                })),
+                                minutes: minutes.map((m) => ({
+                                    time: m.time ?? '',
+                                    count: Number(m.count ?? 0),
+                                })),
+                            };
+
+                            this.updateD3Map(this.realtimeData.countries);
+                        })
+                        .catch((error) => {
+                            console.error('Realtime analytics error:', error);
+                            this.realtimeData = {
+                                total: 0,
+                                countries: [],
+                                minutes: Array.from({length: 30}, (_, i) => ({ time: i, count: 0 })),
+                            };
                         });
                 },
 
@@ -564,6 +592,33 @@
 
                 formatNumber(num) {
                     return new Intl.NumberFormat('en-US', { notation: "compact", compactDisplay: "short" }).format(num);
+                },
+
+                kpiDeltaClass(value) {
+                    const number = Number(value ?? 0);
+                    if (number > 0) return 'text-emerald-500';
+                    if (number < 0) return 'text-red-500';
+                    return 'text-gray-400';
+                },
+
+                formatSignedPercent(value) {
+                    const number = Number(value ?? 0);
+                    const normalized = Math.abs(number) < 0.05 ? 0 : number;
+                    const sign = normalized > 0 ? '+' : '';
+                    return `${sign}${normalized.toFixed(1)}%`;
+                },
+
+                formatPointsDelta(value) {
+                    const number = Number(value ?? 0);
+                    const normalized = Math.abs(number) < 0.01 ? 0 : number;
+                    const sign = normalized > 0 ? '+' : '';
+                    return `${sign}${normalized.toFixed(2)} pts`;
+                },
+
+                visitorMixLabel() {
+                    const incoming = Number(this.data?.breakdowns?.visitor_types?.new ?? 0);
+                    const returning = Number(this.data?.breakdowns?.visitor_types?.returning ?? 0);
+                    return `${incoming.toFixed(1)}% new / ${returning.toFixed(1)}% returning`;
                 },
 
                 formatDuration(seconds) {
@@ -671,11 +726,19 @@
                 async initD3Map() {
                     if (this.mapState.rendered) return;
                     this.mapState.rendered = true;
+                    this.mapState.error = null;
+
+                    const d3Lib = window.d3;
+                    const topojsonLib = window.topojson;
+                    if (!d3Lib || !topojsonLib) {
+                        this.mapState.error = 'Map unavailable (country data is still live).';
+                        return;
+                    }
 
                     const width = 800;
                     const height = 450;
 
-                    const container = d3.select("#realtime-map-container");
+                    const container = d3Lib.select("#realtime-map-container");
                     if(container.empty()) return;
 
                     this.mapState.svg = container
@@ -685,20 +748,42 @@
                         .style("height", "100%")
                         .style("max-height", "400px");
 
-                    const projection = d3.geoMercator()
+                    const projection = d3Lib.geoMercator()
                         .scale(130)
                         .translate([width / 2, height / 1.5]);
 
-                    this.mapState.path = d3.geoPath().projection(projection);
+                    this.mapState.path = d3Lib.geoPath().projection(projection);
 
                     try {
-                        const response = await fetch("https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json");
-                        this.mapState.worldData = await response.json();
+                        const atlasSources = [
+                            "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json",
+                            "https://unpkg.com/world-atlas@2/countries-110m.json",
+                        ];
+
+                        let worldData = null;
+                        for (const url of atlasSources) {
+                            try {
+                                const response = await fetch(url);
+                                if (response.ok) {
+                                    worldData = await response.json();
+                                    break;
+                                }
+                            } catch (sourceError) {
+                                // try next source
+                            }
+                        }
+
+                        if (!worldData) {
+                            this.mapState.error = 'Map unavailable (country data is still live).';
+                            return;
+                        }
+
+                        this.mapState.worldData = worldData;
 
                         this.mapState.svg.append("g")
                             .attr("class", "countries-group")
                             .selectAll("path")
-                            .data(topojson.feature(this.mapState.worldData, this.mapState.worldData.objects.countries).features)
+                            .data(topojsonLib.feature(this.mapState.worldData, this.mapState.worldData.objects.countries).features)
                             .enter().append("path")
                             .attr("d", this.mapState.path)
                             .attr("fill", "#e2e8f0")
@@ -710,12 +795,14 @@
                             this.updateD3Map(this.realtimeData.countries);
                         }
                     } catch (e) {
+                        this.mapState.error = 'Map unavailable (country data is still live).';
                         console.error("Map loading error", e);
                     }
                 },
 
                 updateD3Map(countriesData) {
-                    if (!this.mapState.svg || !this.mapState.worldData) return;
+                    const d3Lib = window.d3;
+                    if (!d3Lib || !this.mapState.svg || !this.mapState.worldData) return;
 
                     const countsDict = {};
                     let maxCount = 0;
@@ -728,7 +815,7 @@
                     const activeColorMin = '#fed7aa';
                     const activeColorMax = '#ea580c';
 
-                    const colorScale = d3.scaleLinear()
+                    const colorScale = d3Lib.scaleLinear()
                         .domain([1, Math.max(maxCount, 2)])
                         .range([activeColorMin, activeColorMax]);
 

@@ -17,9 +17,15 @@
                     </div>
 
                     <!-- Create Form Endpoint -->
-                    <form action="{{ route('form-endpoints.store') }}" method="POST" class="flex w-full sm:w-auto gap-2">
+                    <form action="{{ route('form-endpoints.store') }}" method="POST" class="flex w-full sm:w-auto gap-2 flex-wrap">
                         @csrf
                         <input type="text" name="name" placeholder="Endpoint Name (e.g. Contact Us)" class="w-full sm:w-64 rounded-lg border-gray-300 dark:border-white/[0.06] dark:bg-[#0D1117] dark:text-gray-200 shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 text-sm px-3 py-2" required>
+                        <select name="default_automation_id" class="w-full sm:w-72 rounded-lg border-gray-300 dark:border-white/[0.06] dark:bg-[#0D1117] dark:text-gray-200 shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 text-sm px-3 py-2">
+                            <option value="">No default automation</option>
+                            @foreach(($automations ?? collect()) as $automation)
+                                <option value="{{ $automation->id }}">{{ $automation->name }} ({{ $automation->status }})</option>
+                            @endforeach
+                        </select>
                         <button type="submit" class="inline-flex items-center px-4 py-2 bg-brand-orange border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-brand-orange-600 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 transition-all shadow-sm">
                             Create
                         </button>
@@ -38,6 +44,7 @@
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Name</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Submission URL</th>
+                                    <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Automation</th>
                                     <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Stats</th>
                                     <th class="px-6 py-3 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                                 </tr>
@@ -55,6 +62,21 @@
                                                     <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
                                                 </button>
                                             </div>
+                                        </td>
+                                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                                            <form method="POST" action="{{ route('form-endpoints.update', $endpoint) }}" class="flex items-center gap-2">
+                                                @csrf
+                                                @method('PATCH')
+                                                <select name="default_automation_id" class="rounded-lg border-gray-300 dark:border-white/[0.06] dark:bg-[#0D1117] dark:text-gray-200 text-xs">
+                                                    <option value="">None</option>
+                                                    @foreach(($automations ?? collect()) as $automation)
+                                                        <option value="{{ $automation->id }}" @selected((string) $endpoint->default_automation_id === (string) $automation->id)>
+                                                            {{ $automation->name }}
+                                                        </option>
+                                                    @endforeach
+                                                </select>
+                                                <button type="submit" class="text-xs text-brand-orange hover:underline">Save</button>
+                                            </form>
                                         </td>
                                         <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                                             <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-orange-50 text-orange-700 dark:bg-orange-500/10 dark:text-orange-300">

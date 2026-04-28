@@ -56,4 +56,51 @@ class LandingSettingsTest extends TestCase
         $response->assertSee('Injected Title');
         $response->assertSee('<script>alert("injected")</script>', false);
     }
+
+    public function test_root_uses_same_global_main_for_guest_and_authenticated_user()
+    {
+        $userA = User::factory()->create();
+        $workspaceA = Workspace::create(['user_id' => $userA->id, 'name' => 'Workspace A']);
+        $landingA = Landing::create([
+            'workspace_id' => $workspaceA->id,
+            'name' => 'Landing A',
+            'slug' => 'landing-a',
+            'status' => 'published',
+            'is_main' => true,
+        ]);
+        LandingPage::create([
+            'landing_id' => $landingA->id,
+            'type' => 'index',
+            'name' => 'A Home',
+            'slug' => 'index',
+            'html' => '<h1>ROOT-A-MARKER</h1>',
+        ]);
+
+        $userB = User::factory()->create();
+        $workspaceB = Workspace::create(['user_id' => $userB->id, 'name' => 'Workspace B']);
+        $landingB = Landing::create([
+            'workspace_id' => $workspaceB->id,
+            'name' => 'Landing B',
+            'slug' => 'landing-b',
+            'status' => 'published',
+            'is_main' => true,
+        ]);
+        LandingPage::create([
+            'landing_id' => $landingB->id,
+            'type' => 'index',
+            'name' => 'B Home',
+            'slug' => 'index',
+            'html' => '<h1>ROOT-B-MARKER</h1>',
+        ]);
+
+        $guestResponse = $this->get('/');
+        $response = $this->actingAs($userB)->get('/');
+
+        $response->assertStatus(200);
+        $guestResponse->assertStatus(200);
+        $response->assertSee('ROOT-B-MARKER');
+        $guestResponse->assertSee('ROOT-B-MARKER');
+        $response->assertDontSee('ROOT-A-MARKER');
+        $guestResponse->assertDontSee('ROOT-A-MARKER');
+    }
 }

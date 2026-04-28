@@ -24,6 +24,7 @@ class DatabaseSeeder extends Seeder
 
         $this->call([
             FakeUserLoginSeeder::class,
+            AccessControlSeeder::class,
             TemplateSeeder::class,
             MoroccanMarketSeeder::class,
         ]);

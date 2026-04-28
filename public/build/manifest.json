@@ -4,7 +4,7 @@
     "name": "auto"
   },
   "resources/css/app.css": {
-    "file": "assets/app-fnAHNGai.css",
+    "file": "assets/app-BSnImB_S.css",
     "src": "resources/css/app.css",
     "isEntry": true,
     "name": "app",
@@ -13,7 +13,7 @@
     ]
   },
   "resources/js/app.js": {
-    "file": "assets/app-B1BD8iif.js",
+    "file": "assets/app-D3HgXSr1.js",
     "name": "app",
     "src": "resources/js/app.js",
     "isEntry": true,
@@ -31,12 +31,12 @@
     ]
   },
   "resources/js/editor.js": {
-    "file": "assets/editor-CUub1ebe.js",
+    "file": "assets/editor-BjvJTZ-R.js",
     "name": "editor",
     "src": "resources/js/editor.js",
     "isEntry": true,
     "css": [
-      "assets/editor-CpWN5LTE.css"
+      "assets/editor-CNZIx3_x.css"
     ]
   },
   "resources/js/online-users.js": {

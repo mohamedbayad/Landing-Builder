@@ -3,6 +3,8 @@
 namespace App\Services;
 
 use App\Models\AiProvider;
+use App\Services\AI\Providers\OpenAIProvider;
+use App\Support\AI\ProviderRegistry;
 use Illuminate\Support\Facades\Http;
 use Exception;
 use Illuminate\Support\Facades\Log;
@@ -18,14 +20,15 @@ class AIModelLoaderService
     public function fetchAndSyncModels(int $providerId): array
     {
         $provider = AiProvider::findOrFail($providerId);
-        
-        if (empty($provider->api_key)) {
+
+        if (ProviderRegistry::requiresApiKey((string) $provider->provider) && empty($provider->api_key)) {
             throw new Exception("Cannot load models. The provider has no API Key configured.");
         }
 
         switch (strtolower($provider->provider)) {
             case 'openai':
-                return $this->fetchOpenAIModels($provider);
+            case 'openrouter':
+                return $this->fetchOpenAICompatibleModels($provider);
             case 'anthropic':
                 return $this->fetchAnthropicModels($provider);
             case 'gemini':
@@ -41,12 +44,16 @@ class AIModelLoaderService
 
     protected function fetchOllamaModels(AiProvider $provider): array
     {
-        $baseUrl = rtrim($provider->base_url ?? 'http://localhost:11434', '/');
+        $baseUrl = ProviderRegistry::normalizeOllamaBaseUrl((string) ($provider->base_url ?: ProviderRegistry::ollamaDefaultBaseUrl()));
         $url = "{$baseUrl}/api/tags";
 
         Log::info("AI Loader: Fetching Ollama models from {$url}");
 
-        $response = Http::timeout(10)->get($url);
+        $request = Http::timeout(10);
+        if (!empty($provider->api_key)) {
+            $request = $request->withToken($provider->api_key);
+        }
+        $response = $request->get($url);
 
         if ($response->failed()) {
             Log::error("AI Loader: Failed to fetch Ollama models", ['body' => $response->body()]);
@@ -74,14 +81,24 @@ class AIModelLoaderService
         return $models;
     }
 
-    protected function fetchOpenAIModels(AiProvider $provider): array
+    protected function fetchOpenAICompatibleModels(AiProvider $provider): array
     {
-        $url = $provider->base_url ?? 'https://api.openai.com/v1/models';
+        $providerKey = strtolower($provider->provider);
+        $defaultBaseUrl = ProviderRegistry::defaultBaseUrlFor($providerKey) ?? ProviderRegistry::OPENAI_DEFAULT_BASE_URL;
 
-        $response = Http::withToken($provider->api_key)->get($url);
+        $openAICompatibleProvider = new OpenAIProvider($defaultBaseUrl);
+        if (!empty($provider->base_url)) {
+            $openAICompatibleProvider->setBaseUrl($provider->base_url);
+        }
+
+        $url = rtrim($openAICompatibleProvider->getBaseUrl(), '/') . '/models';
+
+        $response = Http::withToken($provider->api_key)
+            ->timeout(20)
+            ->get($url);
 
         if ($response->failed()) {
-            throw new Exception("Failed to fetch OpenAI models: " . $response->body());
+            throw new Exception("Failed to fetch {$providerKey} models: " . $response->body());
         }
 
         $data = $response->json();
@@ -90,8 +107,11 @@ class AIModelLoaderService
         $models = [];
         $resolver = new \App\Services\AI\Resolvers\OpenAIModelCapabilityResolver();
         
-        foreach ($data['data'] as $modelData) {
-            $modelId = $modelData['id'];
+        foreach (($data['data'] ?? []) as $modelData) {
+            $modelId = $modelData['id'] ?? null;
+            if (!$modelId) {
+                continue;
+            }
             
             $models[] = [
                 'id' => $modelId,

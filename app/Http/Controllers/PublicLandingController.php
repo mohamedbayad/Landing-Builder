@@ -13,33 +13,24 @@ class PublicLandingController extends Controller
      */
     public function home()
     {
-        $activeLandingPage = app()->has('active_landing_page') 
-            ? app('active_landing_page') 
-            : null;
-
-        if ($activeLandingPage) {
-            $page = $activeLandingPage->pages()->where('type', 'index')->first() ?? $activeLandingPage->pages()->first();
-            if ($page) {
-                $html = view('landing_page', ['landing' => $activeLandingPage, 'page' => $page])->render();
-                return response($this->injectRecordingSnippet($html, $activeLandingPage, 'landing'));
-            }
-        }
-
-        // Find the "Main" landing
-        $mainLanding = Landing::where('is_main', true)->where('status', 'published')->first();
+        // Resolve landing in this order:
+        // 1) active custom-domain landing
+        // 2) global published main landing (public fallback)
+        $mainLanding = $this->resolveMainLandingForRequest();
 
         if (!$mainLanding) {
             return view('welcome'); // Default Laravel welcome
         }
 
-        // Find the 'index' page of this landing
-        $page = $mainLanding->pages()->where('type', 'index')->first();
+        // Find the 'index' page of this landing (fallback to first page)
+        $page = $mainLanding->pages()->where('type', 'index')->first()
+            ?? $mainLanding->pages()->first();
 
         if (!$page) {
             abort(404);
         }
 
-        $html = view('landing_page', ['landing' => $mainLanding, 'page' => $page])->render();
+        $html = $this->renderLandingPage($mainLanding, $page);
         return response($this->injectRecordingSnippet($html, $mainLanding, 'landing'));
     }
 
@@ -75,15 +66,16 @@ class PublicLandingController extends Controller
                     }
                 }
 
-                $html = view('landing_page', $data)->render();
+                $html = $this->renderLandingPage($activeLandingPage, $page, $data);
         $html = $this->normalizePreviewAssets($html);
                 $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
                 return response($this->injectRecordingSnippet($html, $activeLandingPage, $pageTypeMapped));
             }
         }
 
-        // 1. First, try to find a page under the Main Landing
-        $mainLanding = Landing::where('is_main', true)->first();
+        // 1. First, try to find a page under the resolved Main Landing
+        // (global published main unless custom-domain binding exists)
+        $mainLanding = $this->resolveMainLandingForRequest();
 
         if ($mainLanding) {
             // Check if slug matches a page under main landing
@@ -124,7 +116,7 @@ class PublicLandingController extends Controller
                     }
                 }
 
-                $html = view('landing_page', $data)->render();
+                $html = $this->renderLandingPage($mainLanding, $page, $data);
         $html = $this->normalizePreviewAssets($html);
                 $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
                 return response($this->injectRecordingSnippet($html, $mainLanding, $pageTypeMapped));
@@ -157,7 +149,7 @@ class PublicLandingController extends Controller
                     $data = array_merge($data, $this->getCheckoutData($landing));
                 }
 
-                $html = view('landing_page', $data)->render();
+                $html = $this->renderLandingPage($landing, $page, $data);
         $html = $this->normalizePreviewAssets($html);
                 $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
                 return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
@@ -166,6 +158,30 @@ class PublicLandingController extends Controller
 
         // 3. Nothing found - 404
         abort(404);
+    }
+
+    /**
+     * Resolve which landing should act as "main" for the current request.
+     *
+     * Priority:
+     * 1) Active custom-domain landing (if bound by middleware)
+     * 2) Global published main landing
+     */
+    private function resolveMainLandingForRequest(): ?Landing
+    {
+        $activeLandingPage = app()->has('active_landing_page')
+            ? app('active_landing_page')
+            : null;
+
+        if ($activeLandingPage instanceof Landing) {
+            return $activeLandingPage;
+        }
+
+        return Landing::where('is_main', true)
+            ->where('status', 'published')
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function preview(Landing $landing, LandingPage $page)
@@ -198,7 +214,7 @@ class PublicLandingController extends Controller
             }
         }
 
-        $html = view('landing_page', $data)->render();
+        $html = $this->renderLandingPage($landing, $page, $data);
         $html = $this->normalizePreviewAssets($html);
         $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
         return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
@@ -253,7 +269,7 @@ class PublicLandingController extends Controller
         $data = ['landing' => $landing, 'page' => $page];
         $data = array_merge($data, $this->getCheckoutData($landing));
 
-        $html = view('landing_page', $data)->render();
+        $html = $this->renderLandingPage($landing, $page, $data);
         $html = $this->normalizePreviewAssets($html);
         return response($this->injectRecordingSnippet($html, $landing, 'checkout'));
     }
@@ -310,10 +326,110 @@ class PublicLandingController extends Controller
             }
         }
 
-        $html = view('landing_page', $data)->render();
+        $html = $this->renderLandingPage($landing, $page, $data);
         $html = $this->normalizePreviewAssets($html);
         $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
         return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
+    }
+
+    private function renderLandingPage(Landing $landing, LandingPage $page, array $data = []): string
+    {
+        $countryContext = $this->resolveVisitorCountryContext();
+
+        $viewData = array_merge($data, [
+            'landing' => $landing,
+            'page' => $page,
+            'visitorCountryCode' => $countryContext['code'],
+            'visitorCountryName' => $countryContext['name'],
+        ]);
+
+        return view('landing_page', $viewData)->render();
+    }
+
+    /**
+     * @return array{code:string,name:string}
+     */
+    private function resolveVisitorCountryContext(): array
+    {
+        $ip = (string) request()->ip();
+        $countryCode = 'XX';
+        $countryName = 'Unknown';
+
+        $isLocalIp = in_array($ip, ['127.0.0.1', '::1'], true)
+            || str_starts_with($ip, '192.168.')
+            || str_starts_with($ip, '10.')
+            || str_starts_with($ip, '172.');
+
+        if ($isLocalIp) {
+            return ['code' => 'MA', 'name' => 'Morocco'];
+        }
+
+        try {
+            if (class_exists(\Stevebauman\Location\Facades\Location::class)) {
+                $position = \Stevebauman\Location\Facades\Location::get($ip);
+                if ($position) {
+                    $resolvedName = trim((string) ($position->countryName ?? ''));
+                    $resolvedCode = strtoupper(trim((string) ($position->countryCode ?? '')));
+
+                    if ($resolvedName !== '') {
+                        $countryName = $resolvedName;
+                    }
+
+                    if ($resolvedCode !== '') {
+                        $countryCode = $resolvedCode;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Silent fallback to unknown.
+        }
+
+        if ($countryCode === 'XX' && $countryName !== 'Unknown') {
+            $countryCode = $this->mapCountryNameToCode($countryName);
+        }
+
+        if ($countryName === 'Unknown' && $countryCode !== 'XX') {
+            $countryName = $this->mapCountryCodeToName($countryCode);
+        }
+
+        return ['code' => $countryCode, 'name' => $countryName];
+    }
+
+    private function mapCountryNameToCode(string $countryName): string
+    {
+        $lookup = [
+            'morocco' => 'MA',
+            'france' => 'FR',
+            'spain' => 'ES',
+            'united states' => 'US',
+            'united kingdom' => 'GB',
+            'germany' => 'DE',
+            'italy' => 'IT',
+            'united arab emirates' => 'AE',
+            'saudi arabia' => 'SA',
+            'egypt' => 'EG',
+        ];
+
+        $key = strtolower(trim($countryName));
+        return $lookup[$key] ?? 'XX';
+    }
+
+    private function mapCountryCodeToName(string $countryCode): string
+    {
+        $lookup = [
+            'MA' => 'Morocco',
+            'FR' => 'France',
+            'ES' => 'Spain',
+            'US' => 'United States',
+            'GB' => 'United Kingdom',
+            'DE' => 'Germany',
+            'IT' => 'Italy',
+            'AE' => 'United Arab Emirates',
+            'SA' => 'Saudi Arabia',
+            'EG' => 'Egypt',
+        ];
+
+        return $lookup[strtoupper(trim($countryCode))] ?? 'Unknown';
     }
 
     private function injectRecordingSnippet(string $html, Landing $landingPage, string $pageType): string
@@ -384,6 +500,8 @@ class PublicLandingController extends Controller
      */
     protected function normalizePreviewAssets(string $html): string
     {
+        $html = $this->injectMaterialIconsAssets($html);
+
         // 1. Process <link rel="stylesheet">
         if (preg_match_all('/<link\b[^>]*>/i', $html, $links)) {
             foreach ($links[0] as $tag) {
@@ -456,5 +574,56 @@ class PublicLandingController extends Controller
         }
 
         return $html;
+    }
+
+    /**
+     * Inject Material Icons/Symbols font links into preview/live HTML when
+     * icon classes are present in page markup.
+     */
+    protected function injectMaterialIconsAssets(string $html): string
+    {
+        if ($html === '') {
+            return $html;
+        }
+
+        $iconFonts = [
+            'material-symbols-outlined' => 'https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,400,0,0',
+            'material-symbols-rounded' => 'https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,0,0',
+            'material-symbols-sharp' => 'https://fonts.googleapis.com/css2?family=Material+Symbols+Sharp:opsz,wght,FILL,GRAD@24,400,0,0',
+            'material-icons' => 'https://fonts.googleapis.com/icon?family=Material+Icons',
+            'material-icons-outlined' => 'https://fonts.googleapis.com/icon?family=Material+Icons+Outlined',
+            'material-icons-round' => 'https://fonts.googleapis.com/icon?family=Material+Icons+Round',
+            'material-icons-sharp' => 'https://fonts.googleapis.com/icon?family=Material+Icons+Sharp',
+        ];
+
+        $requiredHrefs = [];
+        foreach ($iconFonts as $className => $href) {
+            if (preg_match('/\b' . preg_quote($className, '/') . '\b/i', $html)) {
+                $requiredHrefs[] = $href;
+            }
+        }
+
+        if (empty($requiredHrefs)) {
+            return $html;
+        }
+
+        $injections = [];
+        foreach (array_unique($requiredHrefs) as $href) {
+            if (stripos($html, $href) === false) {
+                $injections[] = '<link rel="stylesheet" href="' . $href . '">';
+            }
+        }
+
+        if (empty($injections)) {
+            return $html;
+        }
+
+        $payload = implode("\n", $injections) . "\n";
+
+        if (stripos($html, '<head') !== false) {
+            return preg_replace('/<head\b[^>]*>/i', '$0' . "\n" . $payload, $html, 1) ?? $html;
+        }
+
+        return $payload . $html;
     }
 }

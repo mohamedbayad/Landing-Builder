@@ -66,7 +66,15 @@ class TrackPageVisit
         }
 
         if (!$landing && $request->path() === '/') {
-            $landing = Landing::where('is_main', true)->where('status', 'published')->first();
+            if (app()->has('active_landing_page') && app('active_landing_page') instanceof Landing) {
+                $landing = app('active_landing_page');
+            }
+        }
+
+        if (!$landing && $request->path() === '/') {
+            $landing = Landing::where('is_main', true)
+                ->where('status', 'published')
+                ->first();
         }
 
         return $landing;

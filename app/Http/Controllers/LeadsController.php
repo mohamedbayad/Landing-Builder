@@ -2,12 +2,14 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
-use App\Models\Lead;
+use App\Events\Email\CheckoutCompleted;
+use App\Events\Email\LeadCreated;
 use App\Models\Landing;
+use App\Models\Lead;
 use App\Models\Product;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class LeadsController extends Controller
 {
@@ -429,7 +431,7 @@ class LeadsController extends Controller
             }
         }
 
-         return Lead::create([
+         $lead = Lead::create([
             'type' => 'checkout',
             'landing_id' => $landing->id,
             'email' => $requestData['email'] ?? null,
@@ -451,5 +453,40 @@ class LeadsController extends Controller
             'transaction_id' => $transactionId,
             'order_items' => $orderItemsPayload,
         ]);
+
+        $userId = $landing->workspace?->user_id;
+        if ($userId) {
+            $checkoutAutomationId = $landing->settings?->checkout_automation_id;
+
+            event(new CheckoutCompleted(
+                userId: $userId,
+                leadId: $lead->id,
+                landingId: $landing->id,
+                landingPageId: $lead->landing_page_id,
+                productId: $product->id ?? null,
+                preferredAutomationId: $checkoutAutomationId,
+                email: $lead->email,
+                firstName: $lead->first_name,
+                lastName: $lead->last_name,
+                phone: $lead->phone,
+                productName: $product->name ?? null,
+                orderTotal: (float) $lead->amount,
+                data: is_array($lead->data) ? $lead->data : []
+            ));
+
+            event(new LeadCreated(
+                userId: $userId,
+                leadId: $lead->id,
+                landingId: $landing->id,
+                landingPageId: $lead->landing_page_id,
+                email: $lead->email,
+                firstName: $lead->first_name,
+                lastName: $lead->last_name,
+                phone: $lead->phone,
+                data: is_array($lead->data) ? $lead->data : []
+            ));
+        }
+
+        return $lead;
     }
 }

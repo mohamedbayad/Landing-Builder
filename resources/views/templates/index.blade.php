@@ -1,72 +1,79 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
-            <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
-                {{ __('Templates Library') }}
-            </h2>
+        <div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+                <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">Builder Templates</h2>
+                <p class="text-sm text-gray-500 dark:text-gray-400">Use templates that your role and subscription can access.</p>
+            </div>
+            <div class="flex items-center gap-2">
+                @if(auth()->user()->hasPermission('tech.manage'))
+                    <a href="{{ route('templates.my') }}" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/[0.08] text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/[0.05]">My Templates</a>
+                @endif
+                @if(auth()->user()->hasAnyRole(['super-admin', 'admin']))
+                    <a href="{{ route('templates.create') }}" class="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-600">Add Template</a>
+                @endif
+            </div>
         </div>
     </x-slot>
 
-    <div class="py-12">
+    <div class="py-8">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-
             @if(session('status'))
-                <div class="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800">
-                    {{ session('status') }}
-                </div>
+                <x-ui.alert type="success" class="mb-6" dismissible>{{ session('status') }}</x-ui.alert>
             @endif
-
             @if(session('error'))
-                <div class="mb-6 p-4 rounded-lg bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 border border-red-100 dark:border-red-800">
-                    {{ session('error') }}
-                </div>
+                <x-ui.alert type="error" class="mb-6" dismissible>{{ session('error') }}</x-ui.alert>
             @endif
 
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                @forelse ($templates as $template)
-                    <div class="bg-white dark:bg-[#161B22] overflow-hidden shadow-sm hover:shadow-md transition-shadow duration-200 rounded-xl border border-gray-100 dark:border-white/[0.06] flex flex-col h-full group">
-                        <div class="h-48 bg-gray-100 dark:bg-[#0D1117] flex items-center justify-center overflow-hidden relative">
-                            @if ($template->thumbnail_url)
-                                <img src="{{ $template->thumbnail_url }}" alt="{{ $template->name }}" class="h-full w-full object-cover transform group-hover:scale-105 transition-transform duration-300">
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                @forelse($templates as $template)
+                    <article class="bg-white dark:bg-[#161B22] border border-gray-100 dark:border-white/[0.06] rounded-xl overflow-hidden shadow-sm">
+                        <div class="h-44 bg-gray-100 dark:bg-[#0D1117] overflow-hidden">
+                            @if($template->preview_image_path)
+                                <img src="{{ Str::startsWith($template->preview_image_path, ['http://', 'https://']) ? $template->preview_image_path : Storage::url($template->preview_image_path) }}" alt="{{ $template->name }}" class="w-full h-full object-cover" />
                             @else
-                                <div class="text-center">
-                                    <svg class="mx-auto h-12 w-12 text-gray-300 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                    </svg>
-                                    <span class="text-gray-400 dark:text-gray-500 text-sm mt-2 block">No Preview</span>
-                                </div>
+                                <div class="h-full flex items-center justify-center text-sm text-gray-400">No thumbnail</div>
                             @endif
-                            <div class="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-opacity duration-200"></div>
                         </div>
-                        <div class="p-6 flex-grow flex flex-col justify-between">
-                            <div>
+                        <div class="p-5 space-y-3">
+                            <div class="flex items-start justify-between gap-3">
                                 <h3 class="text-base font-semibold text-gray-900 dark:text-white">{{ $template->name }}</h3>
-                                <p class="mt-2 text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{{ $template->description }}</p>
+                                <span class="text-xs px-2 py-1 rounded-full {{ $template->is_active ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-600' }}">{{ $template->is_active ? 'Enabled' : 'Disabled' }}</span>
                             </div>
-                            <div class="mt-6">
-                                <form action="{{ route('templates.import', $template->id) }}" method="POST">
+                            <p class="text-sm text-gray-500 dark:text-gray-400 line-clamp-2">{{ $template->description ?: 'No description provided.' }}</p>
+                            <div class="flex flex-wrap gap-2 text-xs">
+                                <span class="px-2 py-1 rounded bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300">{{ ucfirst($template->visibility) }}</span>
+                                <span class="px-2 py-1 rounded bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300">{{ $template->category ?: 'general' }}</span>
+                                <span class="px-2 py-1 rounded bg-gray-100 dark:bg-white/[0.06] text-gray-600 dark:text-gray-300">{{ $template->pages_count }} pages</span>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                @forelse($template->plans as $plan)
+                                    <span class="text-[11px] px-2 py-1 rounded bg-blue-100 text-blue-800">{{ $plan->name }}</span>
+                                @empty
+                                    <span class="text-[11px] px-2 py-1 rounded bg-amber-100 text-amber-800">All plans</span>
+                                @endforelse
+                            </div>
+                            <div class="flex items-center gap-2 pt-2">
+                                <form action="{{ route('templates.import', $template->id) }}" method="POST" class="flex-1">
                                     @csrf
-                                    <button type="submit" class="w-full inline-flex justify-center items-center px-4 py-2 bg-brand-orange border border-transparent rounded-lg text-sm font-semibold text-white hover:bg-brand-orange-600 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 transition-all shadow-sm">
-                                        {{ __('Use Template') }}
-                                    </button>
+                                    <button type="submit" class="w-full px-3 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-600">Use Template</button>
                                 </form>
+                                @if(auth()->user()->hasAnyRole(['super-admin', 'admin']))
+                                    <a href="{{ route('templates.edit', $template) }}" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/[0.08] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/[0.05]">Edit</a>
+                                @endif
                             </div>
                         </div>
-                    </div>
+                    </article>
                 @empty
-                    <div class="col-span-1 md:col-span-2 lg:col-span-3 text-center py-12">
-                        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-gray-100 dark:bg-white/[0.06] mb-4">
-                            <svg class="w-8 h-8 text-gray-400 dark:text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path></svg>
-                        </div>
-                        <h3 class="text-lg font-medium text-gray-900 dark:text-white">No Templates Found</h3>
-                        <p class="mt-2 text-gray-500 dark:text-gray-400">Unable to load templates. Please check your license connection.</p>
-                        <div class="mt-6">
-                            <a href="{{ route('settings.index') }}" class="text-brand-orange hover:text-brand-orange-600 font-medium">Manage License &rarr;</a>
-                        </div>
+                    <div class="col-span-full rounded-xl border border-dashed border-gray-300 dark:border-white/[0.12] p-10 text-center">
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">No templates available</h3>
+                        <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">Upload a template under Landing Builder to get started.</p>
+                        @if(auth()->user()->hasAnyRole(['super-admin', 'admin']))
+                            <a href="{{ route('templates.create') }}" class="inline-block mt-4 px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-600">Upload Template ZIP</a>
+                        @endif
                     </div>
                 @endforelse
             </div>
         </div>
     </div>
-
 </x-app-layout>

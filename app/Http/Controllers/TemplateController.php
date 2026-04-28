@@ -2,21 +2,19 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Template;
 use App\Models\Landing;
 use App\Models\LandingPage;
-use App\Models\MediaAsset;
+use App\Models\Plan;
+use App\Models\Template;
 use App\Models\TemplatePage;
+use App\Models\User;
 use Illuminate\Http\Request;
-use Illuminate\Support\Str;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Log;
-
-use ZipArchive;
-use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\DB;
-use App\Services\LicenseService;
+use Illuminate\Support\Facades\File;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use ZipArchive;
 
 class TemplateController extends Controller
 {
@@ -27,269 +25,280 @@ class TemplateController extends Controller
         ]);
 
         $url = (string) $validated['u'];
-        $parsed = parse_url($url);
-        $host = strtolower((string) ($parsed['host'] ?? ''));
-        $path = (string) ($parsed['path'] ?? '');
 
-        // Determine correct content type early so we can fail gracefully without HTML
-        $extension = strtolower(pathinfo($path, PATHINFO_EXTENSION));
-        $fallbackType = match ($extension) {
-            'css' => 'text/css',
-            'js' => 'application/javascript',
-            'json' => 'application/json',
-            default => 'text/plain',
-        };
-
-        // Helper to fail safely (returns empty content or comment, preventing JS/CSS syntax errors)
-        $failSafe = function () use ($fallbackType) {
-            $body = str_contains($fallbackType, 'css') || str_contains($fallbackType, 'javascript') 
-                ? '/* Asset Proxy Failed or Forbidden */' 
-                : '';
-                
-            return response($body, 200, [
-                'Content-Type' => $fallbackType,
-                'Cache-Control' => 'no-cache, no-store, must-revalidate',
-            ]);
-        };
-
-        if ($host === '' || $path === '') {
-            return $failSafe();
-        }
-
-        // Allow only expected licensing/template hosts (prevents open proxy abuse)
-        $allowedHosts = [];
-        $licensingBase = (string) env('LICENSING_SERVER_URL', '');
-        if ($licensingBase !== '') {
-            $licensingHost = parse_url($licensingBase, PHP_URL_HOST);
-            if ($licensingHost) {
-                $allowedHosts[] = strtolower((string) $licensingHost);
-            }
-        }
-
-        $extraAllowed = array_filter(array_map('trim', explode(',', (string) env('TEMPLATE_ASSET_PROXY_ALLOWED_HOSTS', ''))));
-        foreach ($extraAllowed as $h) {
-            $allowedHosts[] = strtolower($h);
-        }
-
-        $allowedHosts = array_values(array_unique($allowedHosts));
-
-        $hostAllowed = empty($allowedHosts) || in_array($host, $allowedHosts, true);
-        if (!$hostAllowed || !str_contains($path, '/storage/templates/')) {
-            return $failSafe();
+        if (!str_contains($url, '/storage/builder-templates/')) {
+            return response('/* forbidden */', 200, ['Content-Type' => 'text/css']);
         }
 
         try {
-            $response = \Illuminate\Support\Facades\Http::timeout(10)
-                ->withOptions(['verify' => false])
-                ->get($url);
-
+            $response = \Illuminate\Support\Facades\Http::timeout(10)->get($url);
             if (!$response->successful()) {
-                return $failSafe();
+                return response('/* not available */', 200, ['Content-Type' => 'text/plain']);
             }
 
-            $contentType = $response->header('Content-Type') ?: $fallbackType;
-
             return response($response->body(), 200, [
-                'Content-Type' => $contentType,
+                'Content-Type' => $response->header('Content-Type') ?: 'application/octet-stream',
                 'Cache-Control' => 'public, max-age=86400',
             ]);
-        } catch (\Exception $e) {
-            return $failSafe();
+        } catch (\Throwable $e) {
+            return response('/* asset proxy error */', 200, ['Content-Type' => 'text/plain']);
         }
     }
 
-    public function index(Request $request, LicenseService $licenseService)
+    public function index(Request $request)
     {
-        $remoteTemplates = collect($licenseService->getTemplates());
-        $excluded = [];
-
-        $filteredRemote = $remoteTemplates->filter(function ($template) use (&$excluded) {
-            $reason = null;
-            $include = $this->isRealTemplateRecord($template, $reason);
-            if (!$include) {
-                $excluded[] = [
-                    'id' => $this->extractTemplateField($template, 'id'),
-                    'reason' => $reason,
-                    'type' => $this->extractTemplateField($template, 'type'),
-                    'source' => $this->extractTemplateField($template, 'source'),
-                    'is_template' => $this->extractTemplateField($template, 'is_template'),
-                    'category' => $this->extractTemplateField($template, 'category'),
-                    'status' => $this->extractTemplateField($template, 'status'),
-                    'visibility' => $this->extractTemplateField($template, 'visibility'),
-                ];
-            }
-            return $include;
-        })->map(function ($t) {
-            $t = (array) $t;
-            $t['id'] = 'remote-' . ($t['id'] ?? '');
-            $t['import_source'] = 'remote';
-            return (object) $t;
-        })->values();
-
-        $localTemplates = Template::query()
-            ->where('is_active', true)
+        $user = $request->user();
+        $query = Template::query()
+            ->with(['plans:id,name,slug', 'owner:id,name'])
             ->withCount('pages')
-            ->latest()
-            ->get()
-            ->map(function (Template $template) {
-                return (object) [
-                    'id' => 'local-' . $template->id,
-                    'import_source' => 'local',
-                    'name' => $template->name,
-                    'description' => $template->description,
-                    'thumbnail_url' => $template->preview_image_path ? Storage::url($template->preview_image_path) : null,
-                ];
-            });
+            ->latest();
 
-        $templates = $localTemplates->concat($filteredRemote)->values();
+        if (!$user->hasAnyRole(['super-admin', 'admin'])) {
+            $query->where('is_active', true);
+        }
 
-        Log::info('Templates query executed', [
-            'local_count' => $localTemplates->count(),
-            'remote_raw_count' => $remoteTemplates->count(),
-            'remote_filtered_count' => $filteredRemote->count(),
-            'excluded_count' => count($excluded),
-            'excluded_samples' => array_slice($excluded, 0, 10),
-            'reason' => 'templates_index_filters_applied',
-        ]);
+        $templates = $query->get();
+        if (!$user->hasAnyRole(['super-admin', 'admin'])) {
+            $templates = $templates
+                ->filter(fn (Template $template) => $this->canUseTemplate($user, $template))
+                ->values();
+        }
 
         return view('templates.index', compact('templates'));
     }
 
+    public function myTemplates(Request $request)
+    {
+        $this->ensureTemplateAdminAccess($request->user());
+
+        $templates = Template::query()
+            ->where('owner_user_id', $request->user()->id)
+            ->with(['plans:id,name,slug'])
+            ->withCount('pages')
+            ->latest()
+            ->get();
+
+        return view('templates.my', compact('templates'));
+    }
+
+    public function create(Request $request)
+    {
+        $this->ensureTemplateAdminAccess($request->user());
+        $plans = Plan::query()->where('status', 'active')->orderBy('sort_order')->orderBy('name')->get();
+        $clients = $this->getClientDirectory();
+        return view('templates.create', compact('plans', 'clients'));
+    }
+
+    public function store(Request $request)
+    {
+        $this->ensureTemplateAdminAccess($request->user());
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:5000',
+            'category' => 'nullable|string|max:120',
+            'visibility' => 'required|in:public,private,internal',
+            'is_active' => 'nullable|boolean',
+            'template_zip' => 'required|file|mimes:zip|max:51200',
+            'thumbnail' => 'nullable|image|max:5120',
+            'plan_ids' => 'nullable|array',
+            'plan_ids.*' => 'exists:plans,id',
+            'allowed_emails_text' => 'nullable|string|max:8000',
+            'allowed_user_ids' => 'nullable|array',
+            'allowed_user_ids.*' => 'integer|exists:users,id',
+        ]);
+
+        $user = $request->user();
+        $slug = $this->generateUniqueSlug($validated['name']);
+        $workingDirectory = storage_path('app/tmp/template-upload-' . Str::uuid());
+        $allowedEmails = $this->resolveAllowedEmails(
+            (string) ($validated['allowed_emails_text'] ?? ''),
+            array_map('intval', $validated['allowed_user_ids'] ?? [])
+        );
+
+        File::ensureDirectoryExists($workingDirectory);
+
+        try {
+            $zip = new ZipArchive();
+            $source = $request->file('template_zip')->getRealPath();
+
+            if ($source === false || $zip->open($source) !== true) {
+                return back()->withInput()->withErrors(['template_zip' => 'Unable to open the ZIP file.']);
+            }
+
+            $zip->extractTo($workingDirectory);
+            $zip->close();
+
+            $pages = $this->collectTemplatePages($workingDirectory);
+            if ($pages->isEmpty()) {
+                return back()->withInput()->withErrors(['template_zip' => 'No importable template pages were found in the ZIP.']);
+            }
+
+            $storageDirectory = 'builder-templates/' . $slug . '-' . Str::random(8);
+            $publicStorageDirectory = storage_path('app/public/' . $storageDirectory);
+            File::ensureDirectoryExists($publicStorageDirectory);
+            File::copyDirectory($workingDirectory, $publicStorageDirectory);
+
+            $thumbnailPath = null;
+            if ($request->hasFile('thumbnail')) {
+                $thumbnailPath = $request->file('thumbnail')->store('builder-templates/thumbnails', 'public');
+            } else {
+                $detectedThumbnail = $this->detectAutoThumbnail($workingDirectory, $storageDirectory);
+                if ($detectedThumbnail) {
+                    $thumbnailPath = $detectedThumbnail;
+                }
+            }
+
+            $zipPath = $request->file('template_zip')->store('builder-templates/zips');
+
+            $template = DB::transaction(function () use ($validated, $user, $slug, $storageDirectory, $zipPath, $thumbnailPath, $pages) {
+                $template = Template::create([
+                    'owner_user_id' => $user->id,
+                    'name' => $validated['name'],
+                    'slug' => $slug,
+                    'description' => $validated['description'] ?? null,
+                    'category' => $validated['category'] ?? 'general',
+                    'preview_image_path' => $thumbnailPath,
+                    'storage_path' => $storageDirectory,
+                    'zip_file_path' => $zipPath,
+                    'visibility' => $validated['visibility'],
+                    'is_active' => (bool) ($validated['is_active'] ?? true),
+                    'allowed_emails' => $allowedEmails,
+                ]);
+
+                foreach ($pages as $page) {
+                    TemplatePage::create([
+                        'template_id' => $template->id,
+                        'type' => $page['type'],
+                        'name' => $page['name'],
+                        'slug' => $page['slug'],
+                        'html' => $this->rewriteTemplateHtmlAssets($page['html'], $storageDirectory),
+                        'css' => $this->rewriteTemplateCssAssets($page['css'] ?? '', $storageDirectory),
+                        'js' => $page['js'] ?? '',
+                        'grapesjs_json' => null,
+                    ]);
+                }
+
+                $planIds = collect($validated['plan_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->values();
+                if ($planIds->isNotEmpty()) {
+                    $template->plans()->sync($planIds->all());
+                }
+
+                return $template;
+            });
+
+            return redirect()->route('templates.edit', $template)->with('status', 'Template uploaded successfully.');
+        } finally {
+            if (File::isDirectory($workingDirectory)) {
+                File::deleteDirectory($workingDirectory);
+            }
+        }
+    }
+
     public function upload(Request $request)
     {
-         // Remote-only implementation - upload disabled for now
-         return redirect()->route('templates.index');
+        return $this->store($request);
     }
 
-    public function import(Request $request, $id, LicenseService $licenseService)
+    public function edit(Request $request, Template $template)
     {
-        set_time_limit(0); // Prevent timeout for large templates
-        ini_set('memory_limit', '512M');
-        
-        Log::info("Starting template import for ID: $id");
+        $this->ensureTemplateAdminAccess($request->user());
+        $this->authorizeTemplateManagement($template, Auth::user());
 
-        $id = (string) $id;
+        $plans = Plan::query()->where('status', 'active')->orderBy('sort_order')->orderBy('name')->get();
+        $selectedPlans = $template->plans()->pluck('plans.id')->all();
+        $clients = $this->getClientDirectory();
+        $selectedClientIds = $clients
+            ->filter(function ($client) use ($template) {
+                $email = strtolower(trim((string) ($client->email ?? '')));
+                $rules = collect($template->allowed_emails ?? [])->map(fn ($rule) => strtolower(trim((string) $rule)));
+                return $email !== '' && $rules->contains($email);
+            })
+            ->pluck('id')
+            ->values()
+            ->all();
+        $allowedEmailsText = implode(PHP_EOL, $template->allowed_emails ?? []);
 
-        if (str_starts_with($id, 'local-')) {
-            $localId = (int) str_replace('local-', '', $id);
-            return $this->importLocalTemplate($localId);
-        }
-
-        $remoteId = str_starts_with($id, 'remote-')
-            ? str_replace('remote-', '', $id)
-            : $id;
-
-        // 1. Fetch Template Data
-        $templates = $licenseService->getTemplates();
-        Log::info("Fetched templates count: " . count($templates));
-
-        $templateData = collect($templates)->firstWhere('id', $remoteId);
-
-        if ($templateData && !$this->isRealTemplateRecord($templateData, $reason)) {
-            Log::warning('Template import blocked by filter', [
-                'template_id' => $remoteId,
-                'reason' => $reason,
-            ]);
-            return redirect()->route('templates.index')->with('error', 'This record is not a valid template.');
-        }
-
-        if (!$templateData) {
-            Log::error("Template $remoteId not found in fetched data.");
-            return redirect()->route('templates.index')->with('error', 'Template not found or access denied.');
-        }
-
-        $template = (object) $templateData;
-        $assetBaseUrl = $template->asset_base_url ?? null;
-
-        // 2. Create Landing
-        $user = Auth::user();
-        $workspace = $user->workspaces()->first();
-
-        if (!$workspace) {
-            $workspace = $user->workspaces()->create(['name' => 'My Workspace']);
-        }
-
-        $landingName = $template->name . ' - Copy';
-        $slug = Str::slug($landingName) . '-' . Str::random(6);
-
-        $landing = Landing::create([
-            'workspace_id' => $workspace->id,
-            'template_id' => null,
-            'name' => $landingName,
-            'slug' => $slug,
-            'status' => 'draft',
-            'uuid' => (string) Str::uuid(),
-            'content_type' => 'landing',
-            'source' => 'remote-template:' . $remoteId,
-            'is_template' => false,
-            'category' => 'imported',
-            'visibility' => 'private',
-        ]);
-
-        // 3. Process Content (From JSON)
-        $structure = $template->structure;
-        [$structure, $assetBaseUrl] = $this->normalizeRemoteStructurePayload($template, $structure, $assetBaseUrl);
-        
-        $html = $structure['html'] ?? '<h1>Empty Template</h1>';
-        $css = $structure['css'] ?? '';
-        $js = $structure['js'] ?? '';
-
-        // Standardize base storage path for all assets
-        $baseStoragePath = "landings/{$landing->uuid}/assets";
-        $fullStoragePath = storage_path("app/public/landings/{$landing->uuid}/assets");
-        $baseStoragePath = "landings/{$landing->uuid}/assets";
-        File::ensureDirectoryExists($fullStoragePath);
-
-        $processed = $this->processRemoteAssets($structure['html'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-        $css = $this->processRemoteCss($structure['css'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-        $html = $processed['html'];
-        $extractedJs = $processed['body_scripts'] ?? '';
-
-        // Merge extracted body scripts only if they are not already included.
-        if (!empty($extractedJs)) {
-            $js = $this->appendUniqueBlock($js, $extractedJs);
-        }
-
-        // Process Head Assets (CSS/JS from custom_head)
-        $customHead = trim((string) ($structure['custom_head'] ?? ''));
-        if (!empty($processed['head_assets'])) {
-            $customHead = $this->appendUniqueBlock($customHead, (string) $processed['head_assets']);
-        }
-        if (!empty($customHead)) {
-            $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-            
-            // Save to Settings
-            $landing->settings()->updateOrCreate(
-                [],
-                ['custom_head_scripts' => $processedHead]
-            );
-        }
-
-        // 4. Create Landing Pages
-        LandingPage::create([
-            'landing_id' => $landing->id,
-            'type' => 'index',
-            'name' => 'Home',
-            'slug' => 'index',
-            'status' => 'draft',
-            'html' => $html,
-            'css' => $css,
-            'js' => $js,
-        ]);
-
-        // 5. Create Default Pages
-        $this->createDefaultPages($landing);
-
-        return redirect()->route('landings.show', $landing)->with('success', 'Template imported successfully.');
+        return view('templates.edit', compact('template', 'plans', 'selectedPlans', 'allowedEmailsText', 'clients', 'selectedClientIds'));
     }
 
-    protected function importLocalTemplate(int $templateId)
+    public function update(Request $request, Template $template)
     {
-        $template = Template::with('pages')->find($templateId);
+        $this->ensureTemplateAdminAccess($request->user());
+        $this->authorizeTemplateManagement($template, $request->user());
+
+        $validated = $request->validate([
+            'name' => 'required|string|max:255',
+            'description' => 'nullable|string|max:5000',
+            'category' => 'nullable|string|max:120',
+            'visibility' => 'required|in:public,private,internal',
+            'is_active' => 'nullable|boolean',
+            'plan_ids' => 'nullable|array',
+            'plan_ids.*' => 'exists:plans,id',
+            'thumbnail' => 'nullable|image|max:5120',
+            'allowed_emails_text' => 'nullable|string|max:8000',
+            'allowed_user_ids' => 'nullable|array',
+            'allowed_user_ids.*' => 'integer|exists:users,id',
+        ]);
+        $allowedEmails = $this->resolveAllowedEmails(
+            (string) ($validated['allowed_emails_text'] ?? ''),
+            array_map('intval', $validated['allowed_user_ids'] ?? [])
+        );
+
+        $payload = [
+            'name' => $validated['name'],
+            'description' => $validated['description'] ?? null,
+            'category' => $validated['category'] ?? 'general',
+            'visibility' => $validated['visibility'],
+            'is_active' => (bool) ($validated['is_active'] ?? false),
+            'allowed_emails' => $allowedEmails,
+        ];
+
+        if ($template->slug === null || $template->slug === '') {
+            $payload['slug'] = $this->generateUniqueSlug($validated['name']);
+        }
+
+        if ($request->hasFile('thumbnail')) {
+            $payload['preview_image_path'] = $request->file('thumbnail')->store('builder-templates/thumbnails', 'public');
+        }
+
+        $template->update($payload);
+
+        $template->plans()->sync(collect($validated['plan_ids'] ?? [])->map(fn ($id) => (int) $id)->unique()->all());
+
+        return redirect()->route('templates.edit', $template)->with('status', 'Template updated successfully.');
+    }
+
+    public function toggleStatus(Request $request, Template $template)
+    {
+        $this->ensureTemplateAdminAccess($request->user());
+        $this->authorizeTemplateManagement($template, $request->user());
+
+        $template->update([
+            'is_active' => !$template->is_active,
+        ]);
+
+        return back()->with('status', 'Template status updated successfully.');
+    }
+
+    public function import(Request $request, $id)
+    {
+        $localId = (int) str_replace('local-', '', (string) $id);
+        $template = Template::with(['pages', 'plans'])->find($localId);
+
         if (!$template || !$template->is_active) {
-            return redirect()->route('templates.index')->with('error', 'Template not found.');
+            return redirect()->route('templates.index')->with('error', 'Template not found or disabled.');
         }
 
+        if (!$this->canUseTemplate($request->user(), $template)) {
+            return redirect()->route('templates.index')->with('error', 'This template is not available for your account or plan.');
+        }
+
+        return $this->importLocalTemplate($template);
+    }
+
+    protected function importLocalTemplate(Template $template)
+    {
         $user = Auth::user();
         $workspace = $user->workspaces()->first();
         if (!$workspace) {
@@ -307,7 +316,7 @@ class TemplateController extends Controller
             'status' => 'draft',
             'uuid' => (string) Str::uuid(),
             'content_type' => 'landing',
-            'source' => 'local-template:' . $template->id,
+            'source' => 'builder-template:' . $template->id,
             'is_template' => false,
             'category' => 'imported',
             'visibility' => 'private',
@@ -327,65 +336,35 @@ class TemplateController extends Controller
             ]);
         }
 
-        Log::info('Local template imported as landing', [
-            'template_id' => $template->id,
-            'landing_id' => $landing->id,
-            'reason' => 'explicit_template_import',
-        ]);
+        if ($landing->pages()->where('type', 'checkout')->doesntExist()) {
+            $this->createDefaultPages($landing);
+        }
 
         return redirect()->route('landings.show', $landing)->with('success', 'Template imported successfully.');
     }
 
-    public function syncLandingTemplate(Request $request, Landing $landing, LicenseService $licenseService)
+    public function syncLandingTemplate(Request $request, Landing $landing)
     {
-        if ($landing->workspace->user_id != Auth::id()) {
+        if ($landing->workspace->user_id !== (int) Auth::id()) {
             abort(403);
         }
 
-        try {
-            if ($landing->template_id) {
-                $result = DB::transaction(function () use ($landing) {
-                    return $this->syncFromLocalTemplate($landing, (int) $landing->template_id);
-                });
-
-                return back()->with('status', "Template synchronized. Updated {$result['updated']} page(s), created {$result['created']} page(s).");
-            }
-
-            $remoteId = $this->extractRemoteTemplateId($landing->source);
-
-            if (!$remoteId) {
-                $remoteId = $this->guessRemoteTemplateIdFromLanding($landing, $licenseService->getTemplates());
-                if ($remoteId) {
-                    $landing->update(['source' => 'remote-template:' . $remoteId]);
-                }
-            }
-
-            if (!$remoteId) {
-                return back()->with('error', 'This landing is not linked to a synchronizable source template.');
-            }
-
-            $result = DB::transaction(function () use ($landing, $remoteId, $licenseService) {
-                return $this->syncFromRemoteTemplate($landing, $remoteId, $licenseService);
-            });
-
-            return back()->with('status', "Template synchronized. Updated {$result['updated']} page(s), created {$result['created']} page(s).");
-        } catch (\Throwable $e) {
-            Log::error('Template sync failed', [
-                'landing_id' => $landing->id,
-                'template_id' => $landing->template_id,
-                'source' => $landing->source,
-                'error' => $e->getMessage(),
-            ]);
-
-            return back()->with('error', 'Failed to synchronize template: ' . $e->getMessage());
+        if (!$landing->template_id) {
+            return back()->with('error', 'This landing is not linked to a template.');
         }
+
+        $result = DB::transaction(function () use ($landing) {
+            return $this->syncFromLocalTemplate($landing, (int) $landing->template_id);
+        });
+
+        return back()->with('status', "Template synchronized. Updated {$result['updated']} page(s), created {$result['created']} page(s).");
     }
 
     protected function syncFromLocalTemplate(Landing $landing, int $templateId): array
     {
         $template = Template::with('pages')->find($templateId);
         if (!$template || !$template->is_active) {
-            throw new \RuntimeException('Local template not found or inactive.');
+            throw new \RuntimeException('Template not found or inactive.');
         }
 
         $updated = 0;
@@ -420,393 +399,323 @@ class TemplateController extends Controller
             $created++;
         }
 
-        if (!str_starts_with((string) $landing->source, 'local-template:')) {
-            $landing->update(['source' => 'local-template:' . $templateId]);
+        if (!str_starts_with((string) $landing->source, 'builder-template:')) {
+            $landing->update(['source' => 'builder-template:' . $templateId]);
         }
 
         return ['updated' => $updated, 'created' => $created];
     }
 
-    protected function syncFromRemoteTemplate(Landing $landing, string $remoteId, LicenseService $licenseService): array
+    protected function createDefaultPages(Landing $landing): void
     {
-        $templates = $licenseService->getTemplates();
-        $templateData = collect($templates)->firstWhere('id', $remoteId);
-
-        if (!$templateData) {
-            throw new \RuntimeException('Remote template not found or access denied.');
-        }
-
-        $reason = null;
-        if (!$this->isRealTemplateRecord($templateData, $reason)) {
-            throw new \RuntimeException("Remote template blocked by filter ({$reason}).");
-        }
-
-        $template = (object) $templateData;
-        $assetBaseUrl = $template->asset_base_url ?? null;
-
-        $structure = $template->structure;
-        [$structure, $assetBaseUrl] = $this->normalizeRemoteStructurePayload($template, $structure, $assetBaseUrl);
-
-        $fullStoragePath = storage_path("app/public/landings/{$landing->uuid}/assets");
-        $baseStoragePath = "landings/{$landing->uuid}/assets";
-        File::ensureDirectoryExists($fullStoragePath);
-
-        $processed = $this->processRemoteAssets($structure['html'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-        $css = $this->processRemoteCss($structure['css'] ?? '', $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-        $js = (string) ($structure['js'] ?? '');
-        $extractedJs = $processed['body_scripts'] ?? '';
-        if (!empty($extractedJs)) {
-            $js = $this->appendUniqueBlock($js, $extractedJs);
-        }
-
-        $customHead = trim((string) ($structure['custom_head'] ?? ''));
-        if (!empty($processed['head_assets'])) {
-            $customHead = $this->appendUniqueBlock($customHead, (string) $processed['head_assets']);
-        }
-        if (!empty($customHead)) {
-            $processedHead = $this->processHeadAssets($customHead, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl);
-            $landing->settings()->updateOrCreate([], ['custom_head_scripts' => $processedHead]);
-        }
-
-        $indexPage = $landing->pages()->where('type', 'index')->first();
-        $created = 0;
-        if (!$indexPage) {
-            $indexPage = LandingPage::create([
+        if ($landing->pages()->where('type', 'checkout')->doesntExist()) {
+            LandingPage::create([
                 'landing_id' => $landing->id,
-                'type' => 'index',
-                'name' => 'Home',
-                'slug' => 'index',
+                'type' => 'checkout',
+                'name' => 'Checkout',
+                'slug' => 'checkout',
                 'status' => 'draft',
+                'html' => '<div class="container mx-auto px-4 py-8"><h1 class="text-3xl font-bold mb-4">Checkout</h1><p>Dynamic Checkout Form will appear here.</p></div>',
             ]);
-            $created = 1;
         }
 
-        $indexPage->update([
-            'html' => $processed['html'],
-            'css' => $css,
-            'js' => $js,
-            'grapesjs_json' => null,
-        ]);
-
-        $landing->update([
-            'source' => 'remote-template:' . $remoteId,
-            'content_type' => $landing->content_type ?: 'landing',
-            'is_template' => false,
-            'category' => $landing->category ?: 'imported',
-            'visibility' => $landing->visibility ?: 'private',
-        ]);
-
-        return ['updated' => 1, 'created' => $created];
+        if ($landing->pages()->where('type', 'thankyou')->doesntExist()) {
+            LandingPage::create([
+                'landing_id' => $landing->id,
+                'type' => 'thankyou',
+                'name' => 'Thank You',
+                'slug' => 'thank-you',
+                'status' => 'draft',
+                'html' => '<div class="bg-gray-50 min-h-screen flex items-center justify-center"><h1>Thank You</h1></div>',
+            ]);
+        }
     }
 
-    protected function extractRemoteTemplateId(?string $source): ?string
+    protected function authorizeTemplateManagement(Template $template, $user): void
     {
-        $source = (string) $source;
-        if (!str_starts_with($source, 'remote-template:')) {
-            return null;
+        if (!$user || !$user->hasAnyRole(['super-admin', 'admin'])) {
+            abort(403);
+        }
+    }
+
+    protected function canUseTemplate($user, Template $template): bool
+    {
+        if ($user->hasAnyRole(['super-admin', 'admin'])) {
+            return true;
         }
 
-        $remoteId = trim(substr($source, strlen('remote-template:')));
-        return $remoteId !== '' ? $remoteId : null;
+        if (!$template->is_active) {
+            return false;
+        }
+
+        if ($template->visibility === 'internal') {
+            return false;
+        }
+
+        $isOwner = $template->owner_user_id === (int) $user->id;
+        $hasEmailRules = $this->hasTemplateEmailRules($template);
+        $matchesEmail = $this->matchesTemplateEmailAccess($user, $template);
+        if ($template->visibility === 'private' && !$isOwner && !$matchesEmail) {
+            return false;
+        }
+
+        $templatePlanIds = $template->relationLoaded('plans')
+            ? $template->plans->pluck('id')
+            : $template->plans()->pluck('plans.id');
+
+        $activePlanId = $user->activeSubscription()?->plan_id;
+        $hasPlanRules = $templatePlanIds->isNotEmpty();
+        $matchesPlan = $hasPlanRules && $activePlanId && $templatePlanIds->contains($activePlanId);
+
+        if (!$hasPlanRules && !$hasEmailRules) {
+            return true;
+        }
+
+        if ($hasPlanRules && $hasEmailRules) {
+            return (bool) ($matchesPlan || $matchesEmail);
+        }
+
+        if ($hasPlanRules) {
+            return (bool) $matchesPlan;
+        }
+
+        return $matchesEmail;
     }
 
-    protected function guessRemoteTemplateIdFromLanding(Landing $landing, array $templates): ?string
+    protected function generateUniqueSlug(string $name): string
     {
-        $landingName = preg_replace('/\s*-\s*copy$/i', '', (string) $landing->name);
+        $base = Str::slug($name);
+        if ($base === '') {
+            $base = 'template';
+        }
 
-        $matches = collect($templates)->filter(function ($template) use ($landingName) {
-            $templateName = trim((string) $this->extractTemplateField($template, 'name', ''));
-            return $templateName !== '' && strcasecmp($templateName, trim($landingName)) === 0;
-        })->values();
+        $slug = $base;
+        $counter = 2;
 
-        if ($matches->count() === 1) {
-            return (string) $this->extractTemplateField($matches->first(), 'id', '');
+        while (Template::query()->where('slug', $slug)->exists()) {
+            $slug = $base . '-' . $counter;
+            $counter++;
+        }
+
+        return $slug;
+    }
+
+    protected function detectAutoThumbnail(string $workingDirectory, string $storageDirectory): ?string
+    {
+        $candidates = [
+            'screenshot.png',
+            'screenshot.jpg',
+            'screenshot.jpeg',
+            'thumbnail.png',
+            'thumbnail.jpg',
+            'thumbnail.jpeg',
+            'preview.png',
+            'preview.jpg',
+            'preview.jpeg',
+        ];
+
+        foreach ($candidates as $candidate) {
+            $source = $workingDirectory . DIRECTORY_SEPARATOR . $candidate;
+            if (!File::exists($source)) {
+                continue;
+            }
+
+            $targetRelative = 'builder-templates/thumbnails/' . Str::random(16) . '-' . basename($candidate);
+            Storage::disk('public')->put($targetRelative, File::get($source));
+            return $targetRelative;
+        }
+
+        $storagePreviewCandidates = [
+            $storageDirectory . '/screenshot.png',
+            $storageDirectory . '/screenshot.jpg',
+            $storageDirectory . '/thumbnail.png',
+            $storageDirectory . '/thumbnail.jpg',
+        ];
+
+        foreach ($storagePreviewCandidates as $candidate) {
+            if (Storage::disk('public')->exists($candidate)) {
+                return $candidate;
+            }
         }
 
         return null;
     }
 
-    private function isRealTemplateRecord($template, ?string &$reason = null): bool
+    protected function collectTemplatePages(string $workingDirectory)
     {
-        $type = strtolower((string) ($this->extractTemplateField($template, 'type', 'template') ?? 'template'));
-        $source = strtolower((string) ($this->extractTemplateField($template, 'source', '') ?? ''));
-        $category = strtolower((string) ($this->extractTemplateField($template, 'category', '') ?? ''));
-        $isTemplate = $this->extractTemplateField($template, 'is_template', null);
-        $status = strtolower((string) ($this->extractTemplateField($template, 'status', '') ?? ''));
+        $manifestPath = $workingDirectory . DIRECTORY_SEPARATOR . 'manifest.json';
+        if (File::exists($manifestPath)) {
+            $manifest = json_decode((string) File::get($manifestPath), true);
+            $pages = collect($manifest['pages'] ?? [])
+                ->map(function ($page) use ($workingDirectory) {
+                    $file = (string) ($page['file'] ?? '');
+                    if ($file === '') {
+                        return null;
+                    }
 
-        if (in_array($category, ['ai', 'generated', 'landing'], true)) {
-            $reason = "category={$category}";
-            return false;
-        }
+                    $absoluteFilePath = $workingDirectory . DIRECTORY_SEPARATOR . str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $file);
+                    if (!File::exists($absoluteFilePath)) {
+                        return null;
+                    }
 
-        if (in_array($status, ['draft', 'published'], true) && $type !== 'template') {
-            $reason = "landing_status={$status}";
-            return false;
-        }
+                    return [
+                        'type' => (string) ($page['type'] ?? 'index'),
+                        'name' => (string) ($page['name'] ?? Str::headline((string) ($page['slug'] ?? 'index'))),
+                        'slug' => (string) ($page['slug'] ?? pathinfo($file, PATHINFO_FILENAME)),
+                        'html' => (string) File::get($absoluteFilePath),
+                        'css' => '',
+                        'js' => '',
+                    ];
+                })
+                ->filter();
 
-        return true;
-    }
-
-    private function extractTemplateField($template, string $field, $default = null)
-    {
-        if (is_array($template)) {
-            return $template[$field] ?? $default;
-        }
-        if (is_object($template)) {
-            return $template->{$field} ?? $default;
-        }
-        return $default;
-    }
-
-    private function appendUniqueBlock(string $existing, string $candidate): string
-    {
-        $left = trim($existing);
-        $right = trim($candidate);
-
-        if ($right === '') {
-            return $left;
-        }
-
-        if ($left === '') {
-            return $right;
-        }
-
-        if (str_contains($left, $right)) {
-            return $left;
-        }
-
-        $leftComparable = $this->normalizeForDedupCompare($left);
-        $rightComparable = $this->normalizeForDedupCompare($right);
-        if ($rightComparable !== '' && str_contains($leftComparable, $rightComparable)) {
-            return $left;
-        }
-
-        return $left . "\n" . $right;
-    }
-
-    private function normalizeForDedupCompare(string $value): string
-    {
-        $normalized = preg_replace('/<script\\b[^>]*>/i', '', $value);
-        $normalized = preg_replace('/<\\/script>/i', '', (string) $normalized);
-        $normalized = preg_replace('/\\s+/', ' ', (string) $normalized);
-        return trim((string) $normalized);
-    }
-
-    /**
-     * Backward/forward compatible parser for remote template payloads.
-     * Supports both legacy structure.html/css/js/custom_head and the new
-     * raw_html_content + structure.assets format.
-     */
-    protected function normalizeRemoteStructurePayload(object $template, $structure, ?string $assetBaseUrl): array
-    {
-        if (is_string($structure)) {
-            $structure = json_decode($structure, true);
-        }
-
-        if (!is_array($structure)) {
-            $structure = [];
-        }
-
-        $assets = array_values(array_filter((array) ($structure['assets'] ?? []), 'is_array'));
-        $html = trim((string) ($structure['html'] ?? ''));
-        $rawHtml = trim((string) ($template->raw_html_content ?? ''));
-        $css = (string) ($structure['css'] ?? '');
-        $js = (string) ($structure['js'] ?? '');
-        $customHead = (string) ($structure['custom_head'] ?? '');
-
-        if ($assets !== []) {
-            $fromAssets = $this->extractLegacyFieldsFromAssets($assets);
-            if (trim($css) === '') {
-                $css = $fromAssets['css'];
-            }
-            if (trim($js) === '') {
-                $js = $fromAssets['js'];
-            }
-            if (trim($customHead) === '') {
-                $customHead = $fromAssets['custom_head'];
+            if ($pages->isNotEmpty()) {
+                return $pages->values();
             }
         }
 
-        // For new payloads, always prefer raw_html_content when assets exist.
-        // This avoids duplicating scripts/styles when structure.html is already compiled.
-        if ($assets !== [] && $rawHtml !== '') {
-            $html = $rawHtml;
-        } elseif ($html === '' && $rawHtml !== '') {
-            $html = $rawHtml;
-        }
+        $fallbackFiles = [
+            'index.html' => ['type' => 'index', 'name' => 'Home', 'slug' => 'index'],
+            'checkout.html' => ['type' => 'checkout', 'name' => 'Checkout', 'slug' => 'checkout'],
+            'thank-you.html' => ['type' => 'thankyou', 'name' => 'Thank You', 'slug' => 'thank-you'],
+            'thankyou.html' => ['type' => 'thankyou', 'name' => 'Thank You', 'slug' => 'thank-you'],
+        ];
 
-        $structure['html'] = $html;
-        $structure['css'] = $css;
-        $structure['js'] = $js;
-        $structure['custom_head'] = $customHead;
-        $structure['assets'] = $assets;
-
-        if (empty($assetBaseUrl) && !empty($template->storage_path)) {
-            $licensingUrl = (string) config('services.licensing.url', env('LICENSING_SERVER_URL', ''));
-            $parsed = parse_url($licensingUrl);
-            if (!empty($parsed['scheme']) && !empty($parsed['host'])) {
-                $origin = $parsed['scheme'] . '://' . $parsed['host'];
-                if (!empty($parsed['port'])) {
-                    $origin .= ':' . $parsed['port'];
-                }
-
-                $assetBaseUrl = rtrim($origin, '/') . '/storage/' . trim((string) $template->storage_path, '/') . '/';
-            }
-        }
-
-        if (empty($assetBaseUrl)) {
-            $assetBaseUrl = $this->inferAssetBaseUrlFromStructure($structure);
-        }
-
-        return [$structure, $assetBaseUrl];
-    }
-
-    protected function injectAssetsIntoHtml(string $html, array $assets): string
-    {
-        $originalHtml = $html;
-        $headTags = [];
-        $bodyTags = [];
-
-        foreach ($assets as $asset) {
-            $tag = $this->buildInjectedAssetTag(
-                (string) ($asset['type'] ?? ''),
-                trim((string) ($asset['content'] ?? ''))
-            );
-
-            if ($tag === null) {
+        $pages = collect();
+        foreach ($fallbackFiles as $file => $meta) {
+            $path = $workingDirectory . DIRECTORY_SEPARATOR . $file;
+            if (!File::exists($path)) {
                 continue;
             }
 
-            $position = ((string) ($asset['position'] ?? 'head')) === 'body' ? 'body' : 'head';
-            if ($position === 'head') {
-                $headTags[] = $tag;
-            } else {
-                $bodyTags[] = $tag;
-            }
+            $pages->push([
+                'type' => $meta['type'],
+                'name' => $meta['name'],
+                'slug' => $meta['slug'],
+                'html' => (string) File::get($path),
+                'css' => '',
+                'js' => '',
+            ]);
         }
 
-        if (!empty($headTags)) {
-            $html = str_replace('</head>', implode("\n", $headTags) . "\n</head>", $html);
-        }
+        return $pages->values();
+    }
 
-        if (!empty($bodyTags)) {
-            $html = str_replace('</body>', implode("\n", $bodyTags) . "\n</body>", $html);
-        }
+    protected function rewriteTemplateHtmlAssets(string $html, string $storageDirectory): string
+    {
+        $html = preg_replace_callback('/\b(src|href)=(["\'])([^"\']+)\2/i', function ($matches) use ($storageDirectory) {
+            $attribute = $matches[1];
+            $quote = $matches[2];
+            $rawValue = $matches[3];
+            $rewritten = $this->rewriteAssetPath($rawValue, $storageDirectory);
+            return $attribute . '=' . $quote . $rewritten . $quote;
+        }, $html) ?? $html;
 
-        // Fragment fallback: if no closing tags exist, keep assets reachable.
-        if (!empty($headTags) && stripos($originalHtml, '</head>') === false) {
-            $html = implode("\n", $headTags) . "\n" . $html;
-        }
-
-        if (!empty($bodyTags) && stripos($originalHtml, '</body>') === false) {
-            $html .= "\n" . implode("\n", $bodyTags);
-        }
+        $html = preg_replace_callback('/url\(([^)]+)\)/i', function ($matches) use ($storageDirectory) {
+            $raw = trim($matches[1], " \t\n\r\0\x0B\"'");
+            $rewritten = $this->rewriteAssetPath($raw, $storageDirectory);
+            return 'url(' . $rewritten . ')';
+        }, $html) ?? $html;
 
         return $html;
     }
 
-    protected function extractLegacyFieldsFromAssets(array $assets): array
+    protected function rewriteTemplateCssAssets(string $css, string $storageDirectory): string
     {
-        $cssParts = [];
-        $jsParts = [];
-        $headParts = [];
-
-        foreach ($assets as $asset) {
-            $type = (string) ($asset['type'] ?? '');
-            $position = ((string) ($asset['position'] ?? 'head')) === 'body' ? 'body' : 'head';
-            $content = trim((string) ($asset['content'] ?? ''));
-
-            if ($content === '') {
-                continue;
-            }
-
-            if ($type === 'css') {
-                if ($this->containsHtmlSnippet($content, ['link', 'style'])) {
-                    $headParts[] = $content;
-                    continue;
-                }
-
-                if ($this->looksLikeUrlSnippet($content)) {
-                    $headParts[] = '<link rel="stylesheet" href="' . e($content) . '">';
-                    continue;
-                }
-
-                $cssParts[] = $content;
-                continue;
-            }
-
-            if ($type === 'js') {
-                if ($this->containsHtmlSnippet($content, ['script'])) {
-                    if ($position === 'head') {
-                        $headParts[] = $content;
-                    } else {
-                        $jsParts[] = $content;
-                    }
-                    continue;
-                }
-
-                if ($this->looksLikeUrlSnippet($content)) {
-                    $tag = '<script src="' . e($content) . '"></script>';
-                    if ($position === 'head') {
-                        $headParts[] = $tag;
-                    } else {
-                        $jsParts[] = $tag;
-                    }
-                    continue;
-                }
-
-                if ($position === 'head') {
-                    $headParts[] = "<script>\n{$content}\n</script>";
-                } else {
-                    $jsParts[] = $content;
-                }
-            }
+        if ($css === '') {
+            return '';
         }
 
-        return [
-            'css' => implode("\n\n", array_filter($cssParts)),
-            'js' => implode("\n\n", array_filter($jsParts)),
-            'custom_head' => implode("\n", array_filter($headParts)),
+        return preg_replace_callback('/url\(([^)]+)\)/i', function ($matches) use ($storageDirectory) {
+            $raw = trim($matches[1], " \t\n\r\0\x0B\"'");
+            $rewritten = $this->rewriteAssetPath($raw, $storageDirectory);
+            return 'url(' . $rewritten . ')';
+        }, $css) ?? $css;
+    }
+
+    protected function rewriteAssetPath(string $path, string $storageDirectory): string
+    {
+        $trimmed = trim($path);
+        if ($trimmed === '') {
+            return $trimmed;
+        }
+
+        if (preg_match('/^(?:https?:)?\/\//i', $trimmed)) {
+            return $trimmed;
+        }
+
+        if (preg_match('/^(?:data:|#|mailto:|tel:|javascript:)/i', $trimmed)) {
+            return $trimmed;
+        }
+
+        $parsedPath = parse_url($trimmed, PHP_URL_PATH);
+        if (!is_string($parsedPath) || $parsedPath === '') {
+            return $trimmed;
+        }
+
+        $extension = strtolower((string) pathinfo($parsedPath, PATHINFO_EXTENSION));
+        $assetExtensions = [
+            'css', 'js', 'png', 'jpg', 'jpeg', 'gif', 'webp', 'svg', 'avif', 'ico',
+            'mp4', 'webm', 'mp3', 'wav', 'woff', 'woff2', 'ttf', 'otf',
+            'json', 'glb', 'gltf', 'bin', 'wasm',
         ];
+
+        if (!in_array($extension, $assetExtensions, true)) {
+            return $trimmed;
+        }
+
+        $relativePath = ltrim($parsedPath, '/');
+        $relativePath = preg_replace('/^\.\//', '', $relativePath) ?? $relativePath;
+
+        $query = parse_url($trimmed, PHP_URL_QUERY);
+        $fragment = parse_url($trimmed, PHP_URL_FRAGMENT);
+
+        $rewritten = Storage::url(trim($storageDirectory, '/') . '/' . $relativePath);
+
+        if (is_string($query) && $query !== '') {
+            $rewritten .= '?' . $query;
+        }
+
+        if (is_string($fragment) && $fragment !== '') {
+            $rewritten .= '#' . $fragment;
+        }
+
+        return $rewritten;
     }
 
-    protected function buildInjectedAssetTag(string $type, string $content): ?string
+    protected function ensureTemplateAdminAccess($user): void
     {
-        if ($content === '') {
-            return null;
+        if (!$user || !$user->hasAnyRole(['super-admin', 'admin'])) {
+            abort(403, 'Only admin or super admin can manage templates.');
         }
-
-        if ($type === 'css') {
-            if ($this->containsHtmlSnippet($content, ['link', 'style'])) {
-                return $content;
-            }
-
-            if ($this->looksLikeUrlSnippet($content)) {
-                return '<link rel="stylesheet" href="' . e($content) . '">';
-            }
-
-            return "<style>\n{$content}\n</style>";
-        }
-
-        if ($type === 'js') {
-            if ($this->containsHtmlSnippet($content, ['script'])) {
-                return $content;
-            }
-
-            if ($this->looksLikeUrlSnippet($content)) {
-                return '<script src="' . e($content) . '"></script>';
-            }
-
-            return "<script>\n{$content}\n</script>";
-        }
-
-        return null;
     }
 
-    protected function containsHtmlSnippet(string $content, array $tags): bool
+    protected function matchesTemplateEmailAccess($user, Template $template): bool
     {
-        foreach ($tags as $tag) {
-            if (preg_match('/<\s*' . preg_quote($tag, '/') . '\b/i', $content) === 1) {
+        $rules = collect($template->allowed_emails ?? [])
+            ->map(fn ($rule) => strtolower(trim((string) $rule)))
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($rules->isEmpty()) {
+            return true;
+        }
+
+        $email = strtolower(trim((string) ($user->email ?? '')));
+        if ($email === '') {
+            return false;
+        }
+
+        foreach ($rules as $rule) {
+            if (str_starts_with($rule, '@')) {
+                if (Str::endsWith($email, $rule)) {
+                    return true;
+                }
+                continue;
+            }
+
+            if ($email === $rule) {
                 return true;
             }
         }
@@ -814,671 +723,75 @@ class TemplateController extends Controller
         return false;
     }
 
-    protected function looksLikeUrlSnippet(string $content): bool
+    protected function hasTemplateEmailRules(Template $template): bool
     {
-        $value = trim($content);
-        if ($value === '') {
-            return false;
-        }
-
-        if (str_contains($value, "\n") || str_contains($value, "\r")) {
-            return false;
-        }
-        if (str_contains($value, '{') || str_contains($value, '}')) {
-            return false;
-        }
-        if (str_starts_with($value, '/*')) {
-            return false;
-        }
-        if (str_starts_with($value, '/') && isset($value[1]) && in_array($value[1], ['*', '/'], true)) {
-            return false;
-        }
-
-        if (filter_var($value, FILTER_VALIDATE_URL)) {
-            return true;
-        }
-
-        if (preg_match('#^(//|/|\\./|\\.\\./)[^\\s<>"\']+$#', $value) !== 1) {
-            return false;
-        }
-
-        if (str_starts_with($value, '//') && preg_match('#^//[A-Za-z0-9]#', $value) !== 1) {
-            return false;
-        }
-
-        return true;
+        return collect($template->allowed_emails ?? [])
+            ->map(fn ($rule) => trim((string) $rule))
+            ->filter()
+            ->isNotEmpty();
     }
 
-    /**
-     * Process ALL remote assets in body HTML.
-     */
-    protected function processRemoteAssets($html, Landing $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl = null)
+    protected function parseAllowedEmails(string $raw): array
     {
-        if (empty($html)) return ['html' => '', 'body_scripts' => ''];
+        $chunks = preg_split('/[\r\n,;]+/', $raw) ?: [];
 
-        // Security: Remove inline event handlers
-        $html = preg_replace('/\s+on[a-z]+\s*=\s*(?:".*?"|\'.*?\'|[^\s>]+)/i', '', $html);
-
-        // === Phase 1: Extract & Rewrite <script> tags ===
-        $extractedScripts = [];
-        $html = preg_replace_callback('/<script\b([^>]*)>(.*?)<\/script>/is', function($match) use (&$extractedScripts, $fullStoragePath, $baseStoragePath, $landing, $assetBaseUrl) {
-            $attrs = $match[1];
-            $content = $match[2];
-            
-            // 1. Check for importmap (modern templates)
-            if (preg_match('/type\s*=\s*["\']importmap["\']/i', $attrs)) {
-                Log::info("Found importmap, processing URLs...");
-                $importmap = json_decode($content, true);
-                if ($importmap && isset($importmap['imports'])) {
-                    foreach ($importmap['imports'] as $key => $src) {
-                        if (preg_match('/^https?:\/\//', $src) || !empty($assetBaseUrl)) {
-                            $assetUrl = $this->resolveAssetReference($src, $assetBaseUrl, $assetBaseUrl);
-                            // SKIP FOLDER MAPPINGS: If key or src ends in '/', keep it remote.
-                            if (str_ends_with($key, '/') || str_ends_with($src, '/')) {
-                                Log::info("Skipping folder-based importmap entry: $key -> $src (keeping remote)");
-                                continue;
-                            }
-
-                            $localUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                            if ($localUrl) $importmap['imports'][$key] = $localUrl;
-                        }
-                    }
-                    $content = json_encode($importmap, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
-                }
-                $extractedScripts[] = "<script type=\"importmap\">{$content}</script>";
-                return '';
-            }
-
-            // 2. Check for External Scripts
-            if (preg_match('/\bsrc\s*=\s*["\']([^"\']+)["\']/i', $attrs, $srcMatch)) {
-                $src = $srcMatch[1];
-                if (preg_match('/^https?:\/\//', $src) || !empty($assetBaseUrl)) {
-                    $assetUrl = $this->resolveAssetReference($src, $assetBaseUrl, $assetBaseUrl);
-                    $localUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                    if ($localUrl) {
-                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $localUrl . '"', $attrs);
-                    } elseif (!empty($assetUrl)) {
-                        $attrs = preg_replace('/\bsrc\s*=\s*["\'][^"\']+["\']/i', 'src="' . $this->buildSameOriginFallbackUrl($assetUrl) . '"', $attrs);
-                    }
-                }
-                $extractedScripts[] = "<script{$attrs}></script>";
-                return '';
-            } 
-                        
-            // 3. Check for Inline Module Scripts (import ... from)
-            if (preg_match('/type=["\']module["\']/i', $attrs) && trim($content)) {
-                // Rewrite inline imports
-                $content = preg_replace_callback('/import\s+.*?\s+from\s+["\'](https?:\/\/[^"\']+)["\']/is', function($imatch) use ($fullStoragePath, $baseStoragePath, $landing) {
-                    $localUrl = $this->downloadAndStore($imatch[1], $fullStoragePath, $baseStoragePath, $landing);
-                    return $localUrl ? str_replace($imatch[1], $localUrl, $imatch[0]) : $imatch[0];
-                }, $content);
-            }
-
-            // Preserve inline scripts
-            if (trim($content)) {
-                $extractedScripts[] = "<script{$attrs}>{$content}</script>";
-            }
-            
-            return '';
-        }, $html);
-
-        // === Phase 2: DOM Processing ===
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="UTF-8">' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-
-        // Process <link rel="stylesheet">
-        foreach (iterator_to_array($dom->getElementsByTagName('link')) as $link) {
-            $rel = $link->getAttribute('rel');
-            $href = $link->getAttribute('href');
-            if (($rel === 'stylesheet' || $rel === 'preload') && $href && preg_match('/^https?:\/\//', $href)) {
-                $localUrl = $this->downloadAndStore($href, $fullStoragePath, $baseStoragePath, $landing, $rel === 'stylesheet');
-                if ($localUrl) $link->setAttribute('href', $localUrl);
-            }
-        }
-
-        // Process <img> Tags
-        foreach (iterator_to_array($dom->getElementsByTagName('img')) as $img) {
-            foreach (['src', 'data-src'] as $attr) {
-                $src = $img->getAttribute($attr);
-                if ($src && preg_match('/^https?:\/\//', $src)) {
-                    $localUrl = $this->downloadAndStoreImage($src, $baseStoragePath, $landing);
-                    if ($localUrl) $img->setAttribute($attr, $localUrl);
-                }
-            }
-        }
-
-        // Process Media Tags
-        foreach (['video', 'audio', 'source'] as $tagName) {
-            foreach (iterator_to_array($dom->getElementsByTagName($tagName)) as $el) {
-                foreach (['src', 'poster'] as $attr) {
-                    $val = $el->getAttribute($attr);
-                    if ($val && preg_match('/^https?:\/\//', $val)) {
-                        $localUrl = $this->downloadAndStore($val, $fullStoragePath, $baseStoragePath, $landing);
-                        if ($localUrl) $el->setAttribute($attr, $localUrl);
-                    }
-                }
-            }
-        }
-
-        // Extract stylesheet/style tags from mixed HTML payloads and return them
-        // separately so editor components remain body-only and render reliably.
-        $extractedHeadAssets = [];
-        $xpath = new \DOMXPath($dom);
-        $headLikeNodes = $xpath->query(
-            '//link[translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="stylesheet"'
-            . ' or translate(@rel,"ABCDEFGHIJKLMNOPQRSTUVWXYZ","abcdefghijklmnopqrstuvwxyz")="preload"]'
-            . ' | //style'
-        );
-
-        foreach (iterator_to_array($headLikeNodes) as $headNode) {
-            $extractedHeadAssets[] = $dom->saveHTML($headNode);
-            if ($headNode->parentNode) {
-                $headNode->parentNode->removeChild($headNode);
-            }
-        }
-
-        $processedHtml = $dom->saveHTML();
-        $processedHtml = preg_replace('/^\s*<\?xml[^>]*\??>/i', '', $processedHtml);
-
-        return [
-            'html' => trim($processedHtml),
-            'body_scripts' => implode("\n", $extractedScripts),
-            'head_assets' => trim(implode("\n", array_filter(array_map('trim', $extractedHeadAssets)))),
-        ];
-    }
-
-    /**
-     * Download an image, store it, and create a MediaAsset record.
-     */
-    protected function processRemoteCss($css, Landing $landing, $fullPath, $relativePathBase, $assetBaseUrl = null)
-    {
-        if (empty($css)) return '';
-
-        return preg_replace_callback('/url\(["\']?(?!data:|https?:\/\/|\/\/)([^"\')\s]+)["\']?\)/i', function($match) use ($landing, $fullPath, $relativePathBase, $assetBaseUrl) {
-            $assetUrl = $this->resolveAssetReference($match[1], $assetBaseUrl, $assetBaseUrl);
-            $localUrl = $this->downloadAndStore($assetUrl, $fullPath, $relativePathBase, $landing, false, $assetBaseUrl);
-            if ($localUrl) {
-                return "url('{$localUrl}')";
-            }
-            if (!empty($assetUrl)) {
-                return "url('" . $this->buildSameOriginFallbackUrl($assetUrl) . "')";
-            }
-            return $match[0];
-        }, $css);
-    }
-
-    protected function downloadAndStoreImage($url, $baseStoragePath, Landing $landing)
-    {
-        try {
-            $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
-            if ($extension) $extension = explode('?', $extension)[0];
-            
-            $filename = 'imported_' . md5($url) . '.' . ($extension ?: 'png');
-            $relativePath = "{$baseStoragePath}/{$filename}";
-            $fullPath = storage_path("app/public/{$relativePath}");
-
-            if (File::exists($fullPath)) return Storage::url($relativePath);
-            
-            $content = $this->downloadWithRetry($url, $mimeType);
-            
-            if ($content !== null) {
-                if (!$extension && $mimeType) {
-                    $extension = $this->mimeToExtension($mimeType);
-                    $filename = 'imported_' . md5($url) . '.' . $extension;
-                    $relativePath = "{$baseStoragePath}/{$filename}";
+        return collect($chunks)
+            ->map(fn ($item) => strtolower(trim((string) $item)))
+            ->map(function (string $item) {
+                if ($item !== '' && !str_contains($item, '@')) {
+                    return '@' . ltrim($item, '@');
                 }
 
-                Storage::disk('public')->put($relativePath, $content);
-                
-                \App\Models\MediaAsset::create([
-                    'landing_id' => $landing->id,
-                    'user_id' => Auth::id(),
-                    'filename' => $filename,
-                    'disk' => 'public',
-                    'relative_path' => $relativePath,
-                    'mime_type' => $mimeType ?? 'image/png',
-                    'size' => strlen($content),
-                    'source' => 'import',
-                ]);
-
-                return Storage::url($relativePath);
-            }
-        } catch (\Exception $e) {
-            Log::warning("Failed to download image: $url - " . $e->getMessage());
-        }
-        return null;
-    }
-
-    protected function createDefaultPages(Landing $landing) 
-    {
-        LandingPage::create([
-            'landing_id' => $landing->id, 'type' => 'checkout', 'name' => 'Checkout', 'slug' => 'checkout', 'status' => 'draft',
-            'html' => '<div class="container mx-auto px-4 py-8"><h1 class="text-3xl font-bold mb-4">Checkout</h1><p>Dynamic Checkout Form will appear here.</p></div>',
-        ]);
-        LandingPage::create([
-            'landing_id' => $landing->id, 'type' => 'thankyou', 'name' => 'Thank You', 'slug' => 'thank-you', 'status' => 'draft',
-            'html' => '<div class="bg-gray-50 min-h-screen flex items-center justify-center"><h1>Thank You</h1></div>',
-        ]);
-    }
-
-    /**
-     * Process head assets (CSS/JS from custom_head).
-     */
-    protected function processHeadAssets($html, Landing $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl = null)
-    {
-        if (empty($html)) return '';
-
-        $dom = new \DOMDocument();
-        libxml_use_internal_errors(true);
-        $dom->loadHTML('<?xml encoding="UTF-8"><root>' . $html . '</root>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-
-        // Process Links (CSS)
-        foreach (iterator_to_array($dom->getElementsByTagName('link')) as $link) {
-            $href = $link->getAttribute('href');
-            if ($href && (preg_match('/^https?:\/\//', $href) || !empty($assetBaseUrl))) {
-                 $assetUrl = $this->resolveAssetReference($href, $assetBaseUrl, $assetBaseUrl);
-                 $newUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, true, $assetBaseUrl);
-                 if ($newUrl) {
-                     $link->setAttribute('href', $newUrl);
-                 } elseif (!empty($assetUrl)) {
-                     $link->setAttribute('href', $this->buildSameOriginFallbackUrl($assetUrl));
-                 }
-            }
-        }
-
-        // Process Scripts (JS)
-        foreach (iterator_to_array($dom->getElementsByTagName('script')) as $script) {
-            $src = $script->getAttribute('src');
-            if ($src && (preg_match('/^https?:\/\//', $src) || !empty($assetBaseUrl))) {
-                 $assetUrl = $this->resolveAssetReference($src, $assetBaseUrl, $assetBaseUrl);
-                 $newUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                 if ($newUrl) {
-                     $script->setAttribute('src', $newUrl);
-                 } elseif (!empty($assetUrl)) {
-                     $script->setAttribute('src', $this->buildSameOriginFallbackUrl($assetUrl));
-                 }
-            }
-        }
-
-        $output = '';
-        $root = $dom->getElementsByTagName('root')->item(0);
-        if ($root) {
-            foreach ($root->childNodes as $child) {
-                $output .= $dom->saveHTML($child);
-            }
-        }
-        return $output;
-    }
-
-    /**
-     * Download a remote file and store it locally.
-     */
-    protected function downloadAndStore($url, $fullStoragePath, $baseStoragePath, Landing $landing, $isCss = false, $assetBaseUrl = null)
-    {
-        if (empty($url)) return null;
-
-        Log::info("Attempting to download/localize asset: $url");
-        
-        try {
-            // Check if already localized by checking for hashed filename in storage
-            $extension = pathinfo(parse_url($url, PHP_URL_PATH), PATHINFO_EXTENSION);
-            if ($extension) $extension = explode('?', $extension)[0];
-            
-            $content = $this->downloadWithRetry($url, $mimeType);
-            if ($content === null) return null;
-
-            // CONTENT VALIDATION: Detect 404/Error HTML pages saved as JS/CSS
-            if (($isCss || preg_match('/\.js(\?|$)/i', $url)) && preg_match('/^\s*<!DOCTYPE\b/i', $content)) {
-                Log::warning("Skipping asset $url: Server returned HTML (likely 404/error) instead of the requested resource.");
-                return null;
-            }
-
-            if (!$extension || $extension === 'bin') {
-                $extension = $this->mimeToExtension($mimeType);
-                if (!$extension) $extension = $isCss ? 'css' : (preg_match('/\.js(\?|$)/i', $url) ? 'js' : 'bin');
-            }
-
-            // Rewrite CSS internal refs
-            if ($isCss || $extension === 'css') {
-                $content = $this->processRemoteCss($content, $landing, $fullStoragePath, $baseStoragePath, $assetBaseUrl ?? $url);
-            }
-
-            // DEEP ASSET CRAWLING for JS/CSS (Detect both relative and absolute assets)
-            if ($extension === 'js' || $extension === 'css') {
-                // Aggressive pattern: Catch any string literally starting or containing asset paths ending in model/media extensions
-                // It now matches: "./assets/...", "/assets/...", and "https://domain.com/assets/..."
-                $pattern = '/(["\'])((?:https?:\/\/[^\/\"\'\s]+)?(?:\.\/|(?:\.\.\/)+|\/)?(?:assets\/)?[^\"\']+\.(?:glb|gltf|json|bin|wasm|mp4|webm|obj|fbx|woff|woff2|ttf|otf))\1/i';
-                
-                $content = preg_replace_callback($pattern, function($match) use ($url, $fullStoragePath, $baseStoragePath, $landing, $assetBaseUrl) {
-                    $assetUrl = $this->resolveAssetReference($match[2], $assetBaseUrl, $url);
-                    
-                    Log::info("Aggressive Crawler discovered: " . $match[2] . " -> Resolved to: " . $assetUrl);
-                    
-                    // Only download if it's on the SAME host as the template source OR it's a relative path
-                    // We don't want to download every random external link from JS, just template assets.
-                    $sourceHost = parse_url($url, PHP_URL_HOST);
-                    $assetHost = parse_url($assetUrl, PHP_URL_HOST);
-                    
-                    if ($sourceHost === $assetHost || !$assetHost || ($assetBaseUrl && parse_url($assetBaseUrl, PHP_URL_HOST) === $assetHost)) {
-                        $localUrl = $this->downloadAndStore($assetUrl, $fullStoragePath, $baseStoragePath, $landing, false, $assetBaseUrl);
-                        if ($localUrl) {
-                            return $match[1] . $localUrl . $match[1];
-                        }
-                        if (!empty($assetUrl)) {
-                            return $match[1] . $this->buildSameOriginFallbackUrl($assetUrl) . $match[1];
-                        }
-                        return $match[0];
-                    }
-                    
-                    return $match[0];
-                }, $content);
-            }
-
-            $extension = strtolower($extension);
-            $contentHash = md5($content);
-            $filename = md5($url . '|' . $contentHash) . '.' . $extension;
-            $relativePath = "{$baseStoragePath}/{$filename}";
-            $absolutePath = $fullStoragePath . '/' . $filename;
-
-            if (File::exists($absolutePath)) {
-                $this->registerImportedMediaAsset($landing, $relativePath, $filename, $mimeType, (int) filesize($absolutePath));
-                return Storage::url($relativePath);
-            }
-
-            Storage::disk('public')->put($relativePath, $content);
-            $this->registerImportedMediaAsset($landing, $relativePath, $filename, $mimeType, strlen($content));
-            return Storage::url($relativePath);
-        } catch (\Exception $e) {
-            Log::warning("Failed to download asset: $url - " . $e->getMessage());
-        }
-        return null;
-    }
-
-    protected function registerImportedMediaAsset(Landing $landing, string $relativePath, string $filename, ?string $mimeType, int $size): void
-    {
-        try {
-            $absolutePath = storage_path('app/public/' . ltrim($relativePath, '/'));
-            $normalizedMime = strtolower(trim((string) explode(';', (string) $mimeType)[0]));
-
-            if ($normalizedMime === '' && File::exists($absolutePath)) {
-                $detectedMime = @mime_content_type($absolutePath);
-                if (is_string($detectedMime) && $detectedMime !== '') {
-                    $normalizedMime = strtolower($detectedMime);
-                }
-            }
-
-            if ($normalizedMime === '' || $normalizedMime === 'application/octet-stream') {
-                $ext = strtolower((string) pathinfo($filename, PATHINFO_EXTENSION));
-                $normalizedMime = $this->guessMimeTypeFromExtension($ext) ?? $normalizedMime;
-            }
-
-            $width = null;
-            $height = null;
-            if ($normalizedMime && str_starts_with($normalizedMime, 'image/') && $normalizedMime !== 'image/svg+xml' && File::exists($absolutePath)) {
-                $dimensions = @getimagesize($absolutePath);
-                $width = $dimensions ? ($dimensions[0] ?? null) : null;
-                $height = $dimensions ? ($dimensions[1] ?? null) : null;
-            }
-
-            $ownerId = (int) ($landing->workspace->user_id ?? Auth::id());
-
-            MediaAsset::updateOrCreate(
-                [
-                    'landing_id' => $landing->id,
-                    'relative_path' => $relativePath,
-                ],
-                [
-                    'user_id' => $ownerId ?: Auth::id(),
-                    'filename' => $filename,
-                    'disk' => 'public',
-                    'mime_type' => $normalizedMime ?: null,
-                    'size' => max($size, 0),
-                    'width' => $width,
-                    'height' => $height,
-                    'source' => 'import',
-                ]
-            );
-        } catch (\Throwable $e) {
-            Log::warning('Failed to register imported media asset', [
-                'landing_id' => $landing->id,
-                'relative_path' => $relativePath,
-                'error' => $e->getMessage(),
-            ]);
-        }
-    }
-
-    protected function guessMimeTypeFromExtension(string $ext): ?string
-    {
-        return match (strtolower($ext)) {
-            'jpg', 'jpeg' => 'image/jpeg',
-            'png' => 'image/png',
-            'gif' => 'image/gif',
-            'webp' => 'image/webp',
-            'svg' => 'image/svg+xml',
-            'avif' => 'image/avif',
-            'mp4' => 'video/mp4',
-            'webm' => 'video/webm',
-            'mov' => 'video/quicktime',
-            'avi' => 'video/x-msvideo',
-            'mkv' => 'video/x-matroska',
-            'mp3' => 'audio/mpeg',
-            'wav' => 'audio/wav',
-            'ogg' => 'audio/ogg',
-            'glb' => 'model/gltf-binary',
-            'gltf' => 'model/gltf+json',
-            'obj' => 'model/obj',
-            'fbx' => 'application/octet-stream',
-            'stl' => 'model/stl',
-            'usdz' => 'model/vnd.usdz+zip',
-            'woff' => 'font/woff',
-            'woff2' => 'font/woff2',
-            'ttf' => 'font/ttf',
-            'otf' => 'font/otf',
-            'wasm' => 'application/wasm',
-            'json' => 'application/json',
-            'js', 'mjs' => 'application/javascript',
-            'css' => 'text/css',
-            'pdf' => 'application/pdf',
-            default => null,
-        };
-    }
-
-    protected function downloadWithRetry($url, &$mimeType = null, $maxRetries = 2)
-    {
-        for ($attempt = 1; $attempt <= $maxRetries; $attempt++) {
-            try {
-                $response = \Illuminate\Support\Facades\Http::timeout(60)->withOptions(['verify' => false])->get($url);
-                if ($response->successful()) {
-                    $mimeType = $response->header('Content-Type');
-                    Log::info("Download successful ($url): " . strlen($response->body()) . " bytes, Mime: $mimeType");
-                    return $response->body();
+                return $item;
+            })
+            ->filter(function (string $item) {
+                if ($item === '') {
+                    return false;
                 }
 
-                Log::warning("Download attempt $attempt failed for $url: Status " . $response->status());
-
-                // Case-Sensitivity / Common Path Attempt for 404s
-                if ($response->status() === 404) {
-                    $variants = [];
-
-                    // Try lowercase version
-                    $lowerUrl = strtolower($url);
-                    if ($lowerUrl !== $url) {
-                        $variants[] = $lowerUrl;
-                    }
-
-                    // Try basename with uppercase first letter (rocket.glb -> Rocket.glb)
-                    $parsedPath = parse_url($url, PHP_URL_PATH);
-                    if (is_string($parsedPath) && $parsedPath !== '') {
-                        $basename = basename($parsedPath);
-                        $upperFirst = ucfirst($basename);
-                        if ($upperFirst !== $basename) {
-                            $upperFirstUrl = $this->replaceUrlPath($url, rtrim(dirname($parsedPath), '/\\') . '/' . $upperFirst);
-                            if ($upperFirstUrl !== $url) {
-                                $variants[] = $upperFirstUrl;
-                            }
-                        }
-                    }
-
-                    foreach (array_values(array_unique($variants)) as $variantUrl) {
-                        Log::info("404 for $url, retrying variant: $variantUrl");
-                        $variantResponse = \Illuminate\Support\Facades\Http::timeout(10)->withOptions(['verify' => false])->get($variantUrl);
-                        if ($variantResponse->successful()) {
-                            $mimeType = $variantResponse->header('Content-Type');
-                            return $variantResponse->body();
-                        }
-                    }
+                if (str_starts_with($item, '@')) {
+                    return preg_match('/^@[a-z0-9.-]+\.[a-z]{2,}$/i', $item) === 1;
                 }
-            } catch (\Exception $e) { }
-            if ($attempt < $maxRetries) usleep(500000);
-        }
-        return null;
+
+                return filter_var($item, FILTER_VALIDATE_EMAIL) !== false;
+            })
+            ->unique()
+            ->values()
+            ->all();
     }
 
-    protected function replaceUrlPath(string $url, string $newPath): string
+    protected function resolveAllowedEmails(string $manualRulesRaw, array $allowedUserIds): array
     {
-        $parts = parse_url($url);
-        if (!$parts || empty($parts['scheme']) || empty($parts['host'])) {
-            return $url;
-        }
+        $manual = $this->parseAllowedEmails($manualRulesRaw);
+        $userEmails = User::query()
+            ->whereIn('id', $allowedUserIds)
+            ->whereNotNull('email')
+            ->pluck('email')
+            ->map(fn ($email) => strtolower(trim((string) $email)))
+            ->filter()
+            ->values()
+            ->all();
 
-        $scheme = $parts['scheme'];
-        $host = $parts['host'];
-        $port = isset($parts['port']) ? ':' . $parts['port'] : '';
-        $query = isset($parts['query']) ? '?' . $parts['query'] : '';
-        $fragment = isset($parts['fragment']) ? '#' . $parts['fragment'] : '';
-
-        $normalizedPath = '/' . ltrim($newPath, '/');
-        return "{$scheme}://{$host}{$port}{$normalizedPath}{$query}{$fragment}";
+        return collect([...$manual, ...$userEmails])
+            ->map(fn ($rule) => strtolower(trim((string) $rule)))
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
     }
 
-    protected function mimeToExtension($mime)
+    protected function getClientDirectory()
     {
-        $map = [
-            'application/javascript' => 'js', 'application/x-javascript' => 'js', 'text/javascript' => 'js', 
-            'text/css' => 'css', 'text/plain' => null, // Let fallback decide for text/plain
-            'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/gif' => 'gif', 'image/webp' => 'webp',
-            'image/svg+xml' => 'svg', 'application/json' => 'json', 
-            'font/woff' => 'woff', 'font/woff2' => 'woff2', 'font/ttf' => 'ttf', 'font/otf' => 'otf',
-            'application/font-woff' => 'woff', 'application/font-woff2' => 'woff2',
-            'application/x-font-ttf' => 'ttf', 'application/x-font-opentype' => 'otf',
-            'model/gltf-binary' => 'glb', 'model/gltf+json' => 'gltf', 
-            'application/wasm' => 'wasm', 'video/mp4' => 'mp4', 'video/webm' => 'webm',
-        ];
-        $baseMime = explode(';', $mime)[0];
-        return $map[$baseMime] ?? null;
-    }
-
-    /**
-     * Resolve a relative URL based on a parent absolute URL.
-     */
-    protected function resolveUrl($base, $rel)
-    {
-        if (preg_match('/^https?:\/\//i', $rel) || str_starts_with($rel, '//')) return $rel;
-        
-        $parse = parse_url($base);
-        $root = $parse['scheme'] . "://" . $parse['host'] . (isset($parse['port']) ? ":" . $parse['port'] : "");
-        $path = $parse['path'] ?? '/';
-        $dir = dirname($path);
-        
-        if (str_starts_with($rel, '/')) return $root . $rel;
-        
-        // Handle ../ and ./ relative to dir
-        $absolute = $dir . '/' . $rel;
-        $parts = explode('/', $absolute);
-        $stack = [];
-        foreach ($parts as $part) {
-            if ($part === '' || $part === '.') continue;
-            if ($part === '..') {
-                if (count($stack) > 0) array_pop($stack);
-                continue;
-            }
-            $stack[] = $part;
-        }
-        return $root . '/' . implode('/', $stack);
-    }
-
-    protected function inferAssetBaseUrlFromStructure(array $structure): ?string
-    {
-        $candidates = [
-            (string) ($structure['html'] ?? ''),
-            (string) ($structure['custom_head'] ?? ''),
-            (string) ($structure['css'] ?? ''),
-        ];
-
-        foreach ($candidates as $candidate) {
-            if ($candidate === '') {
-                continue;
-            }
-
-            if (preg_match_all('#https?://[^\s"\'()<>]+#i', $candidate, $matches)) {
-                foreach ($matches[0] as $url) {
-                    if (!str_contains($url, '/storage/templates/') || !str_contains($url, '/assets/')) {
-                        continue;
-                    }
-
-                    $assetsPos = strpos($url, '/assets/');
-                    if ($assetsPos === false) {
-                        continue;
-                    }
-
-                    $base = rtrim(substr($url, 0, $assetsPos), '/') . '/';
-                    return $base;
-                }
-            }
-        }
-
-        return null;
-    }
-
-    /**
-     * Resolve asset references while supporting template packages that use
-     * root-like paths such as "/assets/...".
-     */
-    protected function resolveAssetReference(string $reference, ?string $assetBaseUrl = null, ?string $contextUrl = null): string
-    {
-        if (preg_match('/^https?:\/\//i', $reference) || str_starts_with($reference, '//')) {
-            return $reference;
-        }
-
-        $assetPath = $assetBaseUrl ? (parse_url($assetBaseUrl, PHP_URL_PATH) ?? '') : '';
-        $isTemplateBase = !empty($assetPath) && str_contains($assetPath, '/storage/templates/');
-
-        if ($isTemplateBase && str_starts_with($reference, '/')) {
-            return rtrim($assetBaseUrl, '/') . '/' . ltrim($reference, '/');
-        }
-
-        // Fallback: infer template base from the current asset URL when the
-        // API did not provide asset_base_url (e.g., stale cached template data).
-        if ($contextUrl && str_starts_with($reference, '/')
-            && str_contains($contextUrl, '/storage/templates/')
-            && str_contains($contextUrl, '/assets/')) {
-            $assetsPos = strpos($contextUrl, '/assets/');
-            if ($assetsPos !== false) {
-                $inferredBase = rtrim(substr($contextUrl, 0, $assetsPos), '/') . '/';
-                return rtrim($inferredBase, '/') . '/' . ltrim($reference, '/');
-            }
-        }
-
-        $base = $contextUrl ?: ($assetBaseUrl ?? '');
-        return $this->resolveUrl($base, $reference);
-    }
-
-    protected function buildSameOriginFallbackUrl(string $assetUrl): string
-    {
-        if (!preg_match('/^https?:\/\//i', $assetUrl)) {
-            return $assetUrl;
-        }
-
-        $assetHost = strtolower((string) (parse_url($assetUrl, PHP_URL_HOST) ?? ''));
-        $appHost = strtolower((string) (parse_url((string) config('app.url'), PHP_URL_HOST) ?? ''));
-
-        if ($assetHost !== '' && $appHost !== '' && $assetHost === $appHost) {
-            return $assetUrl;
-        }
-
-        return url('/template-asset-proxy') . '?u=' . rawurlencode($assetUrl);
+        return User::query()
+            ->select(['id', 'name', 'email'])
+            ->whereNotNull('email')
+            ->where('email', '!=', '')
+            ->whereDoesntHave('roles', function ($query) {
+                $query->whereIn('slug', ['super-admin', 'admin']);
+            })
+            ->orderBy('name')
+            ->orderBy('email')
+            ->limit(1200)
+            ->get();
     }
 }

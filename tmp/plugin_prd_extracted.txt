@@ -1,0 +1,820 @@
+PRODUCT REQUIREMENTS DOCUMENT
+Plugin System Architecture
+Extensible Page Builder Ecosystem
+Core Plugins + Third-Party Extensions + Marketplace
+Document Version
+1.0
+Status
+Draft — For Review
+Date
+April 2026
+Product Area
+Plugin System & Extensibility
+Depends On
+Page Builder Core (see separate PRD)
+Target Release
+Phase 1: Q3 2026 | Full System: Q4 2026
+Priority
+P1 — High
+Table of Contents
+1.
+Executive Summary
+3
+2.
+Why a Plugin System?
+4
+3.
+Plugin Architecture Overview
+5
+4.
+Core Plugin Categories
+7
+5.
+Plugin Manifest & Registration
+10
+6.
+Plugin API & Hooks System
+12
+7.
+Essential Core Plugins (Phase 1)
+15
+8.
+Advanced Plugins (Phase 2)
+20
+9.
+Third-Party Plugin Development
+23
+10.
+Plugin Marketplace
+25
+11.
+Security & Sandboxing
+27
+12.
+Plugin Configuration UI
+29
+13.
+Data Storage & State
+30
+14.
+Performance Considerations
+31
+15.
+Plugin Versioning & Updates
+32
+16.
+Developer Documentation
+33
+17.
+Implementation Roadmap
+34
+18.
+Appendix: Plugin Examples
+35
+1. Executive Summary
+A world-class page builder is not a monolithic application — it is an extensible platform. ClickFunnels, Webflow, WordPress Gutenberg, and Shopify all share a common architecture: a small, fast core + a rich plugin ecosystem.
+This PRD defines the plugin system architecture for our page builder. The system enables us to:
+Ship a lean, fast core editor while deferring specialized features to plugins
+Enable third-party developers to extend the builder (marketplace opportunity)
+Iterate quickly on new features without touching core code
+Support multiple business models (freemium, premium plugins, white-label)
+Match ClickFunnels' extensibility while maintaining Laravel-native simplicity
+Core Principle
+The editor core handles: canvas rendering, drag-drop, inspector panels, state management, and save/publish. Everything else — analytics integrations, A/B testing, advanced animations, third-party connectors, AI content generation — is a plugin.
+1.1 What This PRD Covers
+Plugin architecture and lifecycle
+Plugin categories (Element, Integration, Enhancement, Template)
+API surface and hook system
+18 essential core plugins for Phase 1 launch
+Third-party plugin development guidelines
+Plugin marketplace infrastructure
+Security, sandboxing, and performance constraints
+1.2 What This PRD Does NOT Cover
+Page builder core features (see separate PRD)
+Funnel management system (see separate PRD)
+Specific business logic for individual plugins (each gets its own spec)
+Marketplace business model (pricing, revenue share — separate doc)
+2. Why a Plugin System?
+2.1 Technical Benefits
+Benefit
+Explanation
+Smaller core bundle
+Editor loads in <1.5s because it ships without analytics, A/B testing, AI tools, etc. Users only download what they enable.
+Parallel development
+Team can ship analytics plugin while another team ships AI plugin — no merge conflicts, independent release cycles.
+Testability
+Each plugin has isolated tests. Easier to debug. Failed plugin doesn't crash core.
+Upgradability
+Update Google Analytics integration without touching editor core. Roll back bad plugin without rollback entire app.
+Feature flags
+Plugins can be toggled on/off per workspace. Perfect for beta testing or enterprise-only features.
+2.2 Business Benefits
+Benefit
+Explanation
+Upsell opportunities
+Core free/cheap, premium plugins paid. E.g., 'Advanced Analytics Plugin - $29/mo'.
+Third-party ecosystem
+Marketplace where agencies/developers sell plugins (we take 20-30% cut). WordPress model.
+Competitive moat
+Once ecosystem grows, switching cost for users is high (they lose their plugins). Network effect.
+White-label flexibility
+Agencies can disable our branding plugin, enable their own logo plugin. Customization without forking.
+Faster time-to-market
+Ship MVP fast, iterate via plugins. Don't wait for 'perfect' monolith.
+3. Plugin Architecture Overview
+3.1 Conceptual Model
+EDITOR CORE
+Canvas • Drag-Drop • Inspector • State • Save/Publish
+▼ provides hooks ▼
+PLUGIN SYSTEM (this PRD)
+Plugin Registry • Lifecycle • API • Sandboxing • Marketplace
+▼ loads & executes ▼
+PLUGINS (Element • Integration • Enhancement • Template)
+Analytics • A/B Test • AI Writer • Zapier • Stripe • Custom Elements • ...
+3.2 Plugin Lifecycle
+Stage
+Event
+What Happens
+1. Install
+plugin.install
+Plugin files uploaded to /plugins/{plugin-slug}/, manifest parsed, DB record created, dependencies checked
+2. Activate
+plugin.activate
+Plugin enabled for workspace, init() hook called, settings panel shown, assets enqueued
+3. Runtime
+editor.ready
+Plugin registers hooks, adds elements/panels/buttons, listens to events
+4. Deactivate
+plugin.deactivate
+Plugin disabled, cleanup() hook called, UI elements removed, event listeners unregistered
+5. Uninstall
+plugin.uninstall
+Plugin files deleted, DB records removed, user data optionally deleted (with confirmation)
+3.3 Plugin Types (4 Categories)
+Type
+Purpose & Examples
+Element Plugin
+Adds new draggable elements to the editor. Examples: Video Player (Wistia), Advanced Form Fields, Image Carousel, Interactive Quiz, Product Grid (Shopify), Testimonial Rotator, AI Image Generator
+Integration Plugin
+Connects builder to third-party services. Examples: Google Analytics, Facebook Pixel, Zapier, Stripe Checkout, Mailchimp, ActiveCampaign, Slack, HubSpot, Calendly, Gong
+Enhancement Plugin
+Extends core editor capabilities. Examples: A/B Testing, Heatmaps, Session Recording, Advanced Animations, Custom Fonts, Global Blocks Library, Version Control, Multi-Language, AI Content Writer
+Template Plugin
+Bundles pre-designed templates/sections. Examples: E-commerce Pack (10 product page templates), Agency Pack (portfolio templates), SaaS Pack (pricing pages), Holiday Promo Pack
+4. Core Plugin Categories
+At launch (Phase 1), we ship 18 essential plugins bundled with the builder. These are maintained by us, not third-party. They demonstrate the plugin API and provide immediate value.
+4.1 Analytics & Tracking (3 plugins)
+Plugin
+Category
+Function
+Google Analytics
+Integration
+Inject GA4 tracking script, track page views, events, conversions. Config: GA Measurement ID.
+Facebook Pixel
+Integration
+Track page views, custom events (form submit, button click), conversions. Config: Pixel ID.
+Custom Event Tracker
+Enhancement
+Fire custom events to any endpoint on user actions. Config: Event name, webhook URL, element selector.
+4.2 Form & Lead Capture (2 plugins)
+Plugin
+Category
+Function
+Zapier Integration
+Integration
+Send form submissions to Zapier webhook. Config: Webhook URL, field mapping.
+Mailchimp Sync
+Integration
+Auto-add form leads to Mailchimp list. Config: API key, list ID, tag.
+4.3 Payment & Commerce (2 plugins)
+Plugin
+Category
+Function
+Stripe Checkout
+Integration
+Embed Stripe payment button. Config: Publishable key, product ID, success URL.
+PayPal Button
+Integration
+Add PayPal smart button element. Config: Client ID, currency.
+4.4 Media & Content (3 plugins)
+Plugin
+Category
+Function
+YouTube Embed
+Element
+Adds YouTube video element with privacy mode, autoplay, controls config.
+Vimeo Embed
+Element
+Adds Vimeo video element with custom player colors, privacy.
+Unsplash Images
+Enhancement
+Search and insert free stock photos from Unsplash API directly in editor.
+4.5 Social Proof & Trust (3 plugins)
+Plugin
+Category
+Function
+Testimonial Rotator
+Element
+Carousel of testimonials with auto-rotate, star ratings, photos.
+Live Visitor Counter
+Element
+Shows 'X people viewing this page' (real or simulated). Config: Real/fake, min/max range.
+Trust Badges
+Element
+Pre-designed trust icons: SSL, money-back guarantee, free shipping, secure checkout.
+4.6 Optimization & Conversion (3 plugins)
+Plugin
+Category
+Function
+Countdown Timer
+Element
+Urgency timer (fixed date, evergreen, daily reset). Config: End date, action on expire.
+Exit-Intent Popup
+Enhancement
+Show popup when user tries to leave. Config: Trigger, delay, popup content.
+Sticky CTA Bar
+Element
+Fixed bottom/top bar with CTA button. Config: Text, button, position, scroll trigger.
+4.7 Miscellaneous (2 plugins)
+Plugin
+Category
+Function
+Custom CSS Injector
+Enhancement
+Add global custom CSS per page. Config: CSS editor with syntax highlighting.
+GDPR Cookie Banner
+Element
+Cookie consent banner with Accept/Reject. Config: Text, styling, consent storage.
+Total Phase 1: 18 core plugins
+5. Plugin Manifest & Registration
+5.1 Plugin Directory Structure
+/plugins/
+google-analytics/
+plugin.json         ← Manifest
+plugin.php          ← Backend logic (Laravel)
+plugin.js           ← Frontend logic (Alpine/Vue)
+README.md
+screenshot.png      ← Marketplace thumbnail
+stripe-checkout/
+plugin.json
+plugin.php
+plugin.js
+views/
+settings.blade.php
+assets/
+icon.svg
+5.2 Plugin Manifest (plugin.json)
+Every plugin has a plugin.json manifest:
+{
+"name": "Google Analytics",
+"slug": "google-analytics",
+"version": "1.2.0",
+"author": "Your Company",
+"description": "Track page views and events with GA4",
+"category": "integration",
+"icon": "assets/icon.svg",
+"requires": {
+"builder_version": ">=2.0.0",
+"php": ">=8.1",
+"plugins": []
+},
+"hooks": ["page.render", "element.click"],
+"settings": {
+"measurement_id": {
+"type": "text",
+"label": "GA4 Measurement ID",
+"required": true
+}
+},
+"permissions": ["analytics", "tracking"],
+"assets": {
+"js": ["plugin.js"],
+"css": []
+}
+}
+5.3 Plugin Registration (Backend)
+Plugins register via Laravel service provider:
+<?php
+// plugins/google-analytics/plugin.php
+namespace Plugins\GoogleAnalytics;
+class GoogleAnalyticsPlugin extends BasePlugin
+{
+public function init()
+{
+// Called when plugin activates
+$this->registerHook('page.render', [$this, 'injectScript']);
+}
+public function injectScript($page)
+{
+$measurementId = $this->getSetting('measurement_id');
+return "<script async src='https://www.googletagmanager.com/gtag/js?id={$measurementId}'></script>";
+}
+public function cleanup()
+{
+// Called on deactivate
+}
+}
+6. Plugin API & Hooks System
+6.1 Hook Categories
+Plugins hook into the editor lifecycle via events. Hooks are organized into categories:
+Hook Category
+Events
+Editor Lifecycle
+editor.init, editor.ready, editor.destroy
+Page Lifecycle
+page.create, page.load, page.save, page.publish, page.render (frontend)
+Element Events
+element.add, element.remove, element.update, element.select, element.click (published page)
+Inspector
+inspector.open, inspector.update, inspector.close
+UI Extension
+toolbar.register (add button), panel.register (add sidebar), menu.register (add menu item)
+Form Events
+form.submit, form.validate, form.success, form.error
+User Actions
+user.login, user.save_page, user.publish_page
+6.2 Plugin API Methods
+Plugins interact with the editor via the Plugin API:
+Method
+Purpose
+registerElement(config)
+Add new draggable element to library. Config: name, icon, category, defaultContent, inspector fields.
+registerHook(event, callback)
+Listen to editor events. Callback receives event data.
+addToolbarButton(config)
+Add button to top toolbar. Config: icon, label, onClick handler.
+addInspectorTab(config)
+Add custom tab to inspector panel. Config: label, component (Vue/Blade).
+getPageData()
+Get current page JSON structure.
+updatePageData(data)
+Update page structure (triggers autosave).
+getSetting(key)
+Get plugin setting value (from user config).
+setSetting(key, value)
+Update plugin setting.
+showNotification(msg, type)
+Display toast notification to user. Type: success, error, info, warning.
+http.get/post(url, data)
+Make API calls (sandboxed, rate-limited).
+storage.get/set(key, value)
+Plugin-scoped localStorage.
+6.3 Example: Adding a Custom Element
+// plugin.js (frontend)
+Plugin.registerElement({
+name: 'Countdown Timer',
+slug: 'countdown-timer',
+category: 'urgency',
+icon: '<svg>...</svg>',
+defaultContent: {
+endDate: '2026-12-31T23:59:59',
+mode: 'fixed',
+text: 'Offer ends in:'
+},
+inspectorFields: [
+{ type: 'datetime', key: 'endDate', label: 'End Date' },
+{ type: 'select', key: 'mode', label: 'Mode', options: ['fixed', 'evergreen', 'daily'] },
+{ type: 'text', key: 'text', label: 'Label' }
+],
+render(data) {
+return `<div class="countdown">${data.text} <span id="timer"></span></div>`;
+}
+});
+7. Essential Core Plugins (Phase 1)
+Detailed specifications for the 18 core plugins we ship at launch.
+7.1 Google Analytics Plugin
+Name
+Google Analytics
+Category
+Integration
+Purpose
+Track page views, custom events, conversions with GA4
+Settings
+Measurement ID (text input, required)
+Hooks
+page.render (inject gtag.js), element.click (track custom events)
+Frontend behavior
+Injects GA4 script in <head>, auto-tracks pageview, sends events when user clicks elements with data-event attribute
+User flow
+1. Install plugin, 2. Enter Measurement ID, 3. Activate, 4. Done — all published pages now tracked
+7.2 Stripe Checkout Plugin
+Name
+Stripe Checkout
+Category
+Integration + Element
+Purpose
+Add Stripe payment buttons to pages
+Settings
+Publishable Key (text), Secret Key (password, stored encrypted)
+New element
+Stripe Button — Config: Product ID, Price, Success URL, Cancel URL
+Frontend behavior
+Loads Stripe.js, renders checkout button, redirects to Stripe Checkout on click
+Backend
+Webhook endpoint to handle payment success/failure, updates order status
+7.3 Countdown Timer Plugin
+Name
+Countdown Timer
+Category
+Element
+Purpose
+Create urgency with countdown timers
+Settings
+None (element-level config)
+New element
+Countdown Timer — Config: End date/time, Mode (fixed/evergreen/daily), End action (hide/redirect/message), Style preset (4 options)
+Frontend behavior
+JavaScript timer updates every second, calculates time remaining, executes end action, stores evergreen start in localStorage
+Modes
+Fixed (absolute date), Evergreen (X hours from first visit), Daily (resets at midnight)
+7.4 Exit-Intent Popup Plugin
+Name
+Exit-Intent Popup
+Category
+Enhancement
+Purpose
+Capture abandoning visitors with popup
+Settings
+Enable per page (toggle), Delay (seconds), Show once per session (toggle)
+UI
+Adds 'Exit Popup' panel in inspector where user builds popup content using mini-builder
+Frontend behavior
+Detects mouse leaving viewport (desktop) or back button (mobile), shows modal overlay with content, tracks if shown in sessionStorage
+Content options
+Headline, text, form (email capture), button, close X
+7.5 Zapier Integration Plugin
+Name
+Zapier Integration
+Category
+Integration
+Purpose
+Send form submissions to Zapier webhooks
+Settings
+None (per-form config)
+Form integration
+Adds 'Zapier Webhook' option in form submit actions. User pastes Zapier webhook URL.
+Frontend behavior
+On form submit, POSTs JSON to webhook URL with field data, shows success/error message
+Field mapping
+Auto-maps form fields to JSON keys (email → email, name → name, custom_field_1 → custom_field_1)
+7.6 Testimonial Rotator Plugin
+Name
+Testimonial Rotator
+Category
+Element
+Purpose
+Display rotating customer testimonials
+New element
+Testimonial Rotator — Config: Add testimonials (name, photo, quote, rating), Auto-rotate (toggle + interval), Layout (carousel / grid / single)
+Frontend behavior
+Renders testimonials, auto-rotates if enabled, prev/next arrows, swipe support on mobile
+Inspector fields
+Testimonials (repeater: name, photo upload, quote textarea, rating 1-5), Auto-rotate (toggle), Interval (slider 3-10s), Layout (3 presets)
+(Remaining 12 core plugins follow similar spec structure — full specs in separate technical docs)
+8. Advanced Plugins (Phase 2)
+These plugins ship 3-6 months post-launch (Phase 2). More complex, higher value, potential upsell.
+Plugin
+Category
+Function
+A/B Testing
+Enhancement
+Create page variants, split traffic, track winner. UI: Variant manager, traffic allocator, stats dashboard.
+Heatmaps
+Enhancement
+Visual heatmap of clicks, scrolls, mouse movement. Integration with Hotjar/Crazy Egg or custom tracker.
+Session Recording
+Enhancement
+Record user sessions (mouse, clicks, scrolls). Privacy-compliant (mask sensitive fields). Playback UI.
+AI Content Writer
+Enhancement
+Generate headlines, copy, CTAs with GPT-4. UI: Right-click element → 'AI Generate'. Config: OpenAI API key, tone, length.
+Advanced Animations
+Enhancement
+Scroll-triggered animations (fade, slide, zoom, parallax). UI: Animation panel in inspector, timeline editor (simple).
+Multi-Language
+Enhancement
+Build pages in multiple languages. UI: Language switcher, translation manager, auto-translate via DeepL API.
+Global Blocks Library
+Enhancement
+Save sections as global blocks; edit once, update everywhere. UI: Block manager, Insert from library, Sync status.
+Version Control
+Enhancement
+Git-style versioning. UI: Commit with message, view history, diff viewer, restore version, branch/merge (advanced).
+White-Label
+Enhancement
+Remove our branding, add agency logo/colors. UI: Branding panel (logo upload, primary color, hide 'Powered by').
+HubSpot CRM Sync
+Integration
+Sync form leads to HubSpot contacts. UI: OAuth connect, field mapping, trigger selection.
+Shopify Product Grid
+Element
+Display Shopify products in grid. UI: Connect Shopify, select collection, customize card layout.
+Calendly Booking
+Element
+Embed Calendly widget. UI: Enter Calendly URL, customize appearance (inline/popup).
+9. Third-Party Plugin Development
+9.1 Developer Onboarding
+To encourage third-party plugins, we provide:
+Plugin Development Guide (50-page documentation with examples)
+Starter boilerplate (CLI: `npx create-plugin my-plugin`)
+Sandbox environment (test plugins without affecting production)
+Developer forum / Discord channel
+Plugin review process (security audit + QA before marketplace approval)
+Revenue share: 70% developer, 30% us (if sold via marketplace)
+9.2 Plugin Submission Requirements
+Code quality
+PSR-12 (PHP), ESLint (JS), no eval(), proper escaping, error handling
+Security
+No XSS, CSRF, SQL injection. API keys encrypted at rest. User data consent.
+Performance
+JS bundle < 100KB (gzipped). No blocking scripts. Lazy-load where possible.
+Documentation
+README with setup, config, screenshots. Changelog. Support contact.
+Testing
+Minimum 70% code coverage. E2E tests for critical flows.
+License
+GPL-compatible or proprietary (if paid). Clear terms.
+9.3 Plugin Review Process
+1. Developer submits plugin via marketplace portal (uploads .zip)
+2. Automated checks: manifest valid, dependencies met, code scan (static analysis)
+3. Manual review: security audit, UX check, conflict test (doesn't break core or other plugins)
+4. QA testing: install, activate, test on 3 sample pages, deactivate, uninstall
+5. Approve or Reject (with feedback)
+6. If approved: plugin goes live in marketplace; developer notified
+7. Ongoing: monitor reviews, support tickets; flag for re-review if issues arise
+10. Plugin Marketplace
+10.1 Marketplace UI
+Users discover and install plugins via the marketplace (built into editor):
+Access: Settings → Plugins → 'Browse Marketplace'
+Layout: Grid of plugin cards (icon, name, rating, price, install button)
+Filters: Category (Element, Integration, Enhancement, Template), Price (Free, Paid), Rating (4+ stars), Official (our plugins) vs. Third-party
+Search: Full-text search across name, description, tags
+Plugin detail page: Screenshots, description, changelog, reviews, support link, install button
+Install flow: Click Install → confirm permissions → download → activate → configure (settings panel opens)
+10.2 Plugin Pricing Models
+Model
+Example
+Free
+YouTube Embed, Basic Analytics, Custom CSS Injector — no cost, unlimited use
+Freemium
+Countdown Timer: Free with basic features, Pro version ($9/mo) unlocks evergreen mode + advanced styling
+One-time fee
+Advanced Animations Pack: $49 one-time, lifetime updates
+Subscription
+A/B Testing Plugin: $29/mo, includes stats dashboard + unlimited variants
+Usage-based
+AI Content Writer: Free tier (10 generations/mo), $19/mo for 500 generations
+10.3 Revenue Share
+For paid plugins sold via our marketplace:
+Developer gets 70% of sale price
+We take 30% (covers payment processing, hosting, support, review overhead)
+Payouts monthly via Stripe Connect (min. $50 balance)
+Developer dashboard shows sales, revenue, downloads, reviews
+11. Security & Sandboxing
+11.1 Security Threats
+Plugins are third-party code running in our app. Potential threats:
+Malicious plugin steals user data (API keys, page content, analytics)
+Plugin injects XSS into published pages
+Plugin makes unauthorized API calls (spam, DDOS)
+Plugin conflicts break editor or other plugins
+Abandoned plugin with unpatched vulnerabilities
+11.2 Sandboxing & Permissions
+We mitigate risks with sandboxing:
+Control
+Implementation
+Permission model
+Plugins declare required permissions in manifest (analytics, tracking, storage, http). User sees permissions on install and approves.
+API rate limits
+Plugin API calls rate-limited: 100 req/min (HTTP), 1000 storage ops/min. Prevents abuse.
+Scoped storage
+Plugin localStorage/DB isolated per plugin. Plugin A cannot read Plugin B's data.
+No eval()
+Plugins cannot use eval(), new Function(), or dynamic script injection. Enforced via static analysis.
+CSP headers
+Content Security Policy blocks inline scripts, restricts script sources to plugin-approved domains.
+Review process
+All marketplace plugins manually reviewed for security before approval (see section 9.3).
+Kill switch
+If plugin is flagged malicious post-launch, we can remotely deactivate it for all users (emergency only).
+11.3 User Data Protection
+Plugins that collect user data must:
+Declare data collection in manifest and marketplace listing
+Obtain explicit user consent (checkbox on activation)
+Provide data export/delete functionality (GDPR compliance)
+Encrypt sensitive data at rest (API keys, tokens)
+Not sell or share user data with third parties without consent
+12. Plugin Configuration UI
+Each plugin has a settings panel where users configure it:
+12.1 Settings Panel Location
+Access: Settings → Plugins → [Plugin Name] → Configure
+Layout: Modal or sidebar (depending on complexity)
+Fields: Auto-generated from manifest settings schema (see section 5.2)
+Save button: Saves settings, validates, shows success/error toast
+12.2 Field Types
+Field Type
+Use Case & Rendering
+text
+Simple text input. Example: API Key, Measurement ID
+password
+Masked input, stored encrypted. Example: Secret Key
+textarea
+Multi-line text. Example: Custom CSS, Tracking Script
+toggle
+On/off switch. Example: Enable Auto-Rotate
+select
+Dropdown menu. Example: Mode (fixed/evergreen/daily)
+number
+Number input with min/max. Example: Interval (3-10)
+color
+Color picker. Example: Primary Color
+file
+File upload. Example: Logo Upload
+repeater
+Add/remove rows of fields. Example: Testimonials (name, photo, quote)
+13. Data Storage & State
+Plugins need to store configuration and state. We provide three storage mechanisms:
+Storage Type
+Scope
+Use Case
+Plugin Settings
+Workspace-level
+User configuration (API keys, preferences). Stored in DB, encrypted if sensitive.
+Plugin Storage (key-value)
+Plugin-scoped
+Plugin runtime data (cache, temp state). Accessed via storage.get/set API. Stored in Redis.
+Page Metadata
+Page-level
+Plugin data attached to specific page (e.g., GA tracking code for this page). Stored in page JSON.
+14. Performance Considerations
+Plugins can slow down the editor if not managed well. Performance rules:
+14.1 Loading Strategy
+Lazy-load plugins: Only load when activated (not all installed plugins at once)
+Code-split: Plugin JS/CSS loaded on-demand (not in main bundle)
+Async initialization: Plugins init in parallel, not blocking editor load
+Priority queue: Core plugins load first, third-party plugins load after editor.ready
+14.2 Performance Budget
+Metric
+Limit (per plugin)
+Enforcement
+JS bundle size (gzipped)
+< 100 KB
+Automated check on upload
+CSS bundle size
+< 50 KB
+Automated check
+Editor load impact
+< 200ms delay
+QA test on review
+API calls (HTTP)
+100 req/min
+Rate-limited by system
+Storage operations
+1000 ops/min
+Rate-limited
+15. Plugin Versioning & Updates
+15.1 Semantic Versioning
+Plugins follow semver: MAJOR.MINOR.PATCH
+MAJOR: Breaking changes (e.g., API signature changes, removed features)
+MINOR: New features, backward-compatible
+PATCH: Bug fixes, backward-compatible
+15.2 Update Flow
+1. Developer uploads new version to marketplace
+2. System checks: version > current, manifest valid, tests pass
+3. If MAJOR version: users notified 'Update available, may break compatibility. Review changelog.'
+4. If MINOR/PATCH: auto-update (or user can toggle 'auto-update' off)
+5. Changelog shown in plugin detail page
+6. Rollback option: user can revert to previous version if update breaks something
+16. Developer Documentation
+We provide comprehensive docs for plugin developers:
+Doc Section
+Contents
+Getting Started
+Quick start guide, plugin structure, hello-world example, boilerplate CLI
+Plugin Manifest
+Full manifest schema, field descriptions, validation rules
+Plugin API Reference
+All API methods (registerElement, registerHook, etc.), parameters, return values, code examples
+Hooks & Events
+Complete hook catalog, event payloads, timing diagrams, when to use each
+UI Components
+How to add toolbar buttons, inspector tabs, panels, modals. Vue/Blade component examples.
+Security Best Practices
+Input sanitization, XSS prevention, API key encryption, permissions model
+Testing
+How to write unit/E2E tests, sandbox environment, debugging tools
+Submission & Review
+Submission process, requirements checklist, review timeline, common rejection reasons
+Examples
+10+ real plugin examples (Element, Integration, Enhancement) with full source code on GitHub
+17. Implementation Roadmap
+Phase
+Timeline
+Deliverables
+Phase 0: Foundation
+Weeks 1-4
+Plugin system architecture doc, API design, manifest schema, security model, DB schema for plugin registry
+Phase 1: Core System
+Weeks 5-12
+Plugin registry backend, lifecycle (install/activate/deactivate/uninstall), hook system, API surface, sandboxing/permissions, settings UI generator
+Phase 2: Core Plugins
+Weeks 13-20
+Build 18 core plugins (see section 7), test integration, documentation, settings panels
+Phase 3: Marketplace MVP
+Weeks 21-26
+Marketplace UI (browse, search, install), developer portal (upload, manage), review workflow, payment integration (Stripe Connect)
+Phase 4: Developer Docs
+Weeks 27-30
+Developer documentation site, API reference, examples, video tutorials, boilerplate CLI
+Phase 5: Beta Launch
+Weeks 31-34
+Invite 50 beta developers, collect feedback, iterate on API, approve first 10 third-party plugins
+Phase 6: GA Launch
+Week 35
+Public marketplace launch, marketing (blog, docs, email), monitor for issues
+Phase 7: Advanced Plugins
+Months 10-12
+Build 12 advanced plugins (A/B testing, AI writer, heatmaps, etc. — see section 8)
+Total timeline: ~35 weeks (8-9 months) to full plugin ecosystem
+18. Appendix: Plugin Examples
+Example 1: Simple Integration Plugin (Google Analytics)
+Minimal plugin that injects GA tracking script on published pages.
+// plugin.json
+{
+"name": "Google Analytics",
+"slug": "google-analytics",
+"version": "1.0.0",
+"category": "integration",
+"hooks": ["page.render"],
+"settings": {
+"measurement_id": {
+"type": "text",
+"label": "GA4 Measurement ID",
+"required": true
+}
+}
+}
+// plugin.php
+class GoogleAnalyticsPlugin extends BasePlugin
+{
+public function init()
+{
+$this->registerHook('page.render', [$this, 'injectScript']);
+}
+public function injectScript($page)
+{
+$id = $this->getSetting('measurement_id');
+return "<script async src='https://www.googletagmanager.com/gtag/js?id={$id}'></script>
+<script>window.dataLayer=window.dataLayer||[];function gtag(){dataLayer.push(arguments);}
+gtag('js',new Date());gtag('config','{$id}');</script>";
+}
+}
+Example 2: Element Plugin (Countdown Timer)
+Adds a draggable countdown timer element.
+// plugin.js (frontend)
+Plugin.registerElement({
+name: 'Countdown Timer',
+slug: 'countdown-timer',
+category: 'urgency',
+icon: '<svg>...</svg>',
+defaultContent: {
+endDate: '2026-12-31T23:59:59',
+mode: 'fixed',
+label: 'Offer ends in:'
+},
+inspectorFields: [
+{ type: 'datetime', key: 'endDate', label: 'End Date' },
+{ type: 'select', key: 'mode', label: 'Mode', options: ['fixed', 'evergreen', 'daily'] },
+{ type: 'text', key: 'label', label: 'Label' }
+],
+render(data) {
+return `
+<div class="countdown-timer">
+<p>${data.label}</p>
+<div id="timer" data-end="${data.endDate}" data-mode="${data.mode}">
+<span class="days">00</span>:<span class="hours">00</span>:
+<span class="minutes">00</span>:<span class="seconds">00</span>
+</div>
+</div>
+`;
+},
+script() {
+// Client-side JS to update timer
+const timer = document.getElementById('timer');
+const endDate = new Date(timer.dataset.end);
+setInterval(() => {
+const now = new Date();
+const diff = endDate - now;
+if (diff <= 0) return;
+const days = Math.floor(diff / (1000*60*60*24));
+const hours = Math.floor((diff % (1000*60*60*24)) / (1000*60*60));
+const mins = Math.floor((diff % (1000*60*60)) / (1000*60));
+const secs = Math.floor((diff % (1000*60)) / 1000);
+timer.querySelector('.days').textContent = String(days).padStart(2,'0');
+timer.querySelector('.hours').textContent = String(hours).padStart(2,'0');
+timer.querySelector('.minutes').textContent = String(mins).padStart(2,'0');
+timer.querySelector('.seconds').textContent = String(secs).padStart(2,'0');
+}, 1000);
+}
+});
+— End of Document —
+Plugin System Architecture PRD  •  Confidential

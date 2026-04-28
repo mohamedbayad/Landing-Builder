@@ -84,6 +84,19 @@ class AIModelRoleResolverService
             ->first();
 
         if (!$activeModel) {
+            $activeModel = $this->resolveGlobalAdminDefaultModel($role);
+            if ($activeModel) {
+                Log::info('AI role resolved from global admin default model', [
+                    'requested_workspace_id' => $workspaceId,
+                    'role' => $role,
+                    'provider_id' => $activeModel->ai_provider_id,
+                    'provider' => $activeModel->provider->provider ?? null,
+                    'model' => $activeModel->name,
+                ]);
+            }
+        }
+
+        if (!$activeModel) {
             // Check fallback to completely legacy `.env` config
             Log::warning("No active default AI Model found for role: {$role}. Falling back to default ENV configs.");
             
@@ -112,5 +125,30 @@ class AIModelRoleResolverService
             'apiKey' => $providerConfig->api_key,
             'baseUrl' => $providerConfig->base_url,
         ];
+    }
+
+    private function resolveGlobalAdminDefaultModel(string $role): ?AiModel
+    {
+        $roleFieldMap = [
+            'text_generation' => 'is_default_text_generation',
+            'image_generation' => 'is_default_image_generation',
+            'vision' => 'is_default_vision',
+            'vision_analysis' => 'is_default_vision',
+            'embeddings' => 'is_default_embeddings',
+            'audio' => 'is_default_audio',
+        ];
+
+        $booleanColumn = $roleFieldMap[$role] ?? 'is_default_text_generation';
+
+        return AiModel::where($booleanColumn, true)
+            ->whereHas('provider', function ($providerQuery) {
+                $providerQuery->where('is_active', true)
+                    ->whereHas('workspace.user.roles', function ($rolesQuery) {
+                        $rolesQuery->whereIn('slug', ['super-admin', 'admin']);
+                    });
+            })
+            ->with('provider')
+            ->orderByDesc('id')
+            ->first();
     }
 }

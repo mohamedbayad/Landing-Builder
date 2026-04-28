@@ -7,6 +7,7 @@ use App\Services\AI\Providers\OpenAIProvider;
 use App\Services\AI\Providers\AnthropicProvider;
 use App\Services\AI\Providers\GeminiProvider;
 use App\Services\AIModelRoleResolverService;
+use App\Support\AI\ProviderRegistry;
 use Exception;
 use Illuminate\Support\Facades\Log;
 
@@ -26,14 +27,27 @@ class AgentService
      */
     protected function resolveProvider(string $providerName, ?string $baseUrl = null): AIProviderInterface
     {
-        // Future proofing: Pass baseUrl to providers if they implement custom endpoints
-        return match (strtolower($providerName)) {
-            'openai' => new OpenAIProvider(),
+        $providerKey = strtolower($providerName);
+
+        return match ($providerKey) {
+            'openai', 'openrouter' => $this->createOpenAICompatibleProvider($providerKey, $baseUrl),
             'anthropic', 'claude' => new AnthropicProvider(),
             'gemini', 'google' => new GeminiProvider(),
             'custom', 'ollama' => $this->createOllamaProvider($baseUrl),
             default => throw new Exception("Unsupported AI provider configured: {$providerName}"),
         };
+    }
+
+    protected function createOpenAICompatibleProvider(string $providerName, ?string $baseUrl): OpenAIProvider
+    {
+        $defaultBaseUrl = ProviderRegistry::defaultBaseUrlFor($providerName) ?? ProviderRegistry::OPENAI_DEFAULT_BASE_URL;
+        $provider = new OpenAIProvider($defaultBaseUrl);
+
+        if ($baseUrl) {
+            $provider->setBaseUrl($baseUrl);
+        }
+
+        return $provider;
     }
 
     protected function createOllamaProvider(?string $baseUrl): \App\Services\AI\Providers\OllamaProvider
@@ -176,5 +190,82 @@ class AgentService
         Log::info("Requesting image generation from {$config['provider']} (Model: {$model})");
 
         return $providerInstance->generateImage($prompt, $model, $config['apiKey'], $options);
+    }
+
+    /**
+     * Generate a conversational reply for a list of chat messages.
+     */
+    public function chatReply(
+        array $messages,
+        string $systemPrompt = '',
+        string $role = 'text_generation',
+        ?int $workspaceId = null
+    ): string {
+        $config = $this->resolveRoleConfiguration($role, $workspaceId);
+        $providerInstance = $this->resolveProvider($config['provider'], $config['baseUrl']);
+
+        $normalized = collect($messages)
+            ->map(function ($message) {
+                if (!is_array($message)) {
+                    return null;
+                }
+
+                $role = strtolower((string) ($message['role'] ?? ''));
+                $content = trim((string) ($message['content'] ?? ''));
+
+                if (!in_array($role, ['user', 'assistant'], true) || $content === '') {
+                    return null;
+                }
+
+                return ['role' => $role, 'content' => $content];
+            })
+            ->filter()
+            ->values();
+
+        if ($normalized->isEmpty()) {
+            throw new Exception('Cannot generate chat reply without at least one valid message.');
+        }
+
+        $promptSections = [];
+
+        if ($systemPrompt !== '') {
+            $promptSections[] = "SYSTEM:\n" . $systemPrompt;
+        }
+
+        $conversation = $normalized
+            ->map(function (array $message) {
+                $label = $message['role'] === 'assistant' ? 'ASSISTANT' : 'USER';
+                return "{$label}: {$message['content']}";
+            })
+            ->implode("\n");
+
+        $promptSections[] = "CONVERSATION:\n" . $conversation;
+        $promptSections[] = 'Return only valid JSON in this exact shape: {"reply":"..."}';
+
+        $result = $providerInstance->generate(
+            implode("\n\n", $promptSections),
+            $config['model'],
+            $config['apiKey'],
+            null,
+            ['temperature' => 0.6]
+        );
+
+        if (!is_array($result)) {
+            throw new Exception('AI provider returned an invalid chat payload.');
+        }
+
+        $reply = $result['reply'] ?? $result['text'] ?? $result['content'] ?? $result['output'] ?? null;
+
+        if (is_array($reply)) {
+            $reply = json_encode($reply);
+        }
+
+        $reply = trim((string) $reply);
+
+        if ($reply === '') {
+            throw new Exception('AI provider returned an empty chat reply.');
+        }
+
+        return $reply;
     }
 }

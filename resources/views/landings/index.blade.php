@@ -17,9 +17,9 @@
                 <div class="p-6">
 
                     @if(session('status'))
-                        <div class="mb-6 p-4 rounded-lg bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-300 border border-green-100 dark:border-green-800">
+                        <x-ui.alert type="success" class="mb-6" dismissible>
                             {{ session('status') }}
-                        </div>
+                        </x-ui.alert>
                     @endif
 
                     @if($landings->count() > 0)

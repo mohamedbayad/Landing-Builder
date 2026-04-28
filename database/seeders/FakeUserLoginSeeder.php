@@ -39,6 +39,7 @@ class FakeUserLoginSeeder extends Seeder
                 [
                     'name' => $user['name'],
                     'password' => Hash::make($user['password']),
+                    'status' => 'active',
                     'email_verified_at' => now(),
                 ]
             );

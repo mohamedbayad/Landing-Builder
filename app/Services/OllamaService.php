@@ -2,6 +2,7 @@
 
 namespace App\Services;
 
+use App\Support\AI\ProviderRegistry;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Exception;
@@ -14,13 +15,13 @@ class OllamaService
     public function __construct()
     {
         // Read directly from services config, which reads from env
-        $this->baseUrl = rtrim(config('services.ollama.base_url', 'http://localhost:11434'), '/');
+        $this->baseUrl = ProviderRegistry::normalizeOllamaBaseUrl((string) config('services.ollama.base_url', ProviderRegistry::OLLAMA_FALLBACK_BASE_URL));
         $this->model = config('services.ollama.model', 'llama3');
     }
 
     public function setBaseUrl(string $url): self
     {
-        $this->baseUrl = rtrim($url, '/');
+        $this->baseUrl = ProviderRegistry::normalizeOllamaBaseUrl($url);
         return $this;
     }
 
@@ -71,15 +72,19 @@ class OllamaService
     {
         $url = "{$this->baseUrl}/api/generate";
         $model = $options['model'] ?? $this->model;
+        $apiKey = $options['api_key'] ?? null;
+        unset($options['api_key']);
         
         Log::info("Ollama: Generating text", ['model' => $model, 'url' => $url]);
 
-        $response = Http::timeout(240)->post($url, [
+        $response = $this->requestWithOptionalToken((string) $apiKey)
+            ->timeout(240)
+            ->post($url, [
             'model' => $model,
             'prompt' => $prompt,
             'stream' => false,
             'options' => $options
-        ]);
+            ]);
 
         if ($response->failed()) {
             $this->handleError($response);
@@ -95,10 +100,14 @@ class OllamaService
     {
         $url = "{$this->baseUrl}/api/generate";
         $model = $options['model'] ?? $this->model;
+        $apiKey = $options['api_key'] ?? null;
+        unset($options['api_key']);
 
         Log::info("Ollama: Generating structured JSON", ['model' => $model, 'url' => $url]);
 
-        $response = Http::timeout(300)->post($url, [
+        $response = $this->requestWithOptionalToken((string) $apiKey)
+            ->timeout(300)
+            ->post($url, [
             'model' => $model,
             'prompt' => $prompt,
             'stream' => false,
@@ -106,21 +115,38 @@ class OllamaService
             'options' => array_merge([
                 'temperature' => 0.7,
             ], $options)
-        ]);
+            ]);
 
         if ($response->failed()) {
             $this->handleError($response);
         }
 
+        $rawBody = (string) $response->body();
         $contentText = $response->json('response');
-        $decoded = json_decode($contentText, true);
 
-        if (json_last_error() !== JSON_ERROR_NONE) {
-            Log::error("Ollama: JSON Decoding Failed", ['content' => $contentText]);
-            throw new Exception("Ollama returned invalid JSON: " . json_last_error_msg());
+        $decoded = $this->decodeStructuredPayload($contentText);
+        if (is_array($decoded)) {
+            return $decoded;
         }
 
-        return $decoded;
+        // Fallback: sometimes providers return JSON directly in body or wrapped text.
+        $decodedFromBody = $this->decodeStructuredPayload($rawBody);
+        if (is_array($decodedFromBody)) {
+            return $decodedFromBody;
+        }
+
+        $preview = mb_substr(trim((string) ($contentText ?? $rawBody)), 0, 500);
+        Log::error("Ollama: JSON Decoding Failed", [
+            'response_field_type' => gettype($contentText),
+            'response_field_preview' => mb_substr(trim((string) $contentText), 0, 500),
+            'raw_body_preview' => mb_substr(trim($rawBody), 0, 500),
+        ]);
+
+        if ($preview === '') {
+            throw new Exception("Ollama returned empty response while JSON was expected.");
+        }
+
+        throw new Exception("Ollama returned non-JSON response while JSON was expected.");
     }
 
     /**
@@ -130,15 +156,19 @@ class OllamaService
     {
         $url = "{$this->baseUrl}/api/chat";
         $model = $options['model'] ?? $this->model;
+        $apiKey = $options['api_key'] ?? null;
+        unset($options['api_key']);
 
         Log::info("Ollama: Chat request", ['model' => $model, 'url' => $url]);
 
-        $response = Http::timeout(240)->post($url, [
+        $response = $this->requestWithOptionalToken((string) $apiKey)
+            ->timeout(240)
+            ->post($url, [
             'model' => $model,
             'messages' => $messages,
             'stream' => false,
             'options' => $options
-        ]);
+            ]);
 
         if ($response->failed()) {
             $this->handleError($response);
@@ -183,5 +213,55 @@ class OllamaService
         ]);
         
         throw new Exception("Ollama API Error ({$response->status()}): {$errorBody}");
+    }
+
+    protected function requestWithOptionalToken(?string $apiKey)
+    {
+        if (!empty($apiKey)) {
+            return Http::withToken($apiKey);
+        }
+
+        return Http::acceptJson();
+    }
+
+    /**
+     * Try to decode a structured JSON payload from raw model output.
+     */
+    protected function decodeStructuredPayload(mixed $payload): ?array
+    {
+        if (is_array($payload)) {
+            return $payload;
+        }
+
+        if (!is_string($payload)) {
+            return null;
+        }
+
+        $text = trim($payload);
+        if ($text === '') {
+            return null;
+        }
+
+        // Remove markdown code fences if present.
+        if (str_starts_with($text, '```')) {
+            $text = preg_replace('/^```(?:json)?\s*/i', '', $text) ?? $text;
+            $text = preg_replace('/\s*```$/', '', $text) ?? $text;
+            $text = trim($text);
+        }
+
+        $decoded = json_decode($text, true);
+        if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+            return $decoded;
+        }
+
+        // Extract first JSON object/array from noisy text.
+        if (preg_match('/(\{[\s\S]*\}|\[[\s\S]*\])/', $text, $match) === 1) {
+            $decoded = json_decode($match[1], true);
+            if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+                return $decoded;
+            }
+        }
+
+        return null;
     }
 }

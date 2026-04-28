@@ -37,4 +37,30 @@ class Workspace extends Model
     {
         return $this->hasOne(WorkspaceSetting::class);
     }
+
+    public function workspacePlugins()
+    {
+        return $this->hasMany(WorkspacePlugin::class);
+    }
+
+    public function plugins()
+    {
+        return $this->belongsToMany(Plugin::class, 'workspace_plugins')
+            ->withPivot([
+                'id',
+                'status',
+                'approved_permissions',
+                'settings',
+                'auto_update',
+                'activated_at',
+                'deactivated_at',
+                'last_error',
+            ])
+            ->withTimestamps();
+    }
+
+    public function activePlugins()
+    {
+        return $this->plugins()->wherePivot('status', 'active');
+    }
 }

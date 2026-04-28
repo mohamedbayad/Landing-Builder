@@ -35,10 +35,6 @@ return [
         ],
     ],
 
-    'licensing' => [
-        'url' => env('LICENSING_SERVER_URL', 'http://localhost:8000/api'),
-    ],
-
     'ai' => [
         'provider' => env('AI_PROVIDER'), // e.g., 'openai', 'anthropic', 'gemini'
         'model' => env('AI_MODEL'), // e.g., 'gpt-4o', 'claude-3-5-sonnet'
@@ -51,7 +47,7 @@ return [
     ],
 
     'ollama' => [
-        'base_url' => env('OLLAMA_BASE_URL', 'http://34.52.221.25:11434'),
+        'base_url' => env('OLLAMA_BASE_URL', 'https://ollama.com/api/tags'),
         'model' => env('OLLAMA_MODEL', 'llama3'),
     ],
 

@@ -3,9 +3,12 @@
 namespace App\Http\Controllers\API;
 
 use App\Http\Controllers\Controller;
+use App\Services\AI\Providers\OpenAIProvider;
+use App\Support\AI\ProviderRegistry;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class AISettingsController extends Controller
 {
@@ -14,44 +17,52 @@ class AISettingsController extends Controller
      */
     public function testConnection(Request $request)
     {
+        $allowedProviders = array_merge(ProviderRegistry::allowedProviderKeys(), ['ollama', 'claude', 'google']);
+
         $validated = $request->validate([
-            'provider' => 'required|string',
+            'provider' => ['required', 'string', Rule::in($allowedProviders)],
             'api_key' => 'nullable|string', // Optional for Ollama
             'base_url' => 'nullable|url',
         ]);
 
-        $provider = strtolower($validated['provider']);
-        $apiKey = $validated['api_key'];
+        $provider = $this->normalizeProviderKey($validated['provider']);
+        $apiKey = $validated['api_key'] ?? null;
         
         $models = [];
 
         try {
-            if ($provider === 'openai') {
-                $response = Http::withToken($apiKey)->get('https://api.openai.com/v1/models');
+            if (ProviderRegistry::requiresApiKey($provider) && empty($apiKey)) {
+                throw new \Exception(ProviderRegistry::labelFor($provider) . ' API key is required.');
+            }
+
+            if (ProviderRegistry::isOpenAICompatible($provider)) {
+                $response = Http::withToken($apiKey)
+                    ->timeout(15)
+                    ->get($this->openAICompatibleModelsUrl($provider, $validated['base_url'] ?? null));
                 
                 if ($response->failed()) {
                     throw new \Exception($response->json('error.message') ?? 'Invalid API key or connection error.');
                 }
 
-                // Filter down to chat models
                 $allModels = $response->json('data') ?? [];
                 foreach ($allModels as $m) {
-                    if (str_contains($m['id'], 'gpt')) {
-                        $models[] = [
-                            'id' => $m['id'],
-                            'name' => $m['id']
-                        ];
+                    $modelId = $m['id'] ?? null;
+                    if (!$modelId) {
+                        continue;
                     }
+
+                    $models[] = [
+                        'id' => $modelId,
+                        'name' => $modelId
+                    ];
                 }
-            } elseif ($provider === 'anthropic' || $provider === 'claude') {
+            } elseif ($provider === 'anthropic') {
                 // Anthropic doesn't have a direct /models listing endpoint right now that is universally accessible without proper headers in the same way,
                 // so we hardcode a valid test request or a predefined models list if the test passes.
                 $response = Http::withHeaders([
                     'x-api-key' => $apiKey,
                     'anthropic-version' => '2023-06-01',
-                    'content-type' => '
-                    
-                    application/json'
+                    'content-type' => 'application/json'
                 ])->post('https://api.anthropic.com/v1/messages', [
                     'model' => 'claude-3-haiku-20240307',
                     'max_tokens' => 1,
@@ -80,8 +91,8 @@ class AISettingsController extends Controller
                  }
 
                  $allModels = $response->json('models') ?? [];
-                 foreach ($allModels as $m) {
-                     if (str_contains($m['name'], 'gemini')) {
+                foreach ($allModels as $m) {
+                     if (str_contains(($m['name'] ?? ''), 'gemini')) {
                          $id = str_replace('models/', '', $m['name']);
                          $models[] = [
                              'id' => $id,
@@ -89,9 +100,13 @@ class AISettingsController extends Controller
                          ];
                      }
                  }
-            } elseif ($provider === 'ollama' || $provider === 'custom') {
-                $baseUrl = rtrim($request->base_url ?? 'http://localhost:11434', '/');
-                $response = Http::timeout(5)->get("{$baseUrl}/api/tags");
+            } elseif ($provider === 'custom') {
+                $baseUrl = ProviderRegistry::normalizeOllamaBaseUrl((string) ($request->base_url ?: ProviderRegistry::ollamaDefaultBaseUrl()));
+                $ollamaRequest = Http::timeout(5);
+                if (!empty($apiKey)) {
+                    $ollamaRequest = $ollamaRequest->withToken($apiKey);
+                }
+                $response = $ollamaRequest->get("{$baseUrl}/api/tags");
 
                 if ($response->failed()) {
                     throw new \Exception("Could not connect to Ollama at {$baseUrl}.");
@@ -129,5 +144,27 @@ class AISettingsController extends Controller
                 'message' => $e->getMessage()
             ], 400);
         }
+    }
+
+    protected function openAICompatibleModelsUrl(string $provider, ?string $baseUrl): string
+    {
+        $defaultBaseUrl = ProviderRegistry::defaultBaseUrlFor($provider) ?? ProviderRegistry::OPENAI_DEFAULT_BASE_URL;
+
+        $openAICompatibleProvider = new OpenAIProvider($defaultBaseUrl);
+        if (!empty($baseUrl)) {
+            $openAICompatibleProvider->setBaseUrl($baseUrl);
+        }
+
+        return rtrim($openAICompatibleProvider->getBaseUrl(), '/') . '/models';
+    }
+
+    protected function normalizeProviderKey(string $provider): string
+    {
+        return match (strtolower($provider)) {
+            'claude' => ProviderRegistry::ANTHROPIC,
+            'google' => ProviderRegistry::GEMINI,
+            'ollama' => ProviderRegistry::CUSTOM,
+            default => strtolower($provider),
+        };
     }
 }

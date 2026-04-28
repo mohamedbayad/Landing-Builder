@@ -2,10 +2,9 @@
 
 namespace App\Http\Controllers;
 
-use App\Services\LicenseService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
-use Illuminate\Support\Facades\Cache;
+use Illuminate\Validation\Rule;
 
 class SettingsController extends Controller
 {
@@ -22,59 +21,19 @@ class SettingsController extends Controller
             $workspace->refresh();
         }
 
-        return view('settings.index', compact('workspace'));
+        $workspaceLandings = $workspace->landings()
+            ->select(['id', 'name', 'slug', 'status'])
+            ->orderByDesc('id')
+            ->limit(150)
+            ->get();
+
+        return view('settings.index', compact('workspace', 'workspaceLandings'));
     }
 
-    public function update(Request $request, LicenseService $licenseService)
+    public function update(Request $request)
     {
         $workspace = Auth::user()->workspaces()->first();
         $settings = $workspace->settings;
-
-        // License Activation
-        if ($request->has('license_key')) {
-            $validated = $request->validate([
-                'license_key' => 'required|string',
-            ]);
-
-            $result = $licenseService->activate($validated['license_key']);
-
-            if ($result['success']) {
-                $settings->update([
-                    'license_key' => $validated['license_key'],
-                    'license_status' => 'active',
-                    'license_data' => $result,
-                ]);
-                
-                // Cache the token for middleware usage
-                Cache::put('license_token', $result['token'], now()->addDays(30)); 
-                // Also cache the verified status so realtime middleware doesn't need to call server immediately
-                Cache::put('license_verified_status', 'active', now()->addMinutes(5));
-
-                return redirect()->route('settings.index')->with('status', 'license-activated');
-            } else {
-                // If the user tried to re-activate the CURRENT key and it failed, mark as inactive
-                if ($settings->license_key === $validated['license_key']) {
-                     $settings->update(['license_status' => 'inactive']);
-                     Cache::forget('license_token');
-                }
-
-                return redirect()->route('settings.index')
-                    ->with('error', $result['message'])
-                    ->withInput(); // Keep the key in input
-            }
-        }
-        
-        // Manual Deactivation / Removal
-        if ($request->has('remove_license')) {
-             $settings->update([
-                'license_key' => null,
-                'license_status' => 'inactive',
-                'license_data' => null,
-            ]);
-            Cache::forget('license_token');
-            Cache::forget('license_verified_status');
-            return redirect()->route('settings.index')->with('status', 'license-removed');
-        }
 
         // Basic Workspace Fields (Payment, Currency)
         $activeTab = 'theme';
@@ -150,6 +109,59 @@ class SettingsController extends Controller
             }
 
             $settings->update($validatedAI);
+        }
+
+        // Subscriber Chatbot CTA Settings
+        if ($request->has('chatbot_cta_settings_check')) {
+            $activeTab = 'ai_settings';
+            $validatedChatbotCta = $request->validate([
+                'chatbot_custom_cta_enabled' => 'nullable|in:1,0,on,off',
+                'chatbot_custom_cta_text' => 'nullable|string|max:120',
+                'chatbot_custom_cta_type' => ['nullable', 'string', Rule::in(['form', 'whatsapp', 'instagram', 'custom_link', 'custom_phone'])],
+                'chatbot_custom_cta_target' => 'nullable|string|max:255',
+                'chatbot_custom_cta_landing_id' => [
+                    'nullable',
+                    'integer',
+                    Rule::exists('landings', 'id')->where(fn ($query) => $query->where('workspace_id', $workspace->id)),
+                ],
+            ]);
+
+            $isEnabled = $request->has('chatbot_custom_cta_enabled');
+            $ctaType = (string) ($validatedChatbotCta['chatbot_custom_cta_type'] ?? 'form');
+            $ctaText = trim((string) ($validatedChatbotCta['chatbot_custom_cta_text'] ?? ''));
+            $ctaTarget = trim((string) ($validatedChatbotCta['chatbot_custom_cta_target'] ?? ''));
+            $landingId = $validatedChatbotCta['chatbot_custom_cta_landing_id'] ?? null;
+
+            if ($ctaType === 'whatsapp' || $ctaType === 'custom_phone') {
+                $normalizedPhone = preg_replace('/[^0-9+]/', '', $ctaTarget) ?? '';
+                if ($isEnabled && $normalizedPhone === '') {
+                    return redirect()
+                        ->route('settings.index')
+                        ->withErrors(['chatbot_custom_cta_target' => 'Please enter a valid phone number for this CTA type.'])
+                        ->withInput()
+                        ->with(['activeTab' => 'ai_settings']);
+                }
+                $ctaTarget = $normalizedPhone;
+            }
+
+            if ($ctaType === 'instagram' || $ctaType === 'custom_link') {
+                $isValidUrl = $ctaTarget === '' ? false : filter_var($ctaTarget, FILTER_VALIDATE_URL) !== false;
+                if ($isEnabled && !$isValidUrl) {
+                    return redirect()
+                        ->route('settings.index')
+                        ->withErrors(['chatbot_custom_cta_target' => 'Please enter a valid URL for this CTA type.'])
+                        ->withInput()
+                        ->with(['activeTab' => 'ai_settings']);
+                }
+            }
+
+            $settings->update([
+                'chatbot_custom_cta_enabled' => $isEnabled,
+                'chatbot_custom_cta_text' => $ctaText !== '' ? $ctaText : null,
+                'chatbot_custom_cta_type' => $ctaType,
+                'chatbot_custom_cta_target' => $ctaTarget !== '' ? $ctaTarget : null,
+                'chatbot_custom_cta_landing_id' => $landingId,
+            ]);
         }
 
         return redirect()->route('settings.index')->with(['status' => 'settings-updated', 'activeTab' => $activeTab]);

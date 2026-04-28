@@ -3,7 +3,11 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\Plan;
+use App\Models\Role;
+use App\Models\Subscription;
 use App\Models\User;
+use App\Models\Workspace;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -40,6 +44,32 @@ class RegisteredUserController extends Controller
             'email' => $request->email,
             'password' => Hash::make($request->password),
         ]);
+
+        $subscriberRole = Role::query()->where('slug', 'subscriber')->first();
+        if ($subscriberRole) {
+            $user->roles()->syncWithoutDetaching([$subscriberRole->id]);
+        }
+
+        Workspace::firstOrCreate(
+            ['user_id' => $user->id],
+            ['name' => $user->name . "'s Workspace"]
+        );
+
+        $starterPlan = Plan::query()->where('slug', 'starter')->first();
+        if ($starterPlan) {
+            $trialDays = max((int) ($starterPlan->trial_days ?? 0), 0);
+            Subscription::firstOrCreate(
+                ['user_id' => $user->id, 'plan_id' => $starterPlan->id],
+                [
+                    'status' => $trialDays > 0 ? 'trial' : 'active',
+                    'billing_cycle' => 'monthly',
+                    'payment_status' => 'pending',
+                    'starts_at' => now(),
+                    'ends_at' => $trialDays > 0 ? now()->addDays($trialDays) : now()->addMonth(),
+                    'renews_at' => $trialDays > 0 ? now()->addDays($trialDays) : now()->addMonth(),
+                ]
+            );
+        }
 
         event(new Registered($user));
 

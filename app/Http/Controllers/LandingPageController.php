@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Landing;
 use App\Models\LandingPage;
+use App\Models\WorkspacePlugin;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\File;
@@ -89,9 +90,9 @@ class LandingPageController extends Controller
                     transform: none !important;
                     filter: none !important;
                 }
-                .hidden:not(.slide-solution),
-                .invisible:not(.slide-solution),
-                .opacity-0:not(.slide-solution) {
+                .hidden,
+                .invisible,
+                .opacity-0 {
                     opacity: 1 !important;
                     visibility: visible !important;
                 }
@@ -144,11 +145,26 @@ class LandingPageController extends Controller
         // Complex imported templates (external JS/importmaps) are safer in HTML mode.
         $forceHtmlMode = !empty((string) $page->js) || str_starts_with((string) $landing->source, 'remote-template:');
 
-        // Editor-safe mode: avoid running heavy module scripts (ThreeJS/ScrollTrigger scenes)
+        // Editor-safe mode: avoid running heavy module scripts (for example large WebGL scenes)
         // that can pin/hide sections inside GrapesJS iframe.
         $disableModuleScripts = str_starts_with((string) $landing->source, 'remote-template:');
 
-        return view('editor', compact('landing', 'page', 'editorCustomHead', 'forceHtmlMode', 'disableModuleScripts'));
+        $activeEditorPlugins = WorkspacePlugin::query()
+            ->with('plugin:id,slug,hooks,is_active')
+            ->where('workspace_id', $landing->workspace_id)
+            ->where('status', 'active')
+            ->get()
+            ->filter(fn (WorkspacePlugin $workspacePlugin) => $workspacePlugin->plugin && $workspacePlugin->plugin->is_active)
+            ->map(function (WorkspacePlugin $workspacePlugin) {
+                return [
+                    'slug' => $workspacePlugin->plugin->slug,
+                    'hooks' => is_array($workspacePlugin->plugin->hooks) ? $workspacePlugin->plugin->hooks : [],
+                    'settings' => is_array($workspacePlugin->settings) ? $workspacePlugin->settings : [],
+                ];
+            })
+            ->values();
+
+        return view('editor', compact('landing', 'page', 'editorCustomHead', 'forceHtmlMode', 'disableModuleScripts', 'activeEditorPlugins'));
     }
 
     public function update(Request $request, Landing $landing, LandingPage $page)
@@ -186,9 +202,6 @@ class LandingPageController extends Controller
             $validated['html'] = preg_replace('/transform:\s*none\s*!important;\s*/i', '', $validated['html']);
             $validated['html'] = preg_replace('/filter:\s*none\s*!important;\s*/i', '', $validated['html']);
 
-            // Remove editor/runtime GSAP pin artifacts from marked GSAP sections before persisting.
-            $validated['html'] = $this->stripEditorRuntimeAnimationStyles((string) $validated['html']);
-            
             // Clean up empty style attributes left behind
             $validated['html'] = str_replace(' style=""', '', $validated['html']);
         }
@@ -429,12 +442,9 @@ class LandingPageController extends Controller
                 $parts[] = 'active';
             }
 
-            $hasSlideSolution = in_array('slide-solution', $parts, true);
-            if (!$hasSlideSolution) {
-                $parts = array_values(array_filter($parts, function ($c) {
-                    return !in_array($c, ['hidden', 'invisible', 'opacity-0'], true);
-                }));
-            }
+            $parts = array_values(array_filter($parts, function ($c) {
+                return !in_array($c, ['hidden', 'invisible', 'opacity-0'], true);
+            }));
 
             return 'class=' . $quote . implode(' ', array_unique($parts)) . $quote;
         }, $html) ?? $html;
@@ -553,174 +563,4 @@ class LandingPageController extends Controller
         return null;
     }
 
-    /**
-     * Remove editor/runtime pinning styles that must never be persisted.
-     * Targets GSAP/ScrollTrigger artifacts inside marked GSAP sections:
-     * - [data-gsap-section]
-     * - legacy fallback: #solution
-     */
-    protected function stripEditorRuntimeAnimationStyles(string $html): string
-    {
-        if ($html === '') {
-            return '';
-        }
-
-        libxml_use_internal_errors(true);
-        $dom = new \DOMDocument('1.0', 'UTF-8');
-        $loaded = $dom->loadHTML('<?xml encoding="utf-8" ?>' . $html, LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
-        libxml_clear_errors();
-        if (!$loaded) {
-            return $html;
-        }
-
-        $xpath = new \DOMXPath($dom);
-        $containsClassExpr = "contains(concat(' ', normalize-space(@class), ' '), ' %s ')";
-        $gsapSectionExpr = '(@data-gsap-section) or (@id="solution")';
-
-        // Remove ScrollTrigger wrappers captured from editor runtime for GSAP-marked sections only.
-        $pinSpacers = $xpath->query('//*[' . sprintf($containsClassExpr, 'pin-spacer') . ' and .//*[' . $gsapSectionExpr . ']]');
-        if ($pinSpacers instanceof \DOMNodeList && $pinSpacers->length > 0) {
-            $spacers = [];
-            foreach ($pinSpacers as $spacer) {
-                $spacers[] = $spacer;
-            }
-            foreach ($spacers as $spacer) {
-                $parent = $spacer->parentNode;
-                if (!$parent) {
-                    continue;
-                }
-                while ($spacer->firstChild) {
-                    $parent->insertBefore($spacer->firstChild, $spacer);
-                }
-                $parent->removeChild($spacer);
-            }
-        }
-
-        $runtimeLayoutProps = [
-            'position', 'top', 'right', 'bottom', 'left', 'inset',
-            'width', 'height', 'max-width', 'max-height', 'min-height',
-            'margin', 'padding', 'box-sizing', 'transform', 'translate',
-            'rotate', 'scale',
-        ];
-        $slideVisibilityProps = ['display', 'opacity', 'visibility', 'transform', 'filter', 'pointer-events'];
-
-        $hasRuntimeSignature = function (string $style): bool {
-            return (bool) preg_match(
-                '/(position\s*:\s*fixed|inset\s*:|translate\s*:|rotate\s*:|scale\s*:|max-height\s*:\s*1px|height\s*:\s*1px|top\s*:\s*0px|left\s*:\s*0px)/i',
-                $style
-            );
-        };
-
-        $parseStyle = function (string $style): array {
-            $map = [];
-            $parts = preg_split('/\s*;\s*/', trim($style)) ?: [];
-            foreach ($parts as $part) {
-                if ($part === '' || !str_contains($part, ':')) {
-                    continue;
-                }
-                [$name, $value] = explode(':', $part, 2);
-                $prop = strtolower(trim($name));
-                if ($prop === '') {
-                    continue;
-                }
-                $map[$prop] = trim($value);
-            }
-            return $map;
-        };
-
-        $serializeStyle = function (array $styleMap): string {
-            $chunks = [];
-            foreach ($styleMap as $name => $value) {
-                if ($value === '') {
-                    continue;
-                }
-                $chunks[] = $name . ': ' . $value;
-            }
-            return implode('; ', $chunks);
-        };
-
-        $removeStyleProps = function (\DOMElement $el, array $props) use ($parseStyle, $serializeStyle): void {
-            $style = (string) $el->getAttribute('style');
-            if ($style === '') {
-                return;
-            }
-            $styleMap = $parseStyle($style);
-            foreach ($props as $prop) {
-                unset($styleMap[strtolower($prop)]);
-            }
-            $newStyle = trim($serializeStyle($styleMap));
-            if ($newStyle === '') {
-                $el->removeAttribute('style');
-            } else {
-                $el->setAttribute('style', $newStyle);
-            }
-        };
-
-        // Ensure each GSAP section keeps a real height in preview/publish.
-        // Many GSAP scenes use absolute layers, so without a base height class
-        // ScrollTrigger may pin a ~1px section.
-        $gsapSections = $xpath->query('//*[' . $gsapSectionExpr . ']');
-        if ($gsapSections instanceof \DOMNodeList) {
-            foreach ($gsapSections as $sectionRoot) {
-                if (!($sectionRoot instanceof \DOMElement)) {
-                    continue;
-                }
-
-                if (!$sectionRoot->hasAttribute('data-gsap-section')) {
-                    $sectionId = trim((string) $sectionRoot->getAttribute('id'));
-                    $sectionRoot->setAttribute('data-gsap-section', $sectionId !== '' ? $sectionId : 'section');
-                }
-
-                $classAttr = (string) $sectionRoot->getAttribute('class');
-                $hasHeightClass = (bool) preg_match('/\b(min-h-screen|min-h-\[[^\]]+\]|h-screen|h-\[[^\]]+\])\b/i', $classAttr);
-                if (!$hasHeightClass) {
-                    $newClass = trim($classAttr . ' min-h-screen');
-                    $sectionRoot->setAttribute('class', $newClass);
-                }
-
-                $runtimeNodes = $xpath->query('.//*[@style] | self::*[@style]', $sectionRoot);
-                if ($runtimeNodes instanceof \DOMNodeList) {
-                    foreach ($runtimeNodes as $node) {
-                        if (!($node instanceof \DOMElement) || !$node->hasAttribute('style')) {
-                            continue;
-                        }
-                        $style = (string) $node->getAttribute('style');
-                        if (!$hasRuntimeSignature($style)) {
-                            continue;
-                        }
-                        $removeStyleProps($node, $runtimeLayoutProps);
-                    }
-                }
-
-                $gsapItemNodes = $xpath->query(
-                    './/*[' . sprintf($containsClassExpr, 'slide-solution') . ' or @data-gsap-item][@style]',
-                    $sectionRoot
-                );
-                if ($gsapItemNodes instanceof \DOMNodeList) {
-                    foreach ($gsapItemNodes as $itemNode) {
-                        if ($itemNode instanceof \DOMElement) {
-                            $removeStyleProps($itemNode, $slideVisibilityProps);
-                        }
-                    }
-                }
-            }
-        }
-
-        $body = $dom->getElementsByTagName('body')->item(0);
-        if (!$body) {
-            $fallback = $dom->saveHTML();
-            if (is_string($fallback) && $fallback !== '') {
-                $fallback = preg_replace('/^\s*<\?xml[^>]*\?>\s*/i', '', $fallback) ?? $fallback;
-                return $fallback;
-            }
-            return $html;
-        }
-
-        $output = '';
-        foreach ($body->childNodes as $child) {
-            $output .= $dom->saveHTML($child);
-        }
-
-        return $output !== '' ? $output : $html;
-    }
 }

@@ -14,7 +14,7 @@
     @if($landing->enable_cart)
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.14.8/dist/cdn.min.js"></script>
     @endif
-    {{-- NOTE: @vite removed from public pages — admin CSS/JS is not needed here.
+    {{-- NOTE: @vite removed from public pages -- admin CSS/JS is not needed here.
          Page-specific CSS is rendered inline via $page->css below.
          For production, pre-compile Tailwind per-landing with CLI. --}}
     
@@ -364,6 +364,385 @@
             display: inline-flex;
         }
 
+        .lp-ai-chat {
+            position: fixed;
+            right: 20px;
+            bottom: 18px;
+            z-index: 2147483000;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            pointer-events: none;
+            font-family: "Segoe UI", "Inter", "Helvetica Neue", Arial, sans-serif;
+        }
+
+        .lp-ai-chat__intro {
+            width: min(330px, calc(100vw - 34px));
+            background: #ffffff;
+            color: #17223b;
+            border: 1px solid #d6deeb;
+            border-radius: 12px;
+            box-shadow: 0 10px 28px rgba(15, 23, 42, 0.16);
+            padding: 12px 12px 11px;
+            pointer-events: auto;
+            cursor: pointer;
+            opacity: 0;
+            transform: translateY(6px);
+            visibility: hidden;
+            transition: opacity .18s ease, transform .18s ease, visibility .18s ease;
+            position: absolute;
+            right: 2px;
+            bottom: 74px;
+            z-index: 2;
+        }
+
+        .lp-ai-chat__intro.is-visible {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+        }
+
+        .lp-ai-chat__intro::after {
+            content: "";
+            position: absolute;
+            right: 23px;
+            bottom: -8px;
+            width: 13px;
+            height: 13px;
+            background: #ffffff;
+            border-right: 1px solid #d6deeb;
+            border-bottom: 1px solid #d6deeb;
+            transform: rotate(45deg);
+        }
+
+        .lp-ai-chat__intro-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            margin-bottom: 5px;
+        }
+
+        .lp-ai-chat__intro-title {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.2;
+            font-weight: 700;
+            color: #1c2f57;
+        }
+
+        .lp-ai-chat__intro-close {
+            width: 20px;
+            height: 20px;
+            border: 0;
+            border-radius: 999px;
+            background: transparent;
+            color: #5b6e92;
+            font-size: 17px;
+            line-height: 1;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .15s ease, color .15s ease;
+        }
+
+        .lp-ai-chat__intro-close:hover {
+            color: #22365f;
+            background: #edf1f8;
+        }
+
+        .lp-ai-chat__intro-text {
+            margin: 0;
+            font-size: 12px;
+            line-height: 1.48;
+            color: #405577;
+            font-weight: 500;
+        }
+
+        .lp-ai-chat__toggle {
+            width: 54px;
+            height: 54px;
+            border: 0;
+            border-radius: 999px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #ffffff;
+            background: linear-gradient(180deg, #3e63f3 0%, #2e4ecf 100%);
+            box-shadow: 0 12px 24px rgba(37, 99, 235, 0.3);
+            transition: transform .16s ease, box-shadow .2s ease, filter .2s ease;
+            pointer-events: auto;
+            cursor: pointer;
+        }
+
+        .lp-ai-chat__toggle:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 16px 32px rgba(37, 99, 235, 0.36);
+            filter: brightness(1.03);
+        }
+
+        .lp-ai-chat__panel {
+            width: min(360px, calc(100vw - 26px));
+            max-height: min(74vh, 600px);
+            display: flex;
+            flex-direction: column;
+            border-radius: 14px;
+            overflow: hidden;
+            color: #1e2d49;
+            background: #ffffff;
+            border: 1px solid #d4deed;
+            box-shadow: 0 20px 44px rgba(15, 23, 42, 0.24);
+            opacity: 0;
+            transform: translateY(8px);
+            transform-origin: bottom right;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .16s ease, transform .16s ease, visibility .16s ease;
+            position: absolute;
+            right: 0;
+            bottom: 74px;
+            z-index: 3;
+        }
+
+        .lp-ai-chat__panel.is-open,
+        .lp-ai-chat.is-open .lp-ai-chat__panel {
+            opacity: 1;
+            visibility: visible;
+            transform: translateY(0);
+            pointer-events: auto;
+        }
+
+        .lp-ai-chat__head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 12px 14px;
+            background: #f8fbff;
+            border-bottom: 1px solid #dbe3ef;
+        }
+
+        .lp-ai-chat__title {
+            margin: 0;
+            font-size: 17px;
+            line-height: 1.25;
+            font-weight: 700;
+            color: #22345d;
+        }
+
+        .lp-ai-chat__subtitle {
+            margin: 3px 0 0;
+            font-size: 12px;
+            color: #607395;
+            font-weight: 500;
+        }
+
+        .lp-ai-chat__close {
+            border: 0;
+            background: transparent;
+            color: #5f7296;
+            width: 24px;
+            height: 24px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 20px;
+            line-height: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            transition: background-color .15s ease, color .15s ease;
+        }
+
+        .lp-ai-chat__close:hover {
+            background: #e9eff8;
+            color: #1d2f56;
+        }
+
+        .lp-ai-chat__messages {
+            padding: 12px;
+            min-height: 112px;
+            max-height: 350px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            background: #f3f7fc;
+        }
+
+        .lp-ai-chat__message {
+            max-width: 92%;
+            border-radius: 12px;
+            padding: 10px 12px;
+            font-size: 13.5px;
+            line-height: 1.46;
+            white-space: pre-wrap;
+            word-break: break-word;
+            opacity: 0;
+            transform: translateY(6px);
+            transition: opacity .16s ease, transform .16s ease;
+        }
+
+        .lp-ai-chat__message.is-visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .lp-ai-chat__message--assistant {
+            align-self: flex-start;
+            background: #ffffff;
+            color: #213252;
+            border: 1px solid #d7e0ee;
+            box-shadow: 0 2px 8px rgba(15, 23, 42, 0.05);
+        }
+
+        .lp-ai-chat__message--user {
+            align-self: flex-end;
+            color: #ffffff;
+            background: linear-gradient(180deg, #4a69f3 0%, #3655de 100%);
+            box-shadow: 0 6px 14px rgba(54, 85, 222, 0.22);
+        }
+
+        .lp-ai-chat__composer {
+            padding: 10px;
+            border-top: 1px solid #dbe3ef;
+            background: #f8fbff;
+        }
+
+        .lp-ai-chat__status {
+            margin: 0 0 8px;
+            font-size: 11px;
+            line-height: 1.42;
+            color: #647998;
+            font-weight: 500;
+        }
+
+        .lp-ai-chat__status.is-error {
+            color: #b91c1c;
+        }
+
+        .lp-ai-chat__form {
+            display: flex;
+            align-items: flex-end;
+            gap: 7px;
+        }
+
+        .lp-ai-chat__input {
+            flex: 1;
+            resize: none;
+            min-height: 38px;
+            max-height: 110px;
+            border-radius: 10px;
+            border: 1px solid #c3d0e4;
+            background: #ffffff;
+            color: #1a2e4f;
+            padding: 8px 10px;
+            font-size: 14px;
+            line-height: 1.35;
+            outline: none;
+            transition: border-color .15s ease, box-shadow .15s ease;
+        }
+
+        .lp-ai-chat__input:focus {
+            border-color: #5b74dc;
+            box-shadow: 0 0 0 3px rgba(91, 116, 220, 0.16);
+        }
+
+        .lp-ai-chat__send {
+            border: 0;
+            border-radius: 10px;
+            height: 38px;
+            min-width: 76px;
+            padding: 0 14px;
+            font-size: 14px;
+            font-weight: 700;
+            color: #ffffff;
+            background: linear-gradient(180deg, #4f6ef2 0%, #3654d8 100%);
+            cursor: pointer;
+            transition: transform .15s ease, opacity .15s ease, box-shadow .15s ease;
+        }
+
+        .lp-ai-chat__send:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 14px rgba(54, 84, 216, 0.28);
+        }
+
+        .lp-ai-chat__send:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .lp-ai-chat__action-wrap {
+            display: flex;
+            justify-content: flex-start;
+        }
+
+        .lp-ai-chat__action-btn {
+            border: 0;
+            border-radius: 10px;
+            background: #f97316;
+            color: #ffffff;
+            padding: 9px 14px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            box-shadow: 0 8px 16px rgba(249, 115, 22, 0.28);
+        }
+
+        .lp-ai-chat__action-btn:hover {
+            filter: brightness(1.04);
+        }
+
+        .lp-ai-chat__typing {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .lp-ai-chat__typing-label {
+            font-size: 12px;
+            font-weight: 500;
+            color: #4c5f7f;
+        }
+
+        .lp-ai-chat__typing-dots {
+            display: inline-flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .lp-ai-chat__typing-dots span {
+            width: 6px;
+            height: 6px;
+            border-radius: 999px;
+            background: #7388ab;
+            animation: lp-ai-chat-dot 1.1s infinite ease-in-out;
+        }
+
+        .lp-ai-chat__typing-dots span:nth-child(2) {
+            animation-delay: .15s;
+        }
+
+        .lp-ai-chat__typing-dots span:nth-child(3) {
+            animation-delay: .3s;
+        }
+
+        .lp-ai-chat__target-flash {
+            animation: lp-ai-chat-flash 1.4s ease;
+        }
+
+        @keyframes lp-ai-chat-dot {
+            0%, 80%, 100% { opacity: .35; transform: translateY(0); }
+            40% { opacity: 1; transform: translateY(-2px); }
+        }
+
+        @keyframes lp-ai-chat-flash {
+            0% { box-shadow: 0 0 0 0 rgba(79, 70, 229, .55); }
+            100% { box-shadow: 0 0 0 16px rgba(79, 70, 229, 0); }
+        }
+
         @media (max-width: 1160px) {
             .lp-context {
                 display: none;
@@ -388,6 +767,23 @@
             .lp-adminbar {
                 gap: 8px;
                 padding-inline: 8px;
+            }
+
+            .lp-ai-chat {
+                right: 10px;
+                bottom: 10px;
+            }
+
+            .lp-ai-chat__intro {
+                width: min(330px, calc(100vw - 20px));
+                right: 0;
+                bottom: 72px;
+            }
+
+            .lp-ai-chat__panel {
+                width: min(360px, calc(100vw - 14px));
+                max-height: min(72vh, 520px);
+                bottom: 72px;
             }
         }
     </style>
@@ -859,6 +1255,45 @@
         @endif
     @endif
 
+    @php
+        $countryCode = strtoupper((string) ($visitorCountryCode ?? 'XX'));
+        $countryName = trim((string) ($visitorCountryName ?? 'Unknown'));
+        $offerLabelForChat = trim((string) ($landing->name ?? 'this offer'));
+        $offerLabelForChat = $offerLabelForChat !== '' ? $offerLabelForChat : 'this offer';
+        if (preg_match('/\b(template|html|css|js|seed|seeder|code)\b/i', $offerLabelForChat) === 1) {
+            $offerLabelForChat = 'cette offre';
+        }
+        $pageHtmlForWelcome = (string) ($page->html ?? '');
+        $lpPromiseSnippet = '';
+        if (preg_match('/<h1\b[^>]*>(.*?)<\/h1>/is', $pageHtmlForWelcome, $headingMatch) || preg_match('/<h2\b[^>]*>(.*?)<\/h2>/is', $pageHtmlForWelcome, $headingMatch)) {
+            $lpPromiseSnippet = html_entity_decode(strip_tags((string) ($headingMatch[1] ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+            $lpPromiseSnippet = trim((string) preg_replace('/\s+/u', ' ', $lpPromiseSnippet));
+            $lpPromiseSnippet = \Illuminate\Support\Str::limit($lpPromiseSnippet, 90, '...');
+        }
+
+        $countryMessages = [
+            'MA' => 'Marhba! Ana AI assistant dyal "' . $offerLabelForChat . '". Nchrah lik l offer, nsowlk 1-2 as2ila 3la hadafk w budget, w n3tik ahsan next step bach twali lead.',
+            'FR' => 'Bienvenue. Je suis votre assistant commercial pour "' . $offerLabelForChat . '". Je peux expliquer l offre, qualifier votre besoin, puis vous guider vers la meilleure action pour demarrer.',
+            'US' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I will clarify the offer, ask 1-2 qualification questions, then guide you to the best next step.',
+            'GB' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain the offer, qualify your goals, and point you to the best action on this page.',
+            'ES' => 'Bienvenido. Soy tu asistente comercial para "' . $offerLabelForChat . '". Te explico la oferta, te hago 1-2 preguntas clave y te guio al mejor siguiente paso.',
+            'DE' => 'Willkommen. Ich bin Ihr Vertriebsassistent fuer "' . $offerLabelForChat . '". Ich erklaere das Angebot, stelle 1-2 Qualifizierungsfragen und fuehre Sie zum besten naechsten Schritt.',
+            'IT' => 'Benvenuto. Sono il tuo assistente commerciale per "' . $offerLabelForChat . '". Ti spiego l offerta, faccio 1-2 domande chiave e ti guido al prossimo passo migliore.',
+            'AE' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain the offer, qualify your needs, and guide you to the best next step on this page.',
+            'SA' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I will help you understand the offer, qualify your goal, and guide you to the right action.',
+            'EG' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can clarify the offer, qualify your need, and guide you to the best next step quickly.',
+        ];
+        $defaultCountryMessage = 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain this offer, ask a few qualification questions, and guide you to the best next step.';
+        $countryWelcomeText = $countryMessages[$countryCode] ?? $defaultCountryMessage;
+        if ($lpPromiseSnippet !== '') {
+            $countryWelcomeText .= ' Main promise on this page: "' . $lpPromiseSnippet . '".';
+        }
+        $countryWelcomeTitle = $countryName !== '' && $countryName !== 'Unknown'
+            ? 'Special Welcome - ' . $countryName
+            : 'Special Welcome';
+    @endphp
+
+
     <!-- Facebook Pixel -->
     @if($landing->settings && $landing->settings->fb_pixel_id)
         <script>
@@ -906,7 +1341,6 @@
     <script src="/js/lp-slider-runtime.js" defer></script>
     <script src="/js/analytics.js?v={{ filemtime(public_path('js/analytics.js')) }}" defer></script>
     <script src="/js/exit-intent.js" defer></script>
-
     <!-- Settings & WhatsApp Application -->
     @php
         $wsSettings = $landing->workspace->settings ?? null;
@@ -1146,6 +1580,360 @@
         });
     </script>
     @endauth
+
+    @php
+        $showAiChatbot = !auth()->check() || !auth()->user()->hasAnyRole(['super-admin', 'admin']);
+    @endphp
+    @if($showAiChatbot)
+    @php
+        $aiWelcome = $countryWelcomeText;
+        $isPlaceholderPromise = $lpPromiseSnippet !== '' && (
+            str_contains(mb_strtolower($lpPromiseSnippet), 'insert your html here')
+            || str_contains(mb_strtolower($lpPromiseSnippet), 'templateseeder.php')
+        );
+        $offerAnchor = (!$isPlaceholderPromise && $lpPromiseSnippet !== '')
+            ? $lpPromiseSnippet
+            : (trim((string) optional($landing->settings)->meta_title) ?: $offerLabelForChat);
+        $offerAnchor = \Illuminate\Support\Str::limit($offerAnchor, 95, '...');
+        $aiCommercialIntro = 'Bonjour. Je peux vous expliquer cette offre, ses avantages, et vous orienter vers la meilleure prochaine etape.';
+    @endphp
+    <div id="lp-ai-chat" class="lp-ai-chat" data-endpoint="{{ route('public.ai.chat') }}" data-landing-id="{{ $landing->id }}" data-page-id="{{ $page->id ?? '' }}">
+        <div id="lp-ai-chat-intro" class="lp-ai-chat__intro is-visible" role="status" aria-live="polite">
+            <div class="lp-ai-chat__intro-head">
+                <p class="lp-ai-chat__intro-title">Assistant de l'offre</p>
+                <button id="lp-ai-chat-intro-close" class="lp-ai-chat__intro-close" type="button" aria-label="Fermer l intro">&times;</button>
+            </div>
+            <p class="lp-ai-chat__intro-text">{{ $aiCommercialIntro }}</p>
+        </div>
+        <div id="lp-ai-chat-panel" class="lp-ai-chat__panel" aria-hidden="true">
+            <div class="lp-ai-chat__head">
+                <div>
+                    <p class="lp-ai-chat__title">Assistant Offre</p>
+                    <p class="lp-ai-chat__subtitle">Je vous aide a comprendre cette offre et a choisir la meilleure suite.</p>
+                </div>
+                <button id="lp-ai-chat-close" class="lp-ai-chat__close" type="button" aria-label="Fermer assistant">&times;</button>
+            </div>
+            <div id="lp-ai-chat-messages" class="lp-ai-chat__messages" aria-live="polite">
+                <div class="lp-ai-chat__message lp-ai-chat__message--assistant">{{ $aiWelcome }}</div>
+            </div>
+            <div class="lp-ai-chat__composer">
+                <p id="lp-ai-chat-status" class="lp-ai-chat__status">Partagez votre objectif, votre budget ou votre delai. Je vous guide selon cette offre.</p>
+                <form id="lp-ai-chat-form" class="lp-ai-chat__form">
+                    <textarea id="lp-ai-chat-input" class="lp-ai-chat__input" rows="1" maxlength="1200" placeholder="Posez une question sur l'offre, le prix ou les resultats attendus..." required></textarea>
+                    <button id="lp-ai-chat-send" class="lp-ai-chat__send" type="submit">Envoyer</button>
+                </form>
+            </div>
+        </div>
+        <button id="lp-ai-chat-toggle" class="lp-ai-chat__toggle" type="button" aria-controls="lp-ai-chat-panel" aria-expanded="false" aria-label="Ouvrir assistant">
+            <svg viewBox="0 0 24 24" width="28" height="28" fill="currentColor" aria-hidden="true">
+                <path d="M4 5.75A2.75 2.75 0 0 1 6.75 3h10.5A2.75 2.75 0 0 1 20 5.75v7.5A2.75 2.75 0 0 1 17.25 16H11l-3.84 3.2A.75.75 0 0 1 6 18.62V16h-.25A2.75 2.75 0 0 1 3 13.25v-7.5zm4.75 2.5a1 1 0 1 0 0 2h6.5a1 1 0 1 0 0-2h-6.5zm0 3.75a1 1 0 1 0 0 2h4.25a1 1 0 1 0 0-2H8.75z"/>
+            </svg>
+        </button>
+    </div>
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const root = document.getElementById('lp-ai-chat');
+            if (!root) return;
+            if (root.parentElement !== document.body) {
+                document.body.appendChild(root);
+            }
+
+            const endpoint = root.dataset.endpoint || '';
+            const landingId = Number(root.dataset.landingId || 0);
+            const pageIdRaw = root.dataset.pageId || '';
+            const pageId = pageIdRaw !== '' ? Number(pageIdRaw) : null;
+            const panel = document.getElementById('lp-ai-chat-panel');
+            const toggle = document.getElementById('lp-ai-chat-toggle');
+            const closeBtn = document.getElementById('lp-ai-chat-close');
+            const intro = document.getElementById('lp-ai-chat-intro');
+            const introCloseBtn = document.getElementById('lp-ai-chat-intro-close');
+            const messagesEl = document.getElementById('lp-ai-chat-messages');
+            const statusEl = document.getElementById('lp-ai-chat-status');
+            const form = document.getElementById('lp-ai-chat-form');
+            const input = document.getElementById('lp-ai-chat-input');
+            const sendBtn = document.getElementById('lp-ai-chat-send');
+            const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content') || '';
+
+            if (!endpoint || !landingId || !panel || !toggle || !messagesEl || !statusEl || !form || !input || !sendBtn) {
+                return;
+            }
+
+            let isBusy = false;
+            let history = [];
+            let typingBubble = null;
+
+            const setOpen = (open) => {
+                panel.classList.toggle('is-open', open);
+                panel.setAttribute('aria-hidden', open ? 'false' : 'true');
+                root.classList.toggle('is-open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+                if (open && intro) {
+                    intro.classList.remove('is-visible');
+                }
+                if (open) {
+                    input.focus();
+                }
+            };
+
+            const setStatus = (text, isError = false) => {
+                statusEl.textContent = text;
+                statusEl.classList.toggle('is-error', isError);
+            };
+
+            const addMessage = (role, text) => {
+                const bubble = document.createElement('div');
+                bubble.className = `lp-ai-chat__message lp-ai-chat__message--${role}`;
+                bubble.textContent = text;
+                bubble.classList.add('is-entering');
+                messagesEl.appendChild(bubble);
+                requestAnimationFrame(() => {
+                    bubble.classList.add('is-visible');
+                    bubble.classList.remove('is-entering');
+                });
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            };
+
+            const scrollAndFlashTarget = (el) => {
+                if (!el) return;
+                el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                el.classList.add('lp-ai-chat__target-flash');
+                setTimeout(() => el.classList.remove('lp-ai-chat__target-flash'), 1500);
+            };
+
+            const findTargetByCtaLabel = (label) => {
+                if (!label || typeof label !== 'string') {
+                    return null;
+                }
+
+                const targetLabel = label.trim().toLowerCase();
+                if (!targetLabel) {
+                    return null;
+                }
+
+                const candidates = Array.from(document.querySelectorAll('a, button, input[type="submit"], input[type="button"], [role="button"]'));
+                return candidates.find((el) => {
+                    const text = (el.textContent || el.value || '').trim().toLowerCase();
+                    if (!text) return false;
+                    return text.includes(targetLabel) || targetLabel.includes(text);
+                }) || null;
+            };
+
+            const findFirstFormField = () => {
+                return document.querySelector('form input:not([type="hidden"]):not([type="submit"]):not([type="button"]), form textarea, form select');
+            };
+
+            const addCtaAction = (cta) => {
+                if (!cta || typeof cta !== 'object') {
+                    return;
+                }
+
+                const ctaType = typeof cta.type === 'string' && cta.type.trim() !== ''
+                    ? cta.type.trim()
+                    : 'form';
+
+                const actionLabel = typeof cta.action_text === 'string' && cta.action_text.trim() !== ''
+                    ? cta.action_text.trim()
+                    : 'Passer a l action';
+
+                const targetValue = typeof cta.target === 'string' ? cta.target.trim() : '';
+
+                const wrap = document.createElement('div');
+                wrap.className = 'lp-ai-chat__action-wrap';
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'lp-ai-chat__action-btn';
+                btn.textContent = actionLabel;
+
+                btn.addEventListener('click', () => {
+                    if (ctaType === 'whatsapp' && targetValue) {
+                        const phone = targetValue.replace(/[^0-9]/g, '');
+                        if (phone) {
+                            const waMessage = encodeURIComponent('Bonjour, je souhaite plus de details sur cette offre.');
+                            window.open(`https://wa.me/${phone}?text=${waMessage}`, '_blank', 'noopener');
+                            return;
+                        }
+                    }
+
+                    if (ctaType === 'instagram' && targetValue) {
+                        window.open(targetValue, '_blank', 'noopener');
+                        return;
+                    }
+
+                    if (ctaType === 'custom_link' && targetValue) {
+                        window.open(targetValue, '_blank', 'noopener');
+                        return;
+                    }
+
+                    if (ctaType === 'custom_phone' && targetValue) {
+                        const phone = targetValue.replace(/\s+/g, '');
+                        if (phone) {
+                            window.location.href = `tel:${phone}`;
+                            return;
+                        }
+                    }
+
+                    const ctaTarget = findTargetByCtaLabel(cta.label || '');
+                    if (ctaTarget) {
+                        scrollAndFlashTarget(ctaTarget);
+                        return;
+                    }
+
+                    const fieldTarget = findFirstFormField();
+                    if (fieldTarget) {
+                        scrollAndFlashTarget(fieldTarget);
+                        fieldTarget.focus({ preventScroll: true });
+                    }
+                });
+
+                wrap.appendChild(btn);
+                messagesEl.appendChild(wrap);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            };
+
+            const showTyping = () => {
+                if (typingBubble) return;
+                typingBubble = document.createElement('div');
+                typingBubble.className = 'lp-ai-chat__message lp-ai-chat__message--assistant lp-ai-chat__typing is-visible';
+                typingBubble.innerHTML = '<span class="lp-ai-chat__typing-label">L assistant prepare sa reponse</span><span class="lp-ai-chat__typing-dots" aria-hidden="true"><span></span><span></span><span></span></span>';
+                messagesEl.appendChild(typingBubble);
+                messagesEl.scrollTop = messagesEl.scrollHeight;
+            };
+
+            const hideTyping = () => {
+                if (!typingBubble) return;
+                typingBubble.remove();
+                typingBubble = null;
+            };
+
+            const autoResizeInput = () => {
+                input.style.height = 'auto';
+                input.style.height = Math.min(input.scrollHeight, 110) + 'px';
+            };
+
+            toggle.addEventListener('click', function () {
+                setOpen(!panel.classList.contains('is-open'));
+            });
+
+            if (intro) {
+                intro.addEventListener('click', function (event) {
+                    if (event.target && event.target.id === 'lp-ai-chat-intro-close') {
+                        return;
+                    }
+                    setOpen(true);
+                });
+            }
+
+            if (introCloseBtn) {
+                introCloseBtn.addEventListener('click', function (event) {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    if (intro) {
+                        intro.classList.remove('is-visible');
+                    }
+                });
+            }
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function () {
+                    setOpen(false);
+                });
+            }
+
+            document.addEventListener('keydown', function (event) {
+                if (event.key === 'Escape' && panel.classList.contains('is-open')) {
+                    setOpen(false);
+                }
+            });
+
+            input.addEventListener('input', autoResizeInput);
+            input.addEventListener('keydown', function (event) {
+                if (event.key === 'Enter' && !event.shiftKey) {
+                    event.preventDefault();
+                    form.requestSubmit();
+                }
+            });
+
+            form.addEventListener('submit', async function (event) {
+                event.preventDefault();
+
+                const message = input.value.trim();
+                if (!message || isBusy) {
+                    return;
+                }
+
+                addMessage('user', message);
+                history.push({ role: 'user', content: message });
+                history = history.slice(-10);
+                input.value = '';
+                autoResizeInput();
+                setStatus('Analyse en cours de cette offre pour preparer une recommandation claire...');
+                showTyping();
+
+                isBusy = true;
+                input.disabled = true;
+                sendBtn.disabled = true;
+
+                try {
+                    const response = await fetch(endpoint, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': csrfToken,
+                            'X-Requested-With': 'XMLHttpRequest'
+                        },
+                        body: JSON.stringify({
+                            landing_id: landingId,
+                            page_id: pageId,
+                            message: message,
+                            history: history,
+                            current_url: window.location.href
+                        })
+                    });
+
+                    const data = await response.json().catch(() => ({}));
+
+                    if (!response.ok || data.status !== 'success' || typeof data.reply !== 'string') {
+                        throw new Error(data.message || 'Assistant indisponible pour le moment.');
+                    }
+
+                    const reply = data.reply.trim() || 'Je peux vous aider sur cette offre et les details de commande.';
+                    hideTyping();
+                    addMessage('assistant', reply);
+                    addCtaAction(data.cta);
+                    history.push({ role: 'assistant', content: reply });
+                    history = history.slice(-10);
+                    setStatus('Pour un conseil plus precis, partagez votre objectif et votre budget.');
+                } catch (error) {
+                    hideTyping();
+                    const fallback = 'Je suis temporairement indisponible. Merci de reessayer dans un instant.';
+                    const friendly = (error && typeof error.message === 'string' && error.message.trim() !== '')
+                        ? error.message.trim()
+                        : fallback;
+                    addMessage('assistant', friendly);
+                    setStatus(friendly, true);
+                } finally {
+                    isBusy = false;
+                    input.disabled = false;
+                    sendBtn.disabled = false;
+                    input.focus();
+                }
+            });
+
+            autoResizeInput();
+
+            // Auto-hide outside intro after short time if user ignores it.
+            if (intro) {
+                setTimeout(() => {
+                    if (!panel.classList.contains('is-open')) {
+                        intro.classList.remove('is-visible');
+                    }
+                }, 18000);
+            }
+        });
+    </script>
+    @endif
 
     {{-- Floating WhatsApp Button --}}
     @if($wsSettings && $wsSettings->whatsapp_enabled && !empty($wsSettings->whatsapp_phone))

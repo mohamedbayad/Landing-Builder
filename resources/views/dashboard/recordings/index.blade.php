@@ -1,17 +1,18 @@
 <x-app-layout>
+<x-slot name="topbar">
+    <div class="leading-tight">
+        <h1 class="text-lg sm:text-xl font-bold text-white tracking-tight">Visitor Recordings</h1>
+        <p class="text-xs sm:text-sm text-gray-400 mt-0.5 truncate">
+            Showing replays for {{ $landingPage ? $landingPage->name : 'All Landings' }}
+        </p>
+    </div>
+</x-slot>
+
 <div class="py-8" x-data="{ deviceFilter: 'all', convertedFilter: 'all' }">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
-        <!-- Header Section -->
-        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
-            <div>
-                <h2 class="text-xl font-semibold text-gray-900 dark:text-white tracking-tight">
-                    Visitor Recordings
-                </h2>
-                <p class="mt-0.5 text-sm text-gray-500 dark:text-gray-400">
-                    Showing replays for <span class="font-semibold text-gray-700 dark:text-gray-300">{{ $landingPage ? $landingPage->name : 'All Landings' }}</span>
-                </p>
-            </div>
+        <!-- Filters -->
+        <div class="flex justify-end mb-6">
             <div class="flex flex-wrap gap-2">
                 <div class="relative">
                     <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">

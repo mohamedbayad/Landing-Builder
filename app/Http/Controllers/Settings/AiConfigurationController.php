@@ -7,8 +7,10 @@ use Illuminate\Http\Request;
 use App\Models\AiProvider;
 use App\Models\AiModel;
 use App\Services\AIModelLoaderService;
+use App\Support\AI\ProviderRegistry;
 use Exception;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\Rule;
 
 class AiConfigurationController extends Controller
 {
@@ -17,21 +19,33 @@ class AiConfigurationController extends Controller
      */
     public function storeProvider(Request $request)
     {
+        $providerInput = strtolower((string) $request->input('provider'));
+        $apiKeyRule = ProviderRegistry::requiresApiKey($providerInput) ? 'required|string' : 'nullable|string';
+
         $request->validate([
             'name' => 'required|string|max:255',
-            'provider' => 'required|string|in:openai,anthropic,gemini,custom',
-            'api_key' => 'required|string',
+            'provider' => ['required', 'string', Rule::in(ProviderRegistry::allowedProviderKeys())],
+            'api_key' => $apiKeyRule,
             'base_url' => 'nullable|url'
         ]);
 
         $workspace = auth()->user()->workspaces()->first();
+        $providerKey = strtolower((string) $request->provider);
+
+        $baseUrl = trim((string) $request->base_url);
+        if ($baseUrl === '' && in_array($providerKey, [ProviderRegistry::OPENROUTER, ProviderRegistry::CUSTOM], true)) {
+            $baseUrl = (string) ProviderRegistry::defaultBaseUrlFor($providerKey);
+        }
+        if ($baseUrl !== '' && in_array($providerKey, [ProviderRegistry::CUSTOM], true)) {
+            $baseUrl = ProviderRegistry::normalizeOllamaBaseUrl($baseUrl);
+        }
 
         AiProvider::create([
             'workspace_id' => $workspace->id,
             'name' => $request->name,
-            'provider' => $request->provider,
+            'provider' => $providerKey,
             'api_key' => $request->api_key,
-            'base_url' => $request->base_url,
+            'base_url' => $baseUrl !== '' ? $baseUrl : null,
             'is_active' => true,
         ]);
 

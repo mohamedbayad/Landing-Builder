@@ -9,7 +9,7 @@ use App\Models\Form;
 
 class FormEndpoint extends Model
 {
-    protected $fillable = ['uuid', 'name', 'workspace_id'];
+    protected $fillable = ['uuid', 'name', 'workspace_id', 'default_automation_id'];
 
     public static function booted()
     {
@@ -26,5 +26,10 @@ class FormEndpoint extends Model
     public function forms()
     {
         return $this->hasMany(Form::class);
+    }
+
+    public function defaultAutomation()
+    {
+        return $this->belongsTo(EmailAutomation::class, 'default_automation_id');
     }
 }

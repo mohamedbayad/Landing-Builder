@@ -1,0 +1,208 @@
+﻿PRODUCT REQUIREMENTS DOCUMENT
+Landing Builder v2.0
+Funnel Builder Module — Complete Rebuild
+From Static Page Builder to Full Funnel System
+Table of Contents
+1. Executive Summary
+The current Landing Builder uses GrapeJS as its page editing engine. While functional, it presents significant limitations in UX, performance, element library richness, customization depth, responsive behavior, and — most critically — it lacks any native funnel logic that allows users to build real conversion journeys.
+This PRD proposes a complete rebuild of the Builder module, transforming it from a single-page editor into a full Funnel Builder system inspired by ClickFunnels. The new module will move us from building isolated landing pages to building end-to-end conversion paths: landing → opt-in → sales → checkout → upsell → downsell → thank you → membership.
+1.1 Why Now
+GrapeJS has reached its ceiling for our product requirements.
+User feedback consistently flags UX complexity as the top friction point.
+Competitors (ClickFunnels, Systeme.io, Leadpages) are pulling ahead with funnel-native logic.
+Our market (MENA + global SMBs) demands Arabic/RTL support, faster performance, and sales-flow native tooling.
+Laravel Blade stack allows server-side rendering advantages that competitors (mostly SPA-based) cannot match.
+1.2 High-Level Deliverables
+2. Problem Statement & Current State Analysis
+2.1 Current Pain Points (GrapeJS Implementation)
+Based on user feedback, internal audits, and competitive benchmarking, the current builder suffers from six critical issues:
+2.2 Gap Analysis: Us vs. ClickFunnels
+3. Goals & Success Metrics
+3.1 Primary Goals
+3.2 Success Metrics (KPIs)
+4. Target Users & Personas
+The new Funnel Builder targets four primary personas, each with distinct needs:
+Persona 1 — Salma, The Solo Marketer
+Persona 2 — Youssef, The Agency Owner
+Persona 3 — Khadija, The E-commerce Seller
+Persona 4 — Omar, The Consultant / Coach
+5. Scope & Out of Scope
+5.1 In Scope
+5.2 Out of Scope
+Full CMS / blog engine (may be considered in v3.0)
+Native mobile app builder
+Video hosting (we integrate with YouTube / Vimeo / Wistia)
+Full-featured email marketing platform to rival Mailchimp (we do sequences, not broadcasts at scale)
+Accounting / invoicing features
+Migration tool from ClickFunnels / Leadpages (manual for now; automated tool is a future consideration)
+6. System Architecture Overview
+6.1 Conceptual Architecture
+The new Funnel Builder follows a layered architecture where each layer has a clear responsibility. The diagram below shows how the modules interact:
+6.2 Data Model (High Level)
+The funnel system uses a hierarchical structure. Each Funnel contains multiple Steps, each Step has one Page, and each Page contains nested Sections → Rows → Columns → Elements.
+6.3 Key Database Tables (Simplified)
+7. Core Module: Funnel Management
+7.1 Overview
+The Funnel Management module is the top-level orchestrator. It allows users to create, organize, connect, and monitor entire conversion journeys — not just individual pages. This is the single most important conceptual shift from v1.
+7.2 Funnel Map View
+A visual canvas showing all funnel steps as connected nodes. Users can:
+Drag steps to reorder
+Draw connections between steps (including conditional branches)
+See live metrics on each step node (views, conversions, drop-off)
+Zoom, pan, and fit-to-screen
+Open any step in the page editor with a double-click
+Color-code steps by type (lead capture, sales, thank you, etc.)
+Funnel Map — Visual Concept
+7.3 Step Types
+7.4 Functional Requirements
+8. Core Module: Visual Page Builder
+8.1 Editor Architecture
+The editor follows ClickFunnels' structured model: Section → Row → Column → Element. This structured approach prevents layout chaos, simplifies responsive behavior, and makes editing predictable.
+8.2 Editor Layout
+Top Toolbar
+8.3 Core Editor Capabilities
+Drag-and-Drop
+Drag elements from left panel → drop into any column
+Drag existing elements to reposition across sections
+Visual drop indicators (blue line + highlighted target)
+Snap-to guides for alignment
+Multi-select (Shift+click) for bulk actions
+Keyboard shortcuts (Cmd+D duplicate, Delete to remove, Cmd+Z undo)
+Inline Editing
+Double-click any text element to edit in place
+Rich text toolbar appears on selection (bold, italic, link, color, size)
+Image click → replace, resize, alt text inline
+Button click → edit label, link destination, style in context
+Inspector Panel (Right Side)
+The inspector adapts to the currently selected entity (section / row / column / element). Each has four tabs:
+8.4 Responsive Editing
+Each page has three device views: Desktop, Tablet, Mobile. Users edit each view independently with smart inheritance (mobile inherits from tablet which inherits from desktop). Changes made on desktop cascade down; changes on mobile only affect mobile.
+8.5 Builder Functional Requirements
+9. Elements & Content Blocks Library
+At launch, the builder must ship with 50+ production-ready elements, categorized for fast discovery. Each element has default styles, conversion-optimized presets, and full inspector configuration.
+9.1 Element Categories
+Total at launch: 60 elements across 12 categories
+9.2 Element Specification Example — Button
+Every element has a full specification. Below is the template, illustrated with the Button element:
+9.3 Specialized Elements (ClickFunnels-Equivalent)
+10. Styling & Design System
+10.1 Design Tokens (Global)
+A major UX improvement over v1: funnel-level design tokens. Users set brand colors and fonts once; all elements inherit unless overridden. Changing a token updates the entire funnel instantly.
+10.2 Styling Levels
+Styles can be applied at five levels, with cascade priority from highest (element) to lowest (global):
+11. Forms & Lead Capture
+11.1 Overview
+Forms are first-class citizens in the funnel system. Every form submission creates a Lead, which is automatically linked to a Contact in the CRM and can trigger email sequences or webhook events.
+11.2 Form Builder
+Drag-and-drop field builder within the form element
+Field types: text, email, phone, number, textarea, checkbox, radio, dropdown, date, file upload, hidden field, consent
+Per-field validation: required, regex, min/max, custom error messages
+Conditional fields (show field B only if field A = value X)
+Multi-step forms (wizard mode) with progress indicator
+Pre-fill from URL parameters (utm_*, email, name)
+Honeypot + reCAPTCHA v3 anti-spam
+Phone input with country code selector (MENA countries prioritized)
+Arabic-ready placeholders and labels
+11.3 Submit Actions
+Multiple actions can run in parallel: e.g., Go to next step + Trigger sequence + Webhook.
+12. Checkout & Sales Flow
+12.1 Checkout Element
+The checkout element is a specialized form handling the full sales transaction. It is designed to convert at the highest possible rate with minimal friction.
+12.2 Payment Methods
+12.3 Sales Flow Diagram
+12.4 Order Bump
+A pre-checkout micro-upsell displayed as a checkbox near the payment button. Typically a low-priced add-on ("Add a 30-min coaching call for only $19"). Increases AOV with minimal friction.
+12.5 Tax, Shipping, Coupons
+Shipping: flat rate, weight-based, or free above a threshold; per-country rules
+Tax: VAT, sales tax, zero-tax zones; auto-calculated based on customer location
+Coupons: percentage, fixed amount, free shipping; usage limits, expiry dates, stackability rules
+Order summary updates live as visitor selects options
+13. CRM & Opportunities
+13.1 Overview
+Every lead captured through a funnel form or checkout is automatically added to the CRM as a Contact. The CRM unifies leads, customers, and opportunities in a single interface.
+13.2 Contact Record
+13.3 CRM Views
+Contacts list — searchable, filterable, exportable (CSV)
+Pipeline / Kanban view — drag contacts between stages
+Orders view — all transactions, refunds, revenue reports
+Segments — saved filter sets ("All leads from webinar funnel, last 30 days")
+Individual contact page — full profile, timeline, notes, quick actions (email, add tag)
+14. Email Automation & Follow-up
+14.1 Email Triggers
+14.2 Sequence Builder
+Visual workflow editor (like funnel map but for email steps)
+Actions: Send email, Wait (hours/days), Condition (if/else), Tag, Remove from sequence, Webhook
+Built-in email template editor (simplified builder)
+Dynamic content / personalization tokens ({{first_name}}, {{order.total}})
+A/B test subject lines
+Unsubscribe handling (compliance)
+Analytics: open rate, click rate, conversion per sequence
+15. Analytics & Performance
+15.1 Funnel-Level Dashboard
+15.2 Step-Level Metrics
+Views, unique visitors, avg. time on page
+Conversion rate to next step
+Heatmap-style drop-off visualization on funnel map
+Form analytics: field-level abandonment (which field causes drop-off)
+Button click rates
+Device / browser / country breakdown
+Traffic source attribution (UTM tracking)
+15.3 Reports
+Funnel comparison — side-by-side performance of multiple funnels
+A/B test report — winner detection with statistical significance (Phase 2)
+Revenue report — daily, weekly, monthly, custom range
+Cohort analysis — retention / LTV by acquisition month (Phase 3)
+Export to CSV / PDF for all reports
+16. Templates & Preset Library
+16.1 Funnel Templates (Complete Funnels)
+At launch, ship 30+ complete funnel templates organized by goal:
+16.2 Page Templates (Individual Pages)
+In addition to full-funnel templates, 70+ individual page templates are available to mix-and-match:
+Landing pages (15)
+Opt-in / Squeeze pages (10)
+Sales pages — short & long form (15)
+Checkout pages (8)
+Upsell / Downsell pages (6)
+Thank you pages (6)
+Webinar registration + replay (4)
+Booking / Calendar pages (3) — Phase 3
+404 / Maintenance / Coming Soon (3)
+16.3 Reusable Blocks (User-Saved)
+Users can save any section as a reusable block within their workspace. Perfect for agencies that reuse the same hero, testimonials, or footer across client projects.
+17. Technical Requirements (Laravel Blade Stack)
+17.1 Recommended Stack
+17.2 Editor Implementation Strategy
+17.3 Page Rendering (Published Pages)
+Published pages are server-rendered via Blade → TTFB < 200ms
+Page structure (JSON) is compiled into Blade partials and cached
+Cache invalidates on publish or republish
+Mobile-first CSS delivered inline above-the-fold
+Images served via CDN with responsive srcsets
+No JavaScript required for static content sections
+Interactive elements (forms, countdowns) use lightweight Alpine.js
+Lighthouse score target: ≥ 90 on Performance, SEO, Accessibility
+17.4 Key API Endpoints (Internal)
+18. User Flows & Journey Maps
+18.1 Flow: Creating a Funnel from Scratch
+18.2 Flow: Editing an Element
+19. Non-Functional Requirements
+20. Rollout Plan & Phases
+20.1 Timeline Overview
+Total to v2.0 stable release: ~20 weeks (5 months). Full roadmap through v2.2: ~9–10 months.
+20.2 Migration Strategy
+Existing v1 users must not be forced to rebuild. Migration path:
+Automated conversion tool: reads GrapeJS JSON → maps to new element structure
+Coverage target: 80% of common patterns auto-migrate perfectly
+For unsupported patterns: visual warning + side-by-side manual rebuild helper
+v1 remains accessible for 6 months post-v2 launch (read-only after 3 months)
+Migration guide + 1-on-1 help for paying customers during transition
+20.3 Release Strategy
+Closed beta — 200 invited users (Phase 1.5)
+Public beta — opt-in for existing users (after 4 weeks)
+GA — available to all new signups (after 2 more weeks)
+v1 deprecation announcement — 3 months before shutdown
+Feature flags for gradual rollout of risky changes
+21. Risks & Mitigations
+22. Appendix: Glossary
+— End of Document —
+Landing Builder v2.0 — Funnel Builder Module PRD  •  Confidential

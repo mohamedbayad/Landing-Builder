@@ -1,8 +1,8 @@
 <x-app-layout>
     <x-slot name="header">
-        <div class="flex justify-between items-center">
+        <div class="flex items-center justify-between gap-4">
             <h2 class="font-bold text-2xl text-gray-800 dark:text-white leading-tight">
-                {{ __('Funnel Management') }}: <span class="text-brand-orange">{{ $landing->name }}</span>
+                Funnel Management: <span class="text-brand-orange">{{ $landing->name }}</span>
             </h2>
             <a href="{{ route('landings.index') }}" class="text-sm font-medium text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200">
                 &larr; Back to Landings
@@ -10,179 +10,235 @@
         </div>
     </x-slot>
 
-    <div class="py-12" x-data="{ tab: 'steps' }">
-        <div class="max-w-6xl mx-auto px-4 sm:px-6 md:px-8">
+    <div class="py-10" x-data="{ tab: '{{ old('tab', 'steps') }}' }">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 md:px-8 space-y-5">
+            @if(session('status'))
+                <x-ui.alert type="success" dismissible>
+                    {{ session('status') }}
+                </x-ui.alert>
+            @endif
+
+            @if($errors->any())
+                <x-ui.alert type="error" title="Please review the following issues">
+                    <ul class="list-disc pl-5 space-y-1">
+                        @foreach($errors->all() as $error)
+                            <li>{{ $error }}</li>
+                        @endforeach
+                    </ul>
+                </x-ui.alert>
+            @endif
+
             <div class="bg-white dark:bg-[#161B22] shadow-sm rounded-xl border border-gray-100 dark:border-white/[0.06] overflow-hidden">
-                
-                <!-- Tabs -->
                 <div class="border-b border-gray-100 dark:border-white/[0.06]">
                     <nav class="flex overflow-x-auto px-2" aria-label="Tabs">
-                        <button @click="tab = 'steps'" :class="{ 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10': tab === 'steps', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'steps' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150 flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg>
+                        <button @click="tab = 'steps'"
+                                :class="tab === 'steps' ? 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             Funnel Steps
                         </button>
-                        <button @click="tab = 'products'" :class="{ 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10': tab === 'products', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'products' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150 flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z"></path></svg>
+                        <button @click="tab = 'products'"
+                                :class="tab === 'products' ? 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             Products
                         </button>
-                        <button @click="tab = 'checkout'" :class="{ 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10': tab === 'checkout', 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300': tab !== 'checkout' }" class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150 flex items-center">
-                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path></svg>
+                        <button @click="tab = 'checkout'"
+                                :class="tab === 'checkout' ? 'border-brand-orange text-brand-orange bg-orange-50/50 dark:bg-orange-500/10' : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300'"
+                                class="whitespace-nowrap py-4 px-6 border-b-2 font-medium text-sm transition-colors duration-150">
                             Checkout Fields
                         </button>
                     </nav>
                 </div>
 
-                <div class="p-8">
-                    
-                    <!-- Steps Tab -->
+                <div class="p-6 md:p-8">
                     <div x-show="tab === 'steps'" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0">
-                        <div class="space-y-4">
-                            @foreach($pages as $page)
-                                <div class="flex items-center justify-between p-5 bg-white dark:bg-[#161B22] rounded-xl border border-gray-200 dark:border-white/[0.06] shadow-sm hover:shadow transition-shadow">
-                                    <div class="flex items-center gap-4">
-                                        <div class="flex-shrink-0 w-10 h-10 flex items-center justify-center rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-brand-orange font-bold border border-indigo-100 dark:border-indigo-800">
-                                            @if($page->type == 'index') 1
-                                            @elseif($page->type == 'checkout') 2
-                                            @elseif($page->type == 'thankyou') 3
-                                            @else ? @endif
-                                        </div>
-                                        <div>
-                                            <h4 class="text-base font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                                                {{ $page->name }}
-                                                <span class="text-xs font-normal px-2 py-0.5 rounded-full bg-gray-100 dark:bg-[#161B22] text-gray-500 dark:text-gray-400 capitalize">{{ $page->type }}</span>
-                                            </h4>
-                                            <div class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-                                                Route: <span class="font-mono text-xs bg-gray-50 dark:bg-white/[0.02] px-1 py-0.5 rounded">/{{ $page->slug == 'index' ? '' : $page->slug }}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex items-center gap-2">
-                                        <a href="{{ route('landings.pages.edit', [$landing, $page]) }}" class="inline-flex items-center px-4 py-2 bg-brand-orange text-white rounded-lg text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm">
-                                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path></svg>
-                                            Edit Design
-                                        </a>
-                                        <a href="{{ route('landings.preview', [$landing, $page]) }}" target="_blank" class="inline-flex items-center px-3 py-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-white/8 transition-all">
-                                            <svg class="w-4 h-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"></path></svg>
-                                            Preview
-                                        </a>
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
+                        @php
+                            $sortedPages = $pages->sortBy('funnel_position')->values();
+                            $pagesById = $pages->keyBy('id');
+                        @endphp
 
-                    <!-- Products Tab -->
-                    <div x-show="tab === 'products'" x-cloak style="display: none;">
-                        <div class="flex justify-between items-center mb-6">
+                        <div class="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                             <div>
-                                <h3 class="text-lg font-bold text-gray-900 dark:text-white">Product Offers</h3>
-                                <p class="text-sm text-gray-500 dark:text-gray-400">Manage the products available for purchase on this funnel.</p>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Funnel Flow</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Manage step names, step types, order, and the next-step connection for each page.</p>
                             </div>
-                            <button @click="$refs.addProductModal.classList.remove('hidden')" class="inline-flex items-center gap-2 px-4 py-2 bg-brand-orange text-white rounded-lg text-sm font-semibold hover:bg-brand-orange-600 transition-all shadow-sm">
-                                + Add Product
+                            <button type="button"
+                                    @click="$refs.addStepModal.classList.remove('hidden')"
+                                    class="inline-flex items-center gap-2 rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-orange-600">
+                                + Add Step
                             </button>
                         </div>
 
-                        <!-- Product List -->
-                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.06]">
-                            <table class="min-w-full divide-y divide-gray-200 dark:divide-white/[0.06]">
-                                <thead class="bg-gray-50 dark:bg-white/[0.02]">
-                                    <tr>
-                                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Product Name</th>
-                                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
-                                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Label</th>
-                                        <th class="px-6 py-4 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Direct Link</th>
-                                        <th class="px-6 py-4 text-right text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="bg-white dark:bg-[#161B22] divide-y divide-gray-100 dark:divide-white/[0.06]">
-                                    @php
-                                        // Calc Base URL safely
-                                        $checkoutPage = $landing->pages->where('type', 'checkout')->first();
-                                        $checkoutSlug = $checkoutPage ? $checkoutPage->slug : 'checkout';
-                                        $baseUrl = $landing->is_main ? url($checkoutSlug) : url('/preview/' . $landing->id . '/' . ($checkoutPage->id ?? ''));
-                                    @endphp
-                                    
-                                    @forelse($products as $product)
-                                        <tr class="hover:bg-gray-50 dark:hover:bg-white/8/50 transition-colors">
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 dark:text-white">{{ $product->name }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">{{ $product->currency }} {{ $product->price }}</td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                @if($product->label)
-                                                    <span class="px-2 py-1 rounded-full bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs">{{ $product->label }}</span>
-                                                @else 
-                                                    <span class="text-gray-300 dark:text-gray-600">-</span>
-                                                @endif
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                                                <div class="flex items-center gap-2 group">
-                                                    <code class="text-xs bg-gray-50 dark:bg-white/[0.02] border border-gray-200 dark:border-white/10 px-2 py-1 rounded select-all max-w-[150px] truncate text-gray-600 dark:text-gray-400">...product={{ $product->id }}</code>
-                                                    <button onclick="navigator.clipboard.writeText('{{ $baseUrl }}?product={{ $product->id }}'); window.Toast ? window.Toast.success('Link Copied') : alert('Copied!');" class="text-brand-orange hover:text-brand-orange-600 text-xs font-bold opacity-75 group-hover:opacity-100">Copy</button>
-                                                </div>
-                                            </td>
-                                            <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                                                <form action="{{ route('funnel.products.destroy', [$landing, $product]) }}" method="POST" onsubmit="event.preventDefault(); window.confirmAction('Are you sure you want to delete this product?', this);">
-                                                    @csrf
-                                                    @method('DELETE')
-                                                    <button type="submit" class="text-gray-400 hover:text-red-600 dark:hover:text-red-400 transition-colors">
-                                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg>
-                                                    </button>
-                                                </form>
-                                            </td>
-                                        </tr>
-                                    @empty
-                                        <tr>
-                                            <td colspan="5" class="px-6 py-12 text-center text-sm text-gray-500 dark:text-gray-400 bg-gray-50 dark:bg-white/[0.02]">
-                                                <svg class="mx-auto h-10 w-10 text-gray-400 dark:text-gray-500 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"></path></svg>
-                                                No products added yet. Add a product to get started.
-                                            </td>
-                                        </tr>
-                                    @endforelse
-                                </tbody>
-                            </table>
+                        <div class="mb-8 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            @forelse($sortedPages as $page)
+                                @php
+                                    $nextLabel = 'End Funnel';
+                                    if ($page->next_landing_page_id && $pagesById->has($page->next_landing_page_id)) {
+                                        $next = $pagesById->get($page->next_landing_page_id);
+                                        $nextLabel = $next->name;
+                                    }
+                                @endphp
+                                <div class="rounded-xl border border-gray-200 bg-gray-50/70 p-4 dark:border-white/10 dark:bg-white/[0.03]">
+                                    <div class="flex items-start justify-between gap-3">
+                                        <div>
+                                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-gray-400">Step {{ $page->funnel_position ?? $loop->iteration }}</div>
+                                            <div class="mt-1 text-sm font-semibold text-gray-900 dark:text-white">{{ $page->name }}</div>
+                                            <div class="mt-1 text-xs text-gray-500 dark:text-gray-400">/{{ $page->slug }}</div>
+                                        </div>
+                                        <span class="rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-700 dark:bg-orange-500/20 dark:text-orange-300">
+                                            {{ $stepTypes[$page->funnel_step_type ?? 'landing'] ?? ucfirst(str_replace('_', ' ', $page->funnel_step_type ?? 'landing')) }}
+                                        </span>
+                                    </div>
+                                    <div class="mt-3 border-t border-gray-200 pt-3 text-xs text-gray-600 dark:border-white/10 dark:text-gray-300">
+                                        Next: <span class="font-medium">{{ $nextLabel }}</span>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="rounded-xl border border-dashed border-gray-300 p-6 text-sm text-gray-500 dark:border-white/10 dark:text-gray-400">
+                                    No steps found yet.
+                                </div>
+                            @endforelse
                         </div>
 
-                        <!-- Add Product Modal -->
-                        <div x-ref="addProductModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-labelledby="modal-title" role="dialog" aria-modal="true">
-                            <div class="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-                                <div class="fixed inset-0 bg-gray-600 bg-opacity-75 transition-opacity" aria-hidden="true" @click="$refs.addProductModal.classList.add('hidden')"></div>
-                                <span class="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-                                <div class="inline-block align-bottom bg-white dark:bg-[#161B22] rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-                                    <form action="{{ route('funnel.products.store', $landing) }}" method="POST">
+                        <form method="POST" action="{{ route('funnel.steps.update', $landing) }}" class="space-y-4" id="funnel-steps-form">
+                            @csrf
+                            @method('PUT')
+
+                            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+                                    <thead class="bg-gray-50 dark:bg-white/[0.03]">
+                                        <tr>
+                                            <th class="w-14 px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Order</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Step</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Type</th>
+                                            <th class="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Next Step</th>
+                                            <th class="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="funnel-steps-sortable" class="divide-y divide-gray-100 bg-white dark:divide-white/10 dark:bg-[#161B22]">
+                                        @foreach($sortedPages as $index => $page)
+                                            <tr class="align-top js-step-row" draggable="true" data-step-row data-page-id="{{ $page->id }}">
+                                                <td class="px-4 py-3">
+                                                    <div class="flex items-center gap-2">
+                                                        <button type="button"
+                                                                class="js-drag-handle inline-flex h-9 w-9 cursor-grab items-center justify-center rounded-lg border border-gray-300 text-gray-500 transition hover:bg-gray-100 hover:text-gray-700 active:cursor-grabbing dark:border-white/10 dark:text-gray-400 dark:hover:bg-white/10 dark:hover:text-white"
+                                                                title="Drag to reorder"
+                                                                aria-label="Drag to reorder step">
+                                                            <svg class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                                                <path d="M7 4a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-1.5 7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3zm9-13.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm0 6a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm-1.5 7.5a1.5 1.5 0 100-3 1.5 1.5 0 000 3z" />
+                                                            </svg>
+                                                        </button>
+                                                        <span class="js-row-order inline-flex min-w-[1.8rem] items-center justify-center rounded-full bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-600 dark:bg-white/10 dark:text-gray-300">
+                                                            {{ old("pages.$index.funnel_position", $page->funnel_position ?? ($index + 1)) }}
+                                                        </span>
+                                                    </div>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <input type="hidden" name="pages[{{ $index }}][id]" value="{{ $page->id }}">
+                                                    <input type="hidden"
+                                                           class="js-position-input"
+                                                           name="pages[{{ $index }}][funnel_position]"
+                                                           value="{{ old("pages.$index.funnel_position", $page->funnel_position ?? ($index + 1)) }}">
+                                                    <input type="text"
+                                                           name="pages[{{ $index }}][name]"
+                                                           value="{{ old("pages.$index.name", $page->name) }}"
+                                                           class="mb-2 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                    <div class="text-xs text-gray-500 dark:text-gray-400">/{{ $page->slug }}</div>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <select name="pages[{{ $index }}][funnel_step_type]"
+                                                            class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                        @foreach($stepTypes as $value => $label)
+                                                            <option value="{{ $value }}" {{ old("pages.$index.funnel_step_type", $page->funnel_step_type ?? 'landing') === $value ? 'selected' : '' }}>
+                                                                {{ $label }}
+                                                            </option>
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <select name="pages[{{ $index }}][next_landing_page_id]"
+                                                            class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                        <option value="">End Funnel</option>
+                                                        @foreach($sortedPages as $candidate)
+                                                            @if((int) $candidate->id !== (int) $page->id)
+                                                                <option value="{{ $candidate->id }}" {{ (string) old("pages.$index.next_landing_page_id", $page->next_landing_page_id) === (string) $candidate->id ? 'selected' : '' }}>
+                                                                    {{ $candidate->name }}
+                                                                </option>
+                                                            @endif
+                                                        @endforeach
+                                                    </select>
+                                                </td>
+                                                <td class="px-4 py-3">
+                                                    <div class="flex items-center justify-end gap-2">
+                                                        <a href="{{ route('landings.pages.edit', [$landing, $page]) }}"
+                                                           class="inline-flex items-center rounded-lg bg-brand-orange px-3 py-1.5 text-xs font-semibold text-white hover:bg-brand-orange-600">
+                                                            Builder
+                                                        </a>
+                                                        <a href="{{ route('landings.preview', [$landing, $page]) }}"
+                                                           target="_blank"
+                                                           class="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10">
+                                                            Preview
+                                                        </a>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+                            <p class="text-xs text-gray-500 dark:text-gray-400">
+                                Drag rows using the handle to reorder steps. Position updates automatically.
+                            </p>
+
+                            <div class="flex justify-end">
+                                <button type="submit" class="rounded-lg bg-brand-orange px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-orange-600">
+                                    Save Funnel Flow
+                                </button>
+                            </div>
+                        </form>
+
+                        <div x-ref="addStepModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
+                            <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+                                <div class="fixed inset-0 bg-gray-700/70" @click="$refs.addStepModal.classList.add('hidden')"></div>
+                                <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+                                <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-xl bg-white p-6 text-left align-bottom shadow-xl transition-all dark:bg-[#161B22] sm:align-middle">
+                                    <h4 class="text-base font-semibold text-gray-900 dark:text-white">Add New Funnel Step</h4>
+                                    <p class="mt-1 text-sm text-gray-500 dark:text-gray-400">Create a new page step and place it in your funnel flow.</p>
+
+                                    <form method="POST" action="{{ route('funnel.steps.store', $landing) }}" class="mt-5 space-y-4">
                                         @csrf
-                                        <div class="bg-white dark:bg-[#161B22] px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                            <h3 class="text-lg leading-6 font-medium text-gray-900 dark:text-white mb-4" id="modal-title">Add New Product</h3>
-                                            <div class="space-y-4">
-                                                <div>
-                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name</label>
-                                                    <input type="text" name="name" placeholder="E.g. Premium Plan" class="mt-1 block w-full rounded-md border-gray-300 dark:border-white/10 dark:bg-[#161B22] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 sm:text-sm" required>
-                                                </div>
-                                                <div class="flex gap-4">
-                                                    <div class="w-2/3">
-                                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Price</label>
-                                                        <input type="number" step="0.01" name="price" placeholder="49.99" class="mt-1 block w-full rounded-md border-gray-300 dark:border-white/10 dark:bg-[#161B22] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 sm:text-sm" required>
-                                                    </div>
-                                                    <div class="w-1/3">
-                                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Currency</label>
-                                                        <select name="currency" class="mt-1 block w-full rounded-md border-gray-300 dark:border-white/10 dark:bg-[#161B22] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 sm:text-sm">
-                                                            <option value="USD">USD ($)</option>
-                                                            <option value="EUR">EUR (€)</option>
-                                                            <option value="MAD">MAD (DH)</option>
-                                                        </select>
-                                                    </div>
-                                                </div>
-                                                <div>
-                                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Badge Label (Optional)</label>
-                                                    <input type="text" name="label" placeholder="e.g. Best Value" class="mt-1 block w-full rounded-md border-gray-300 dark:border-white/10 dark:bg-[#161B22] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20 sm:text-sm">
-                                                </div>
-                                            </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Step Name</label>
+                                            <input type="text" name="name" required
+                                                   class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white"
+                                                   placeholder="Example: Upsell Offer">
                                         </div>
-                                        <div class="bg-gray-50 dark:bg-white/[0.02] px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                                            <button type="submit" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange/20 sm:ml-3 sm:w-auto sm:text-sm">
-                                                Add Product
-                                            </button>
-                                            <button type="button" @click="$refs.addProductModal.classList.add('hidden')" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 dark:border-white/10 shadow-sm px-4 py-2 bg-white dark:bg-[#161B22] text-base font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/8 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange/20 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
+
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Slug (optional)</label>
+                                            <input type="text" name="slug"
+                                                   class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white"
+                                                   placeholder="upsell-offer">
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Step Type</label>
+                                            <select name="funnel_step_type"
+                                                    class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                @foreach($stepTypes as $value => $label)
+                                                    <option value="{{ $value }}">{{ $label }}</option>
+                                                @endforeach
+                                            </select>
+                                        </div>
+
+                                        <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
+                                            <button type="button"
+                                                    @click="$refs.addStepModal.classList.add('hidden')"
+                                                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10">
                                                 Cancel
+                                            </button>
+                                            <button type="submit" class="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange-600">
+                                                Create Step
                                             </button>
                                         </div>
                                     </form>
@@ -191,53 +247,241 @@
                         </div>
                     </div>
 
-                    <!-- Checkout Fields Tab -->
-                    <div x-show="tab === 'checkout'" x-cloak style="display: none;">
-                         <div class="mb-6">
-                            <h3 class="text-lg font-bold text-gray-900 dark:text-white">Checkout Form Configuration</h3>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Control which fields appear on your checkout form and set custom labels.</p>
-                         </div>
-                         
-                         <form action="{{ route('funnel.fields.store', $landing) }}" method="POST">
-                             @csrf
-                             <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/[0.06]">
-                                 <table class="min-w-full divide-y divide-gray-200 dark:divide-white/[0.06]">
-                                     <thead class="bg-gray-50 dark:bg-white/[0.02]">
-                                         <tr>
-                                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Field Name</th>
-                                             <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Visible</th>
-                                             <th class="px-6 py-3 text-center text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Required</th>
-                                             <th class="px-6 py-3 text-left text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Custom Label</th>
-                                         </tr>
-                                     </thead>
-                                     <tbody class="bg-white dark:bg-[#161B22] divide-y divide-gray-100 dark:divide-white/[0.06]">
-                                         @foreach($checkoutFields as $field)
-                                            <tr class="hover:bg-gray-50 dark:hover:bg-white/8/50 transition-colors">
-                                                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-700 dark:text-gray-200 capitalize">
-                                                    {{ str_replace('_', ' ', $field->field_name) }}
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-center">
-                                                    <input type="checkbox" name="fields[{{ $field->field_name }}][enabled]" value="1" {{ $field->is_enabled ? 'checked' : '' }} class="rounded text-indigo-600 focus:ring-brand-orange/20 border-gray-300 dark:border-white/10 dark:bg-[#161B22] h-4 w-4 cursor-pointer">
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap text-center">
-                                                     <input type="checkbox" name="fields[{{ $field->field_name }}][required]" value="1" {{ $field->is_required ? 'checked' : '' }} class="rounded text-indigo-600 focus:ring-brand-orange/20 border-gray-300 dark:border-white/10 dark:bg-[#161B22] h-4 w-4 cursor-pointer">
-                                                </td>
-                                                <td class="px-6 py-4 whitespace-nowrap">
-                                                    <input type="text" name="fields[{{ $field->field_name }}][label]" value="{{ $field->label }}" placeholder="{{ str_replace('_', ' ', $field->field_name) }}" class="w-full text-sm rounded-lg border-gray-300 dark:border-white/10 dark:bg-[#161B22] dark:text-white focus:ring-brand-orange/20 focus:border-indigo-500 py-1.5">
-                                                </td>
-                                            </tr>
-                                         @endforeach
-                                     </tbody>
-                                 </table>
-                             </div>
-                             <div class="mt-6 flex justify-end">
-                                 <button type="submit" class="px-6 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-brand-orange/20 shadow-md transition-all">Save Field Settings</button>
-                             </div>
-                         </form>
+                    <div x-show="tab === 'products'" x-cloak style="display: none;">
+                        @php
+                            $checkoutPage = $pages->firstWhere('type', 'checkout');
+                            $checkoutSlug = $checkoutPage?->slug ?? 'checkout';
+                            $checkoutPath = $landing->is_main ? '/' . ltrim($checkoutSlug, '/') : '/' . $landing->slug . '/' . ltrim($checkoutSlug, '/');
+                            $baseCheckoutUrl = url($checkoutPath);
+                        @endphp
+
+                        <div class="mb-6 flex items-center justify-between">
+                            <div>
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Product Offers</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400">Manage the products available on this funnel checkout flow.</p>
+                            </div>
+                            <button @click="$refs.addProductModal.classList.remove('hidden')" class="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange-600">
+                                + Add Product
+                            </button>
+                        </div>
+
+                        <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
+                            <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+                                <thead class="bg-gray-50 dark:bg-white/[0.03]">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Product Name</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Price</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Label</th>
+                                        <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Direct Link</th>
+                                        <th class="px-6 py-3 text-right text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-gray-100 bg-white dark:divide-white/10 dark:bg-[#161B22]">
+                                    @forelse($products as $product)
+                                        <tr>
+                                            <td class="px-6 py-4 text-sm font-semibold text-gray-900 dark:text-white">{{ $product->name }}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-700 dark:text-gray-300">{{ $product->currency }} {{ number_format((float) $product->price, 2) }}</td>
+                                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                @if($product->label)
+                                                    <span class="rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700 dark:bg-indigo-500/20 dark:text-indigo-300">{{ $product->label }}</span>
+                                                @else
+                                                    -
+                                                @endif
+                                            </td>
+                                            <td class="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
+                                                <div class="group flex items-center gap-2">
+                                                    <code class="max-w-[220px] truncate rounded border border-gray-200 bg-gray-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-white/[0.03]">{{ $baseCheckoutUrl }}?product={{ $product->id }}</code>
+                                                    <button type="button"
+                                                            onclick="navigator.clipboard.writeText('{{ $baseCheckoutUrl }}?product={{ $product->id }}'); window.Toast ? window.Toast.success('Link copied') : alert('Link copied');"
+                                                            class="text-xs font-semibold text-brand-orange hover:text-brand-orange-600">
+                                                        Copy
+                                                    </button>
+                                                </div>
+                                            </td>
+                                            <td class="px-6 py-4 text-right">
+                                                <form action="{{ route('funnel.products.destroy', [$landing, $product]) }}" method="POST" onsubmit="event.preventDefault(); window.confirmAction('Delete this product?', this);">
+                                                    @csrf
+                                                    @method('DELETE')
+                                                    <button type="submit" class="text-sm font-semibold text-red-500 hover:text-red-600">Delete</button>
+                                                </form>
+                                            </td>
+                                        </tr>
+                                    @empty
+                                        <tr>
+                                            <td colspan="5" class="px-6 py-10 text-center text-sm text-gray-500 dark:text-gray-400">No products added yet.</td>
+                                        </tr>
+                                    @endforelse
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <div x-ref="addProductModal" class="hidden fixed inset-0 z-50 overflow-y-auto" aria-modal="true" role="dialog">
+                            <div class="flex min-h-screen items-end justify-center px-4 pb-20 pt-4 text-center sm:block sm:p-0">
+                                <div class="fixed inset-0 bg-gray-700/70" @click="$refs.addProductModal.classList.add('hidden')"></div>
+                                <span class="hidden sm:inline-block sm:h-screen sm:align-middle" aria-hidden="true">&#8203;</span>
+                                <div class="inline-block w-full max-w-lg transform overflow-hidden rounded-xl bg-white p-6 text-left align-bottom shadow-xl transition-all dark:bg-[#161B22] sm:align-middle">
+                                    <h4 class="text-base font-semibold text-gray-900 dark:text-white">Add New Product</h4>
+                                    <form action="{{ route('funnel.products.store', $landing) }}" method="POST" class="mt-4 space-y-4">
+                                        @csrf
+
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Product Name</label>
+                                            <input type="text" name="name" required class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                        </div>
+
+                                        <div class="grid grid-cols-3 gap-3">
+                                            <div class="col-span-2">
+                                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Price</label>
+                                                <input type="number" step="0.01" name="price" required class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                            </div>
+                                            <div>
+                                                <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Currency</label>
+                                                <select name="currency" class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                    <option value="USD">USD</option>
+                                                    <option value="EUR">EUR</option>
+                                                    <option value="MAD">MAD</option>
+                                                </select>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label class="mb-1 block text-sm font-medium text-gray-700 dark:text-gray-300">Badge Label (optional)</label>
+                                            <input type="text" name="label" class="block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                        </div>
+
+                                        <div class="mt-6 flex items-center justify-end gap-3 border-t border-gray-100 pt-4 dark:border-white/10">
+                                            <button type="button"
+                                                    @click="$refs.addProductModal.classList.add('hidden')"
+                                                    class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 dark:border-white/10 dark:text-gray-300 dark:hover:bg-white/10">
+                                                Cancel
+                                            </button>
+                                            <button type="submit" class="rounded-lg bg-brand-orange px-4 py-2 text-sm font-semibold text-white hover:bg-brand-orange-600">
+                                                Add Product
+                                            </button>
+                                        </div>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
+                    <div x-show="tab === 'checkout'" x-cloak style="display: none;">
+                        <div class="mb-6">
+                            <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Checkout Form Configuration</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">Control which fields are visible and required for checkout.</p>
+                        </div>
+
+                        <form action="{{ route('funnel.fields.store', $landing) }}" method="POST">
+                            @csrf
+
+                            <div class="overflow-x-auto rounded-lg border border-gray-200 dark:border-white/10">
+                                <table class="min-w-full divide-y divide-gray-200 dark:divide-white/10">
+                                    <thead class="bg-gray-50 dark:bg-white/[0.03]">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Field Name</th>
+                                            <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Visible</th>
+                                            <th class="px-6 py-3 text-center text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Required</th>
+                                            <th class="px-6 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">Custom Label</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-gray-100 bg-white dark:divide-white/10 dark:bg-[#161B22]">
+                                        @foreach($checkoutFields as $field)
+                                            <tr>
+                                                <td class="px-6 py-4 text-sm font-medium text-gray-700 capitalize dark:text-gray-200">
+                                                    {{ str_replace('_', ' ', $field->field_name) }}
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <input type="checkbox" name="fields[{{ $field->field_name }}][enabled]" value="1" {{ $field->is_enabled ? 'checked' : '' }} class="h-4 w-4 rounded border-gray-300 text-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22]">
+                                                </td>
+                                                <td class="px-6 py-4 text-center">
+                                                    <input type="checkbox" name="fields[{{ $field->field_name }}][required]" value="1" {{ $field->is_required ? 'checked' : '' }} class="h-4 w-4 rounded border-gray-300 text-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22]">
+                                                </td>
+                                                <td class="px-6 py-4">
+                                                    <input type="text" name="fields[{{ $field->field_name }}][label]" value="{{ $field->label }}" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-800 focus:border-brand-orange focus:ring-brand-orange/20 dark:border-white/10 dark:bg-[#161B22] dark:text-white">
+                                                </td>
+                                            </tr>
+                                        @endforeach
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            <div class="mt-6 flex justify-end">
+                                <button type="submit" class="rounded-lg bg-brand-orange px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-orange-600">
+                                    Save Checkout Fields
+                                </button>
+                            </div>
+                        </form>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
 </x-app-layout>
+
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        const sortableBody = document.getElementById('funnel-steps-sortable');
+        if (!sortableBody) return;
+
+        let draggedRow = null;
+
+        const refreshPositions = () => {
+            const rows = sortableBody.querySelectorAll('[data-step-row]');
+            rows.forEach((row, idx) => {
+                const nextPosition = idx + 1;
+                const positionInput = row.querySelector('.js-position-input');
+                const orderBadge = row.querySelector('.js-row-order');
+
+                if (positionInput) {
+                    positionInput.value = String(nextPosition);
+                }
+                if (orderBadge) {
+                    orderBadge.textContent = String(nextPosition);
+                }
+            });
+        };
+
+        refreshPositions();
+
+        sortableBody.addEventListener('dragstart', (event) => {
+            const row = event.target.closest('[data-step-row]');
+            if (!row) return;
+
+            draggedRow = row;
+            row.classList.add('opacity-60');
+            event.dataTransfer.effectAllowed = 'move';
+            event.dataTransfer.setData('text/plain', row.dataset.pageId || '');
+        });
+
+        sortableBody.addEventListener('dragover', (event) => {
+            if (!draggedRow) return;
+            event.preventDefault();
+
+            const targetRow = event.target.closest('[data-step-row]');
+            if (!targetRow || targetRow === draggedRow) return;
+
+            const rect = targetRow.getBoundingClientRect();
+            const shouldInsertAfter = event.clientY > rect.top + rect.height / 2;
+
+            if (shouldInsertAfter) {
+                targetRow.after(draggedRow);
+            } else {
+                targetRow.before(draggedRow);
+            }
+        });
+
+        sortableBody.addEventListener('drop', (event) => {
+            if (!draggedRow) return;
+            event.preventDefault();
+            refreshPositions();
+        });
+
+        sortableBody.addEventListener('dragend', () => {
+            if (draggedRow) {
+                draggedRow.classList.remove('opacity-60');
+                draggedRow = null;
+            }
+            refreshPositions();
+        });
+    });
+</script>

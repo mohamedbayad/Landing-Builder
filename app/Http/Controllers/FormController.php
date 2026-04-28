@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers;
 
-use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
+use App\Events\Email\FormSubmitted;
+use App\Models\EmailAutomation;
 use App\Models\Form;
 use App\Models\Landing;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 
 class FormController extends Controller
 {
@@ -17,6 +19,7 @@ class FormController extends Controller
             return view('forms.index', [
                 'forms' => new \Illuminate\Pagination\LengthAwarePaginator([], 0, 15),
                 'endpoints' => collect(),
+                'automations' => collect(),
             ]);
         }
         
@@ -28,9 +31,14 @@ class FormController extends Controller
             ->latest()
             ->paginate(15);
 
-        $endpoints = $workspace->formEndpoints()->withCount('forms')->get();
+        $endpoints = $workspace->formEndpoints()->with('defaultAutomation')->withCount('forms')->get();
+        $automations = EmailAutomation::query()
+            ->where('user_id', Auth::id())
+            ->where('trigger_type', 'form_submitted')
+            ->orderBy('name')
+            ->get(['id', 'name', 'status']);
 
-        return view('forms.index', compact('forms', 'endpoints'));
+        return view('forms.index', compact('forms', 'endpoints', 'automations'));
     }
 
     public function store(Request $request)
@@ -42,13 +50,30 @@ class FormController extends Controller
         ]);
 
         $formData = json_decode($validated['data'], true);
+        $landing = Landing::query()->find($validated['landing_id']);
 
-        Form::create([
+        $form = Form::create([
             'landing_id' => $validated['landing_id'],
             'email' => $validated['email'] ?? ($formData['email'] ?? null),
             'data' => $formData,
             'ip_address' => $request->ip(),
         ]);
+
+        $userId = $landing->workspace?->user_id;
+        if ($userId) {
+            event(new FormSubmitted(
+                userId: $userId,
+                formId: $form->id,
+                landingId: $landing->id,
+                formEndpointId: null,
+                preferredAutomationId: $landing->settings?->form_automation_id,
+                email: $form->email,
+                firstName: $formData['first_name'] ?? $formData['billing_first_name'] ?? null,
+                lastName: $formData['last_name'] ?? $formData['billing_last_name'] ?? null,
+                phone: $formData['phone'] ?? $formData['billing_phone'] ?? null,
+                data: $formData
+            ));
+        }
 
         return response()->json(['success' => true]);
     }

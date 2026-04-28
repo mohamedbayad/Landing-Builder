@@ -117,6 +117,11 @@ class Landing extends Model
         return $this->hasMany(LandingPage::class);
     }
 
+    public function funnelPages()
+    {
+        return $this->hasMany(LandingPage::class)->orderBy('funnel_position')->orderBy('id');
+    }
+
     public function trackingEvents()
     {
         return $this->hasMany(TrackingEvent::class);

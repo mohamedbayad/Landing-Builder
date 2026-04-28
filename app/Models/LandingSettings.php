@@ -27,10 +27,22 @@ class LandingSettings extends Model
         'enable_card',
         'enable_paypal',
         'enable_cod',
+        'form_automation_id',
+        'checkout_automation_id',
     ];
 
     public function landing()
     {
         return $this->belongsTo(Landing::class);
+    }
+
+    public function formAutomation()
+    {
+        return $this->belongsTo(EmailAutomation::class, 'form_automation_id');
+    }
+
+    public function checkoutAutomation()
+    {
+        return $this->belongsTo(EmailAutomation::class, 'checkout_automation_id');
     }
 }

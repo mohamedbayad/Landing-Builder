@@ -22,6 +22,7 @@
                             ['id' => 'seo',       'label' => 'SEO & Metadata'],
                             ['id' => 'scripts',   'label' => 'Scripts & Pixels'],
                             ['id' => 'payments',  'label' => 'Payment Settings'],
+                            ['id' => 'email',     'label' => 'Email Automation'],
                             ['id' => 'cart',      'label' => 'Shopping Cart'],
                             ['id' => 'countdown', 'label' => 'Countdown Timer'],
                         ] as $t)
@@ -163,6 +164,50 @@
                                                    class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange transition-colors">
                                             <input type="password" name="paypal_secret" value="{{ old('paypal_secret', $landing->settings->paypal_secret ?? '') }}" placeholder="Secret"
                                                    class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange transition-colors">
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Shopping Cart Tab -->
+                        <div x-show="tab === 'email'" x-cloak style="display: none;">
+                            <div class="space-y-6">
+                                <div class="bg-gray-50 dark:bg-white/[0.02] p-5 rounded-xl border border-gray-100 dark:border-white/[0.06]">
+                                    <h3 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Automation Integration</h3>
+                                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-4">
+                                        Connect this landing to specific email automations for form submissions and checkout completions.
+                                    </p>
+
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label for="form_automation_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Form Automation</label>
+                                            <select id="form_automation_id" name="form_automation_id"
+                                                    class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange transition-colors">
+                                                <option value="">None (trigger all active form automations)</option>
+                                                @foreach(($automations ?? collect())->where('trigger_type', 'form_submitted') as $automation)
+                                                    <option value="{{ $automation->id }}"
+                                                            {{ (string) old('form_automation_id', $landing->settings->form_automation_id ?? '') === (string) $automation->id ? 'selected' : '' }}>
+                                                        {{ $automation->name }} ({{ $automation->status }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('form_automation_id') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
+                                        </div>
+
+                                        <div>
+                                            <label for="checkout_automation_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Checkout Automation</label>
+                                            <select id="checkout_automation_id" name="checkout_automation_id"
+                                                    class="block w-full rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-[#161B22] text-sm text-gray-700 dark:text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand-orange/20 focus:border-brand-orange transition-colors">
+                                                <option value="">None (trigger all active checkout automations)</option>
+                                                @foreach(($automations ?? collect())->where('trigger_type', 'checkout_completed') as $automation)
+                                                    <option value="{{ $automation->id }}"
+                                                            {{ (string) old('checkout_automation_id', $landing->settings->checkout_automation_id ?? '') === (string) $automation->id ? 'selected' : '' }}>
+                                                        {{ $automation->name }} ({{ $automation->status }})
+                                                    </option>
+                                                @endforeach
+                                            </select>
+                                            @error('checkout_automation_id') <p class="text-red-500 text-xs mt-1">{{ $message }}</p> @enderror
                                         </div>
                                     </div>
                                 </div>

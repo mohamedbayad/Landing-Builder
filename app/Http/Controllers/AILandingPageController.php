@@ -40,7 +40,7 @@ class AILandingPageController extends Controller
     {
         $validated = $request->validate([
             'product_name' => 'required|string|max:255',
-            'product_image' => 'required|image|max:10240', // 10MB
+            'product_image' => 'nullable|image|max:10240', // 10MB (optional)
             'description' => 'nullable|string',
             'audience' => 'nullable|string',
             'offer' => 'nullable|string',
@@ -52,24 +52,28 @@ class AILandingPageController extends Controller
             \Illuminate\Support\Facades\Log::info("AI Generation Request Received", ['product' => $request->product_name]);
 
             $workspace = auth()->user()->workspaces()->first();
-
-            // 1. Diagnose File Input (Debugging Request)
-            if (!$request->hasFile('product_image')) {
-                \Illuminate\Support\Facades\Log::error("Upload Failure: Request has no 'product_image' file.");
-                return response()->json(['status' => 'error', 'message' => "No file uploaded. Please check the 'product_image' field."], 400);
+            if (!$workspace) {
+                return response()->json([
+                    'status' => 'error',
+                    'message' => 'No active workspace found for your account.',
+                ], 422);
             }
 
-            // 2. Use ImageStorageService for the full pipeline
-            $uploadResult = $this->imageService->store($request->file('product_image'));
+            $imagePath = null;
+            $imageUrl = null;
+            if ($request->hasFile('product_image')) {
+                $uploadResult = $this->imageService->store($request->file('product_image'));
+                if (!$uploadResult['success']) {
+                    return response()->json(['status' => 'error', 'message' => "Storage failed: " . $uploadResult['error']], 500);
+                }
 
-            if (!$uploadResult['success']) {
-                return response()->json(['status' => 'error', 'message' => "Storage failed: " . $uploadResult['error']], 500);
+                $imagePath = $uploadResult['absolute_path'] ?? null;
+                $imageUrl = $uploadResult['url'] ?? null;
             }
 
-            // 3. Prepare input for pipeline (Fixed: No temporary cleanup)
-            $input = $request->all();
-            $input['image_path'] = $uploadResult['absolute_path'];
-            $input['image_url'] = $uploadResult['url'];
+            $input = $validated;
+            $input['image_path'] = $imagePath;
+            $input['image_url'] = $imageUrl;
             $input['is_temporary'] = false; // Changed to false to prevent job cleanup if it's meant to be permanent
             $input['niche'] = $request->description;
 

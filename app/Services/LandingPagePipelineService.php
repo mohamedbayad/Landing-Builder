@@ -60,7 +60,47 @@ class LandingPagePipelineService
   \"identity_lock\": \"Detailed physical inventory of the product's geometry, branding, and shape.\"
 }";
 
-        $rawAnalysis = $this->agent->generateDirect($analysisPrompt, "You are a concise product analyst extracting visual and market data.", '', $imagePath, 'vision', $workspaceId);
+        if (!empty($imagePath) && is_string($imagePath) && is_file($imagePath)) {
+            $rawAnalysis = $this->agent->generateDirect(
+                $analysisPrompt,
+                "You are a concise product analyst extracting visual and market data.",
+                '',
+                $imagePath,
+                'vision',
+                $workspaceId
+            );
+        } else {
+            $textOnlyPrompt = "Analyze this product brief and infer product identity. Reply ONLY with a JSON object using the same keys:
+{
+  \"name\": \"product name\",
+  \"cat\": \"category\",
+  \"sub\": \"subcategory\",
+  \"mat\": \"materials\",
+  \"col\": \"colors\",
+  \"style\": \"design style\",
+  \"audience\": \"target audience\",
+  \"uses\": [\"use 1\", \"use 2\"],
+  \"feats\": [\"feature 1\", \"feature 2\"],
+  \"keywords\": [\"keyword 1\", \"keyword 2\"],
+  \"identity_lock\": \"Best-effort physical description inferred from text only.\"
+}
+
+Product name: " . ($input['product_name'] ?? 'Unknown Product') . "
+Description: " . ($input['description'] ?? '') . "
+Audience: " . ($input['audience'] ?? '') . "
+Offer: " . ($input['offer'] ?? '') . "
+CTA: " . ($input['cta'] ?? '') . "
+Language: " . ($input['language'] ?? 'English');
+
+            $rawAnalysis = $this->agent->generateDirect(
+                $textOnlyPrompt,
+                "You are a concise product analyst extracting market data from text when no image is provided.",
+                '',
+                null,
+                'text_generation',
+                $workspaceId
+            );
+        }
         
         $analysis = [
             'product_name_guess' => $rawAnalysis['name'] ?? $input['product_name'] ?? 'Unknown Product',
