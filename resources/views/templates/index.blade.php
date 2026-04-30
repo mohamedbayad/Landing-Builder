@@ -10,6 +10,12 @@
                     <a href="{{ route('templates.my') }}" class="px-4 py-2 rounded-lg border border-gray-200 dark:border-white/[0.08] text-sm font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/[0.05]">My Templates</a>
                 @endif
                 @if(auth()->user()->hasAnyRole(['super-admin', 'admin']))
+                    <form action="{{ route('templates.repair-upload') }}" method="POST" class="inline-block" onsubmit="return confirm('Run template upload repair now?')">
+                        @csrf
+                        <button type="submit" class="px-4 py-2 rounded-lg border border-amber-300 text-amber-700 bg-amber-50 text-sm font-semibold hover:bg-amber-100">
+                            Repair Upload Issues
+                        </button>
+                    </form>
                     <a href="{{ route('templates.create') }}" class="px-4 py-2 rounded-lg bg-brand-orange text-white text-sm font-semibold hover:bg-brand-orange-600">Add Template</a>
                 @endif
             </div>
@@ -60,6 +66,13 @@
                                 </form>
                                 @if(auth()->user()->hasAnyRole(['super-admin', 'admin']))
                                     <a href="{{ route('templates.edit', $template) }}" class="px-3 py-2 rounded-lg border border-gray-200 dark:border-white/[0.08] text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/[0.05]">Edit</a>
+                                    <form action="{{ route('templates.destroy', $template) }}" method="POST" class="inline-block" onsubmit="return confirm('Remove this template permanently? This cannot be undone.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="px-3 py-2 rounded-lg border border-red-200 text-red-700 text-sm hover:bg-red-50 dark:border-red-500/30 dark:text-red-300 dark:hover:bg-red-500/10">
+                                            Remove
+                                        </button>
+                                    </form>
                                 @endif
                             </div>
                         </div>

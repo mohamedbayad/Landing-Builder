@@ -325,6 +325,12 @@ class PluginController extends Controller
         } catch (ValidationException $e) {
             report($e);
         }
+
+        try {
+            $pluginManager->install($this->grapesJsLpBuilderManifest(), true);
+        } catch (ValidationException $e) {
+            report($e);
+        }
     }
 
     protected function tailwindEditorManifest(): array
@@ -515,6 +521,78 @@ class PluginController extends Controller
                 'builder_version' => '>=2.0.0',
                 'php' => '>=8.1',
                 'plugins' => ['tailwind-css'],
+            ],
+        ];
+    }
+
+    protected function grapesJsLpBuilderManifest(): array
+    {
+        return [
+            'name' => 'GrapesJS LP Builder',
+            'slug' => 'grapesjs-lp-builder',
+            'version' => '1.0.0',
+            'author' => 'Funnel Builder Core',
+            'description' => 'Adds section-aware GSAP and Three.js controls for LP templates, plus manifest prefill and export animation regeneration.',
+            'category' => 'enhancement',
+            'icon' => 'layers',
+            'hooks' => ['editor.init', 'editor.ready', 'page.save'],
+            'settings' => [
+                'enabled' => [
+                    'type' => 'select',
+                    'label' => 'Enable LP Builder Plugin',
+                    'required' => false,
+                    'options' => [
+                        ['value' => '1', 'label' => 'Enabled'],
+                        ['value' => '0', 'label' => 'Disabled'],
+                    ],
+                ],
+                'gsap' => [
+                    'type' => 'select',
+                    'label' => 'Enable GSAP Sections',
+                    'required' => false,
+                    'options' => [
+                        ['value' => '1', 'label' => 'Enabled'],
+                        ['value' => '0', 'label' => 'Disabled'],
+                    ],
+                ],
+                'threejs' => [
+                    'type' => 'select',
+                    'label' => 'Enable Three.js Sections',
+                    'required' => false,
+                    'options' => [
+                        ['value' => '1', 'label' => 'Enabled'],
+                        ['value' => '0', 'label' => 'Disabled'],
+                    ],
+                ],
+                'gsap_version' => [
+                    'type' => 'text',
+                    'label' => 'GSAP Version',
+                    'required' => false,
+                ],
+                'three_version' => [
+                    'type' => 'text',
+                    'label' => 'Three.js Version',
+                    'required' => false,
+                ],
+                'debug' => [
+                    'type' => 'select',
+                    'label' => 'Debug Logging',
+                    'required' => false,
+                    'options' => [
+                        ['value' => '0', 'label' => 'Disabled'],
+                        ['value' => '1', 'label' => 'Enabled'],
+                    ],
+                ],
+            ],
+            'permissions' => [],
+            'assets' => [
+                'js' => [],
+                'css' => [],
+            ],
+            'requires' => [
+                'builder_version' => '>=2.0.0',
+                'php' => '>=8.1',
+                'plugins' => [],
             ],
         ];
     }

@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Symfony\Component\HttpFoundation\Response;
 use App\Models\Landing;
 use App\Services\AnalyticsTrackerService;
+use App\Support\LandingPublicUrl;
 
 class TrackPageVisit
 {
@@ -65,6 +66,20 @@ class TrackPageVisit
             $landing = Landing::where('slug', $landingSlug)->first();
         }
 
+        if (!$landing && $workspaceEndpoint = $request->route('workspaceEndpoint')) {
+            $baseQuery = Landing::query()
+                ->where('status', 'published')
+                ->whereHas('workspace.settings', function ($query) use ($workspaceEndpoint) {
+                    $query->where('workspace_public_endpoint', strtolower((string) $workspaceEndpoint));
+                });
+
+            $landing = (clone $baseQuery)
+                ->where('is_main', true)
+                ->first()
+                ?? (clone $baseQuery)
+                ->first();
+        }
+
         if (!$landing && $request->path() === '/') {
             if (app()->has('active_landing_page') && app('active_landing_page') instanceof Landing) {
                 $landing = app('active_landing_page');
@@ -72,9 +87,14 @@ class TrackPageVisit
         }
 
         if (!$landing && $request->path() === '/') {
-            $landing = Landing::where('is_main', true)
+            $landing = Landing::query()
+                ->where('is_main', true)
                 ->where('status', 'published')
-                ->first();
+                ->with(['workspace.user.roles'])
+                ->get()
+                ->first(function (Landing $candidate) {
+                    return LandingPublicUrl::isPlatformMainLanding($candidate);
+                });
         }
 
         return $landing;
@@ -97,6 +117,9 @@ class TrackPageVisit
             'public.home',
             'public.page',
             'public.landing.page',
+            'public.workspace.home',
+            'public.workspace.landing',
+            'public.workspace.landing.page',
             'landings.checkout'
         ];
 

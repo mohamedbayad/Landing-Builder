@@ -53,6 +53,7 @@ class AccessControlSeeder extends Seeder
             'integrations.manage',
             'custom_code.manage',
             'tech.manage',
+            'custom_domains.manage',
         ];
 
         foreach ($permissionNames as $permissionName) {
@@ -84,7 +85,7 @@ class AccessControlSeeder extends Seeder
                     'builder.access', 'builder.export', 'builder.import',
                     'settings.view', 'settings.edit', 'analytics.view',
                     'plugins.manage', 'integrations.manage', 'custom_code.manage',
-                    'tech.manage',
+                    'tech.manage', 'custom_domains.manage',
                 ],
             ],
             'subscriber' => [
@@ -94,7 +95,7 @@ class AccessControlSeeder extends Seeder
                     'templates.view',
                     'landing_pages.view', 'landing_pages.create', 'landing_pages.edit',
                     'builder.access', 'builder.export', 'builder.import',
-                    'analytics.view',
+                    'analytics.view', 'custom_domains.manage',
                 ],
             ],
             'developer' => [

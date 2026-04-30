@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Landing;
 use App\Models\Product;
+use App\Support\LandingPublicUrl;
 use App\Http\Controllers\LeadsController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -128,7 +129,7 @@ class PaymentController extends Controller
                 // Return URL for redirection
                 $thankYouPage = $landing->pages()->where('type', 'thankyou')->first();
                 $redirectUrl = $thankYouPage 
-                    ? ($landing->is_main ? '/'.$thankYouPage->slug : route('landings.preview', [$landing, $thankYouPage]))
+                    ? LandingPublicUrl::signedPageUrl($landing, $thankYouPage)
                     : null;
 
                 return response()->json(['status' => 'COMPLETED', 'redirect_url' => $redirectUrl]);

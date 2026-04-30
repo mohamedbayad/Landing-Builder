@@ -443,8 +443,9 @@
                                         <span class="text-sm font-medium text-gray-900 dark:text-white">{{ Str::limit($landing->name, 28) }}</span>
                                     </td>
                                     <td class="px-6 py-4">
+                                        @php($isPlatformMain = \App\Support\LandingPublicUrl::isPlatformMainLanding($landing))
                                         <span class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold {{ $landing->is_main ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20' : 'bg-gray-100 text-gray-600 dark:bg-white/[0.05] dark:text-gray-400 border border-gray-200 dark:border-white/[0.08]' }}">
-                                            {{ $landing->is_main ? 'Live' : 'Draft' }}
+                                            {{ $landing->is_main ? ($isPlatformMain ? 'Main Landing (Platform Root)' : 'Workspace Default') : 'Secondary' }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4 text-right">

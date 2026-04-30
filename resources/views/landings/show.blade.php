@@ -70,15 +70,7 @@
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap">
                                         <div class="text-sm font-mono text-gray-500 dark:text-gray-400">
-                                            @if($landing->is_main && $page->type === 'index')
-                                                /
-                                            @elseif($landing->is_main)
-                                                /{{ $page->slug }}
-                                            @elseif($page->type === 'index')
-                                                /p/{{ $landing->slug }}
-                                            @else
-                                                /p/{{ $landing->slug }}/{{ $page->slug }}
-                                            @endif
+                                            {{ parse_url(\App\Support\LandingPublicUrl::pageUrl($landing, $page), PHP_URL_PATH) }}
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 whitespace-nowrap text-right">

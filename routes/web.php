@@ -3,11 +3,6 @@
 use App\Http\Controllers\ProfileController;
 use Illuminate\Support\Facades\Route;
 
-Route::get('/', function () {
-    return view('welcome');
-});
-
-
 Route::get('/debug-rec/{sessionId}', function ($sessionId) {
     $session = \App\Models\RecordingSession::where('session_id', $sessionId)->with('pages.events')->firstOrFail();
     $landingPage = $session->landingPage;
@@ -48,12 +43,18 @@ Route::middleware('auth')->group(function () {
         Route::post('/upload', [App\Http\Controllers\TemplateController::class, 'upload'])
             ->name('upload')
             ->middleware(['permission:templates.upload', 'permission:tech.manage']);
+        Route::post('/repair-upload', [App\Http\Controllers\TemplateController::class, 'repairUploadIssues'])
+            ->name('repair-upload')
+            ->middleware(['permission:templates.upload', 'permission:tech.manage']);
         Route::get('/{template}/edit', [App\Http\Controllers\TemplateController::class, 'edit'])
             ->name('edit')
             ->middleware(['permission:templates.edit', 'permission:tech.manage']);
         Route::put('/{template}', [App\Http\Controllers\TemplateController::class, 'update'])
             ->name('update')
             ->middleware(['permission:templates.edit', 'permission:tech.manage']);
+        Route::delete('/{template}', [App\Http\Controllers\TemplateController::class, 'destroy'])
+            ->name('destroy')
+            ->middleware(['permission:templates.delete', 'permission:tech.manage']);
         Route::patch('/{template}/toggle-status', [App\Http\Controllers\TemplateController::class, 'toggleStatus'])
             ->name('toggle-status')
             ->middleware(['permission:templates.publish', 'permission:tech.manage']);
@@ -181,7 +182,9 @@ Route::middleware('auth')->group(function () {
     });
 
     // Custom Domains - Admin
-    Route::prefix('dashboard/domains')->group(function () {
+    Route::prefix('dashboard/domains')
+        ->middleware('permission:custom_domains.manage')
+        ->group(function () {
         Route::get('/', [\App\Http\Controllers\CustomDomainController::class, 'index'])->name('domains.index');
         Route::post('/', [\App\Http\Controllers\CustomDomainController::class, 'store'])->name('domains.store');
         Route::get('/{domain}', [\App\Http\Controllers\CustomDomainController::class, 'show'])->name('domains.show');
@@ -373,6 +376,19 @@ Route::get('/email/unsubscribe/{contact}', [App\Http\Controllers\EmailTrackingCo
 Route::get('/invoices/{lead}', [App\Http\Controllers\InvoiceController::class, 'download'])->name('invoices.download')->middleware('signed');
 
 // Catch-all public landing routes (must stay last)
+Route::get('/w/{workspaceEndpoint}', [App\Http\Controllers\PublicLandingController::class, 'workspaceHome'])
+    ->where('workspaceEndpoint', '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+    ->name('public.workspace.home');
+Route::get('/w/{workspaceEndpoint}/{landingSlug}', [App\Http\Controllers\PublicLandingController::class, 'workspaceLanding'])
+    ->where('workspaceEndpoint', '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+    ->where('landingSlug', '^[a-zA-Z0-9-_]+$')
+    ->name('public.workspace.landing');
+Route::get('/w/{workspaceEndpoint}/{landingSlug}/{pageSlug}', [App\Http\Controllers\PublicLandingController::class, 'workspaceLandingPage'])
+    ->where('workspaceEndpoint', '^[a-z0-9]+(?:-[a-z0-9]+)*$')
+    ->where('landingSlug', '^[a-zA-Z0-9-_]+$')
+    ->where('pageSlug', '^[a-zA-Z0-9-_]+$')
+    ->name('public.workspace.landing.page');
+
 Route::get('/', [App\Http\Controllers\PublicLandingController::class, 'home'])->name('public.home');
 Route::get('/{slug}', [App\Http\Controllers\PublicLandingController::class, 'page'])->where('slug', '^[a-zA-Z0-9-_]+$')->name('public.page');
 Route::get('/{landingSlug}/{pageSlug}', [App\Http\Controllers\PublicLandingController::class, 'landingSubPage'])

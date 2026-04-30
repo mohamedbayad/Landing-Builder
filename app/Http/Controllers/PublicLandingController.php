@@ -4,7 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Landing;
 use App\Models\LandingPage;
-use Illuminate\Http\Request;
+use App\Support\LandingPublicUrl;
 
 class PublicLandingController extends Controller
 {
@@ -13,16 +13,12 @@ class PublicLandingController extends Controller
      */
     public function home()
     {
-        // Resolve landing in this order:
-        // 1) active custom-domain landing
-        // 2) global published main landing (public fallback)
         $mainLanding = $this->resolveMainLandingForRequest();
 
         if (!$mainLanding) {
             return view('welcome'); // Default Laravel welcome
         }
 
-        // Find the 'index' page of this landing (fallback to first page)
         $page = $mainLanding->pages()->where('type', 'index')->first()
             ?? $mainLanding->pages()->first();
 
@@ -30,158 +26,52 @@ class PublicLandingController extends Controller
             abort(404);
         }
 
-        $html = $this->renderLandingPage($mainLanding, $page);
-        return response($this->injectRecordingSnippet($html, $mainLanding, 'landing'));
+        return $this->respondWithLandingPage($mainLanding, $page);
     }
 
     /**
-     * Serve a sub-page of the main landing (e.g. /checkout)
-     * OR serve a specific landing by its slug (e.g., /lp-copy-3JDCG5)
+     * Legacy single-segment public route.
+     * 1) Custom-domain page slug under active landing
+     * 2) Page slug under platform main landing
+     * 3) Legacy landing slug for non-platform landings -> redirect to /w/{workspace}/{landing}
      */
     public function page($slug)
-    {
-        $activeLandingPage = app()->has('active_landing_page') 
-            ? app('active_landing_page') 
-            : null;
-
-        if ($activeLandingPage) {
-            $page = $activeLandingPage->pages()->where('slug', $slug)->first();
-            if ($page) {
-                $data = ['landing' => $activeLandingPage, 'page' => $page];
-                if ($page->type === 'checkout') {
-                    $data = array_merge($data, $this->getCheckoutData($activeLandingPage));
-                }
-                
-                // Thank You Page - add layout
-                if ($page->type === 'thankyou') {
-                    $wsSettings = $activeLandingPage->workspace->settings ?? null;
-                    $data['thankyouLayout'] = $wsSettings->thankyou_style ?? 'thankyou_1';
-                    
-                    if (request()->has('lead')) {
-                        $leadId = request()->query('lead');
-                        $lead = \App\Models\Lead::find($leadId);
-                        if ($lead && $lead->landing_id == $activeLandingPage->id) {
-                            $data['lead'] = $lead;
-                        }
-                    }
-                }
-
-                $html = $this->renderLandingPage($activeLandingPage, $page, $data);
-        $html = $this->normalizePreviewAssets($html);
-                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
-                return response($this->injectRecordingSnippet($html, $activeLandingPage, $pageTypeMapped));
-            }
-        }
-
-        // 1. First, try to find a page under the resolved Main Landing
-        // (global published main unless custom-domain binding exists)
-        $mainLanding = $this->resolveMainLandingForRequest();
-
-        if ($mainLanding) {
-            // Check if slug matches a page under main landing
-            $page = $mainLanding->pages()->where('slug', $slug)->first();
-            
-            if ($page) {
-                // Check visibility
-                if ($mainLanding->status !== 'published') {
-                    if (!request()->user() || request()->user()->id != $mainLanding->workspace->user_id) {
-                        abort(404);
-                    }
-                }
-
-                // Security: Protect Thank You Pages
-                if ($page->type === 'thankyou') {
-                    if (!request()->hasValidSignature()) {
-                        abort(403, 'Unauthorized access to Thank You page.');
-                    }
-                }
-
-                $data = ['landing' => $mainLanding, 'page' => $page];
-
-                if ($page->type === 'checkout') {
-                    $data = array_merge($data, $this->getCheckoutData($mainLanding));
-                }
-                
-                // Thank You Page - add layout
-                if ($page->type === 'thankyou') {
-                    $wsSettings = $mainLanding->workspace->settings ?? null;
-                    $data['thankyouLayout'] = $wsSettings->thankyou_style ?? 'thankyou_1';
-                    
-                    if (request()->has('lead')) {
-                        $leadId = request()->query('lead');
-                        $lead = \App\Models\Lead::find($leadId);
-                        if ($lead && $lead->landing_id == $mainLanding->id) {
-                            $data['lead'] = $lead;
-                        }
-                    }
-                }
-
-                $html = $this->renderLandingPage($mainLanding, $page, $data);
-        $html = $this->normalizePreviewAssets($html);
-                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
-                return response($this->injectRecordingSnippet($html, $mainLanding, $pageTypeMapped));
-            }
-        }
-
-        // 2. If not a main landing page, check if slug matches another Landing
-        $landing = Landing::where('slug', $slug)->first();
-
-        if ($landing) {
-            // Check visibility - must be published for public access
-            if ($landing->status !== 'published') {
-                if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
-                    abort(404);
-                }
-            }
-
-            // Find the index page of this landing
-            $page = $landing->pages()->where('type', 'index')->first();
-
-            if (!$page) {
-                // Fallback to first page if no index
-                $page = $landing->pages()->first();
-            }
-
-            if ($page) {
-                $data = ['landing' => $landing, 'page' => $page];
-
-                if ($page->type === 'checkout') {
-                    $data = array_merge($data, $this->getCheckoutData($landing));
-                }
-
-                $html = $this->renderLandingPage($landing, $page, $data);
-        $html = $this->normalizePreviewAssets($html);
-                $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
-                return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
-            }
-        }
-
-        // 3. Nothing found - 404
-        abort(404);
-    }
-
-    /**
-     * Resolve which landing should act as "main" for the current request.
-     *
-     * Priority:
-     * 1) Active custom-domain landing (if bound by middleware)
-     * 2) Global published main landing
-     */
-    private function resolveMainLandingForRequest(): ?Landing
     {
         $activeLandingPage = app()->has('active_landing_page')
             ? app('active_landing_page')
             : null;
 
         if ($activeLandingPage instanceof Landing) {
-            return $activeLandingPage;
+            $page = $activeLandingPage->pages()->where('slug', $slug)->first();
+            if ($page) {
+                return $this->respondWithLandingPage($activeLandingPage, $page);
+            }
         }
 
-        return Landing::where('is_main', true)
-            ->where('status', 'published')
-            ->orderByDesc('updated_at')
-            ->orderByDesc('id')
-            ->first();
+        $mainLanding = $this->resolveMainLandingForRequest();
+        if ($mainLanding instanceof Landing) {
+            $page = $mainLanding->pages()->where('slug', $slug)->first();
+            if ($page) {
+                return $this->respondWithLandingPage($mainLanding, $page);
+            }
+        }
+
+        $landing = Landing::where('slug', $slug)->first();
+        if ($landing) {
+            $this->assertLandingVisible($landing);
+
+            if (LandingPublicUrl::isPlatformMainLanding($landing)) {
+                $indexPage = $landing->pages()->where('type', 'index')->first()
+                    ?? $landing->pages()->first();
+                if ($indexPage) {
+                    return $this->respondWithLandingPage($landing, $indexPage);
+                }
+            } else {
+                return $this->redirectLegacyLandingToWorkspace($landing);
+            }
+        }
+
+        abort(404);
     }
 
     public function preview(Landing $landing, LandingPage $page)
@@ -253,12 +143,7 @@ class PublicLandingController extends Controller
 
     public function checkoutFlow(Landing $landing)
     {
-        // Visibility check
-        if ($landing->status !== 'published') {
-            if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
-                abort(404);
-            }
-        }
+        $this->assertLandingVisible($landing);
 
         $page = $landing->pages()->where('type', 'checkout')->first();
 
@@ -266,57 +151,183 @@ class PublicLandingController extends Controller
             abort(404, 'Checkout page not found.');
         }
 
-        $data = ['landing' => $landing, 'page' => $page];
-        $data = array_merge($data, $this->getCheckoutData($landing));
-
-        $html = $this->renderLandingPage($landing, $page, $data);
-        $html = $this->normalizePreviewAssets($html);
-        return response($this->injectRecordingSnippet($html, $landing, 'checkout'));
+        return $this->respondWithLandingPage($landing, $page);
     }
 
-    /**
-     * Serve a sub-page of a specific landing (e.g., /lp-copy-3JDCG5/checkout)
-     */
-    public function landingSubPage($landingSlug, $pageSlug)
+    public function workspaceHome(string $workspaceEndpoint)
     {
-        $landing = Landing::where('slug', $landingSlug)->first();
-
+        $landing = $this->resolveWorkspaceMainLanding($workspaceEndpoint);
         if (!$landing) {
             abort(404);
         }
 
-        // Check visibility
-        if ($landing->status !== 'published') {
-            if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
-                abort(404);
-            }
-        }
-
-        // Find the page by slug
-        $page = $landing->pages()->where('slug', $pageSlug)->first();
-
+        $page = $landing->pages()->where('type', 'index')->first()
+            ?? $landing->pages()->first();
         if (!$page) {
             abort(404);
         }
 
-        // Security: Protect Thank You Pages
-        if ($page->type === 'thankyou') {
-            if (!request()->hasValidSignature()) {
-                abort(403, 'Unauthorized access to Thank You page.');
-            }
+        return $this->respondWithLandingPage($landing, $page);
+    }
+
+    public function workspaceLanding(string $workspaceEndpoint, string $landingSlug)
+    {
+        $landing = $this->resolveWorkspaceLanding($workspaceEndpoint, $landingSlug);
+        if (!$landing) {
+            abort(404);
         }
 
+        $this->assertLandingVisible($landing);
+
+        $page = $landing->pages()->where('type', 'index')->first()
+            ?? $landing->pages()->first();
+        if (!$page) {
+            abort(404);
+        }
+
+        return $this->respondWithLandingPage($landing, $page);
+    }
+
+    public function workspaceLandingPage(string $workspaceEndpoint, string $landingSlug, string $pageSlug)
+    {
+        $landing = $this->resolveWorkspaceLanding($workspaceEndpoint, $landingSlug);
+        if (!$landing) {
+            abort(404);
+        }
+
+        $this->assertLandingVisible($landing);
+
+        $page = $landing->pages()->where('slug', $pageSlug)->first();
+        if (!$page) {
+            abort(404);
+        }
+
+        return $this->respondWithLandingPage($landing, $page);
+    }
+
+    /**
+     * Legacy sub-page route: /{landingSlug}/{pageSlug}
+     */
+    public function landingSubPage($landingSlug, $pageSlug)
+    {
+        $landing = Landing::where('slug', $landingSlug)->first();
+        if (!$landing) {
+            abort(404);
+        }
+
+        $this->assertLandingVisible($landing);
+
+        $page = $landing->pages()->where('slug', $pageSlug)->first();
+        if (!$page) {
+            abort(404);
+        }
+
+        if (LandingPublicUrl::isPlatformMainLanding($landing)) {
+            return $this->respondWithLandingPage($landing, $page);
+        }
+
+        return $this->redirectLegacyLandingPageToWorkspace($landing, $page);
+    }
+
+    /**
+     * Resolve which landing should act as "main" for the current request.
+     *
+     * Priority:
+     * 1) Active custom-domain landing (if bound by middleware)
+     * 2) Global published main landing owned by admin/super-admin
+     */
+    private function resolveMainLandingForRequest(): ?Landing
+    {
+        $activeLandingPage = app()->has('active_landing_page')
+            ? app('active_landing_page')
+            : null;
+
+        if ($activeLandingPage instanceof Landing) {
+            if ($activeLandingPage->status === 'published') {
+                return $activeLandingPage;
+            }
+
+            return null;
+        }
+
+        return Landing::query()
+            ->where('is_main', true)
+            ->where('status', 'published')
+            ->with(['workspace.user.roles'])
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->get()
+            ->first(function (Landing $landing) {
+                return LandingPublicUrl::isPlatformMainLanding($landing);
+            });
+    }
+
+    private function resolveWorkspaceMainLanding(string $workspaceEndpoint): ?Landing
+    {
+        $workspaceEndpoint = strtolower(trim($workspaceEndpoint));
+        $baseQuery = Landing::query()
+            ->where('status', 'published')
+            ->whereHas('workspace.settings', function ($query) use ($workspaceEndpoint) {
+                $query->where('workspace_public_endpoint', $workspaceEndpoint);
+            })
+            ->with('workspace.settings');
+
+        $mainLanding = (clone $baseQuery)
+            ->where('is_main', true)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+
+        if ($mainLanding) {
+            return $mainLanding;
+        }
+
+        return (clone $baseQuery)
+            ->orderByDesc('updated_at')
+            ->orderByDesc('id')
+            ->first();
+    }
+
+    private function resolveWorkspaceLanding(string $workspaceEndpoint, string $landingSlug): ?Landing
+    {
+        $workspaceEndpoint = strtolower(trim($workspaceEndpoint));
+
+        return Landing::query()
+            ->where('slug', $landingSlug)
+            ->whereHas('workspace.settings', function ($query) use ($workspaceEndpoint) {
+                $query->where('workspace_public_endpoint', $workspaceEndpoint);
+            })
+            ->with('workspace.settings')
+            ->first();
+    }
+
+    private function assertLandingVisible(Landing $landing): void
+    {
+        if ($landing->status === 'published') {
+            return;
+        }
+
+        if (!request()->user() || request()->user()->id != $landing->workspace->user_id) {
+            abort(404);
+        }
+    }
+
+    private function buildLandingViewData(Landing $landing, LandingPage $page): array
+    {
         $data = ['landing' => $landing, 'page' => $page];
 
         if ($page->type === 'checkout') {
             $data = array_merge($data, $this->getCheckoutData($landing));
         }
 
-        // Thank You Page - add layout
         if ($page->type === 'thankyou') {
+            if (!request()->hasValidSignature()) {
+                abort(403, 'Unauthorized access to Thank You page.');
+            }
+
             $wsSettings = $landing->workspace->settings ?? null;
             $data['thankyouLayout'] = $wsSettings->thankyou_style ?? 'thankyou_1';
-            
+
             if (request()->has('lead')) {
                 $leadId = request()->query('lead');
                 $lead = \App\Models\Lead::find($leadId);
@@ -326,10 +337,51 @@ class PublicLandingController extends Controller
             }
         }
 
+        return $data;
+    }
+
+    private function respondWithLandingPage(Landing $landing, LandingPage $page)
+    {
+        $data = $this->buildLandingViewData($landing, $page);
         $html = $this->renderLandingPage($landing, $page, $data);
         $html = $this->normalizePreviewAssets($html);
-        $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou']) ? $page->type : 'landing';
+        $pageTypeMapped = in_array($page->type, ['checkout', 'thankyou'], true) ? $page->type : 'landing';
+
         return response($this->injectRecordingSnippet($html, $landing, $pageTypeMapped));
+    }
+
+    private function redirectLegacyLandingToWorkspace(Landing $landing)
+    {
+        $target = LandingPublicUrl::indexUrl($landing);
+        $query = request()->getQueryString();
+        if ($query) {
+            $target .= (str_contains($target, '?') ? '&' : '?') . $query;
+        }
+
+        return redirect()->to($target, 301);
+    }
+
+    private function redirectLegacyLandingPageToWorkspace(Landing $landing, LandingPage $page)
+    {
+        $queryParams = request()->query();
+        unset($queryParams['signature'], $queryParams['expires']);
+
+        if ($page->type === 'thankyou') {
+            if (!request()->hasValidSignature()) {
+                abort(403, 'Unauthorized access to Thank You page.');
+            }
+
+            $target = LandingPublicUrl::signedPageUrl($landing, $page, $queryParams);
+            return redirect()->to($target, 301);
+        }
+
+        $target = LandingPublicUrl::pageUrl($landing, $page);
+        $query = request()->getQueryString();
+        if ($query) {
+            $target .= (str_contains($target, '?') ? '&' : '?') . $query;
+        }
+
+        return redirect()->to($target, 301);
     }
 
     private function renderLandingPage(Landing $landing, LandingPage $page, array $data = []): string
@@ -469,7 +521,8 @@ class PublicLandingController extends Controller
         }
 
         if (str_starts_with($decoded, '/storage/')) {
-            return parse_url($decoded, PHP_URL_PATH) ?: null;
+            $directPath = parse_url($decoded, PHP_URL_PATH) ?: null;
+            return is_string($directPath) ? $this->resolveExistingStoragePath($directPath) : null;
         }
 
         $parsed = parse_url($decoded);
@@ -483,12 +536,56 @@ class PublicLandingController extends Controller
         }
 
         if (str_starts_with($path, '/storage/')) {
-            return $path;
+            return $this->resolveExistingStoragePath($path);
         }
 
         $pos = stripos($path, '/storage/');
         if ($pos !== false) {
-            return substr($path, $pos);
+            return $this->resolveExistingStoragePath(substr($path, $pos));
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve a /storage asset path and repair common missing-segment paths.
+     */
+    protected function resolveExistingStoragePath(string $storagePath): ?string
+    {
+        if (!str_starts_with($storagePath, '/storage/')) {
+            return null;
+        }
+
+        $normalizedPath = parse_url($storagePath, PHP_URL_PATH) ?: $storagePath;
+        $relative = ltrim(substr($normalizedPath, strlen('/storage/')), '/');
+        $absolute = storage_path('app/public/' . $relative);
+
+        if (\Illuminate\Support\Facades\File::exists($absolute)) {
+            return '/storage/' . $relative;
+        }
+
+        // Repair malformed template paths:
+        // /storage/builder-templates/{token}/assets/...  ->
+        // /storage/builder-templates/{token}/{subfolder}/assets/...
+        if (!preg_match('#^builder-templates/([^/]+)/(.+)$#', $relative, $matches)) {
+            return null;
+        }
+
+        $templateToken = $matches[1];
+        $tail = ltrim($matches[2], '/');
+        $templateBase = storage_path('app/public/builder-templates/' . $templateToken);
+
+        if (!\Illuminate\Support\Facades\File::isDirectory($templateBase)) {
+            return null;
+        }
+
+        $subfolders = \Illuminate\Support\Facades\File::directories($templateBase);
+        foreach ($subfolders as $folder) {
+            $candidateAbsolute = rtrim($folder, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $tail);
+            if (\Illuminate\Support\Facades\File::exists($candidateAbsolute)) {
+                $folderName = basename($folder);
+                return '/storage/builder-templates/' . $templateToken . '/' . $folderName . '/' . $tail;
+            }
         }
 
         return null;
@@ -559,6 +656,7 @@ class PublicLandingController extends Controller
                 if (\Illuminate\Support\Facades\File::exists($absolute)) {
                     $js = \Illuminate\Support\Facades\File::get($absolute);
                     if (!empty($js)) {
+                        $js = $this->rewriteTemplateAssetUrlsInScript($js, $path);
                         preg_match('/type=["\']([^"\']+)["\']/', $tag, $typeMatch);
                         $typeObj = !empty($typeMatch) ? ' type="' . $typeMatch[1] . '"' : '';
                         
@@ -574,6 +672,30 @@ class PublicLandingController extends Controller
         }
 
         return $html;
+    }
+
+    /**
+     * Rewrite hardcoded root asset URLs in template scripts to their real
+     * /storage builder-template location.
+     */
+    protected function rewriteTemplateAssetUrlsInScript(string $js, string $scriptStoragePath): string
+    {
+        if ($js === '' || $scriptStoragePath === '') {
+            return $js;
+        }
+
+        if (!preg_match('#^/storage/builder-templates/([^/]+)/([^/]+)/assets/js/#', $scriptStoragePath, $m)) {
+            return $js;
+        }
+
+        $baseAssets = '/storage/builder-templates/' . $m[1] . '/' . $m[2] . '/assets';
+
+        // Common hardcoded pattern in exported templates.
+        return preg_replace(
+            '#([\'"])\/assets\/3d-object\/([^\'"]+)\1#',
+            '$1' . $baseAssets . '/3d-object/$2$1',
+            $js
+        ) ?? $js;
     }
 
     /**

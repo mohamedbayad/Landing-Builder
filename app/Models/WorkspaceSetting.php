@@ -11,6 +11,7 @@ class WorkspaceSetting extends Model
 
     protected $fillable = [
         'workspace_id',
+        'workspace_public_endpoint',
         // Theme
         'dashboard_direction',
         'dashboard_primary_color',
@@ -51,6 +52,7 @@ class WorkspaceSetting extends Model
     ];
 
     protected $casts = [
+        'workspace_public_endpoint' => 'string',
         'sidebar_collapsed' => 'boolean',
         'thankyou_show_summary' => 'boolean',
         'thankyou_show_invoice_btn' => 'boolean',

@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Landing;
 use App\Models\Lead;
 use App\Models\WorkspaceSetting;
+use App\Support\LandingPublicUrl;
 
 class WhatsAppService
 {
@@ -15,7 +16,7 @@ class WhatsAppService
     {
         $vars = [
             '{{ landing-title }}' => $landing->title ?? 'Offers',
-            '{{ landing-url }}'   => route('public.home'),
+            '{{ landing-url }}'   => LandingPublicUrl::indexUrl($landing),
             '{{ workspace-name }}' => $workspaceName ?? 'Our Store',
             '{{ page-id }}'       => $landing->id,
         ];
@@ -54,7 +55,7 @@ class WhatsAppService
 
             // Landing
             '{{ landing-title }}'  => $landing->title ?? 'Offer',
-            '{{ landing-url }}'    => route('public.home'),
+            '{{ landing-url }}'    => LandingPublicUrl::indexUrl($landing),
         ];
 
         return str_replace(array_keys($vars), array_values($vars), $template);

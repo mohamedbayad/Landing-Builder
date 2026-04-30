@@ -1,0 +1,28 @@
+{
+  "name": "grapesjs-lp-builder",
+  "version": "1.0.0",
+  "description": "GrapesJS landing page builder plugin with GSAP and Three.js section controls",
+  "main": "dist/grapesjs-lp-builder.js",
+  "module": "src/index.js",
+  "exports": {
+    ".": {
+      "import": "./src/index.js",
+      "default": "./dist/grapesjs-lp-builder.js"
+    }
+  },
+  "files": [
+    "src",
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "grapesjs",
+    "landing-page",
+    "gsap",
+    "threejs"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "grapesjs": "^0.21.x"
+  }
+}

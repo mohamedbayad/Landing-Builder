@@ -10,6 +10,7 @@ import advancedStyleManagerPlugin from './plugins/advanced-style-manager';
 import backgroundPlugin from './plugins/background';
 import tailwindCardsBlocksPlugin from './plugins/tailwind-cards-blocks';
 import tailwindAutocompletePlugin from './plugins/tailwind-autocomplete';
+import installLpBuilderWorkspacePlugin from './plugins/lp-builder';
 
 const SYSTEM_KEY = '__funnel_builder_plugin_system';
 const SYSTEM_VERSION = '1.0.0';
@@ -17,6 +18,7 @@ const WORKSPACE_PLUGIN_TAILWIND = 'tailwind-css';
 const WORKSPACE_PLUGIN_TAILWIND_AUTOCOMPLETE = 'tailwind-classes-autocomplete';
 const WORKSPACE_PLUGIN_MATERIAL_ICONS = 'google-material-icons';
 const WORKSPACE_PLUGIN_TAILWIND_CARDS = 'tailwind-cards';
+const WORKSPACE_PLUGIN_LP_BUILDER = 'grapesjs-lp-builder';
 const MODE_EDITOR = 'editor';
 const MODE_PREVIEW = 'preview';
 const MODE_PUBLISHED = 'published';
@@ -672,6 +674,51 @@ const RUNTIME_PLUGINS = {
         });
     },
     form: (editor) => {
+        const formTraitDefinitions = [
+            { type: 'text', name: 'action', label: 'Action URL', placeholder: '/forms/process' },
+            {
+                type: 'select',
+                name: 'method',
+                label: 'Method',
+                options: [
+                    { id: 'post', name: 'POST' },
+                    { id: 'get', name: 'GET' },
+                ],
+            },
+            { type: 'text', name: 'data-form-name', label: 'Form Name' },
+            { type: 'text', name: 'data-success-message', label: 'Success Message' },
+            { type: 'text', name: 'data-redirect-url', label: 'Redirect URL' },
+            { type: 'text', name: 'data-lead-source', label: 'Lead Source' },
+            { type: 'text', name: 'data-webhook', label: 'Webhook URL' },
+            { type: 'text', name: 'data-automation-trigger', label: 'Automation Trigger' },
+        ];
+
+        const ensureFormTraits = (component) => {
+            if (!component) {
+                return;
+            }
+
+            const tagName = String(component.get?.('tagName') || '').toLowerCase();
+            const type = String(component.get?.('type') || '').toLowerCase();
+            if (tagName !== 'form' && type !== 'funnel-form') {
+                return;
+            }
+
+            if (typeof component.getTraits !== 'function' || typeof component.addTrait !== 'function') {
+                return;
+            }
+
+            const existingNames = component
+                .getTraits()
+                .map((trait) => (trait?.get ? trait.get('name') : trait?.name))
+                .filter(Boolean);
+
+            const missingTraits = formTraitDefinitions.filter((trait) => !existingNames.includes(trait.name));
+            if (missingTraits.length > 0) {
+                component.addTrait(missingTraits, { at: 0 });
+            }
+        };
+
         if (!editor.DomComponents.getType('funnel-form')) {
             editor.DomComponents.addType('funnel-form', {
                 isComponent: (el) => {
@@ -739,14 +786,7 @@ const RUNTIME_PLUGINS = {
                                 },
                             },
                         ],
-                        traits: [
-                            { type: 'text', name: 'data-form-name', label: 'Form Name' },
-                            { type: 'text', name: 'data-success-message', label: 'Success Message' },
-                            { type: 'text', name: 'data-redirect-url', label: 'Redirect URL' },
-                            { type: 'text', name: 'data-lead-source', label: 'Lead Source' },
-                            { type: 'text', name: 'data-webhook', label: 'Webhook URL' },
-                            { type: 'text', name: 'data-automation-trigger', label: 'Automation Trigger' },
-                        ],
+                        traits: formTraitDefinitions,
                     },
                 },
             });
@@ -769,6 +809,8 @@ const RUNTIME_PLUGINS = {
                 type: 'funnel-form',
             },
         });
+
+        editor.on('component:selected', ensureFormTraits);
     },
     'countdown-timer': (editor) => {
         countdownPlugin(editor);
@@ -1882,6 +1924,11 @@ const applyWorkspacePlugins = (editor, options = {}) => {
 
         if (slug === WORKSPACE_PLUGIN_TAILWIND_CARDS) {
             installTailwindCardsWorkspacePlugin(editor, plugin?.settings || {});
+            return;
+        }
+
+        if (slug === WORKSPACE_PLUGIN_LP_BUILDER) {
+            installLpBuilderWorkspacePlugin(editor, plugin?.settings || {});
         }
     });
 };

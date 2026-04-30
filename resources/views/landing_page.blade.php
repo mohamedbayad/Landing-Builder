@@ -41,9 +41,18 @@
         gtag('config', '{{ $landing->settings->ga_measurement_id }}');
         </script>
     @endif
+
+    @php
+        $preparedPageCss = (string) ($page->css ?? '');
+        $preparedPageCss = preg_replace('/<script\b[^>]*>.*?<\/script>/is', '', $preparedPageCss) ?? $preparedPageCss;
+        $preparedPageCss = preg_replace('/<\/?(?:html|head|body|meta|title|link)\b[^>]*>/i', '', $preparedPageCss) ?? $preparedPageCss;
+        $preparedPageCss = preg_replace('/<style\b[^>]*>/i', '', $preparedPageCss) ?? $preparedPageCss;
+        $preparedPageCss = preg_replace('/<\/style>/i', '', $preparedPageCss) ?? $preparedPageCss;
+        $preparedPageCss = trim((string) $preparedPageCss);
+    @endphp
     
     <style>
-        {!! $page->css !!}
+        {!! $preparedPageCss !!}
         :root {
             --cart-bg: {{ $landing->cart_bg_color ?? '#ffffff' }};
             --cart-text: {{ $landing->cart_text_color ?? '#000000' }};
@@ -811,9 +820,7 @@
                 $statusClass = 'lp-badge--preview';
             }
 
-            $publicUrl = $page->type === 'index'
-                ? ($landing->is_main ? route('public.home') : route('public.page', $landing->slug))
-                : ($landing->is_main ? url('/' . $page->slug) : route('public.landing.page', [$landing->slug, $page->slug]));
+            $publicUrl = \App\Support\LandingPublicUrl::pageUrl($landing, $page);
             $previewUrl = route('landings.preview', [$landing, $page]);
             $avatarInitials = collect(explode(' ', trim((string) ($authUser->name ?? 'U'))))
                 ->filter()
@@ -1245,12 +1252,130 @@
         @endif
     @endif
 
-    @if(!empty($page->js))
-        @if(str_contains($page->js, '<script'))
-            {!! $page->js !!}
+    @php
+        $rawPageJs = (string) ($page->js ?? '');
+        $preparedPageJs = preg_replace('/^\s*@import\s+url\([^)]+\)\s*;?\s*$/mi', '', $rawPageJs) ?? $rawPageJs;
+        $preparedPageJs = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $preparedPageJs) ?? $preparedPageJs;
+        $preparedPageJs = trim((string) $preparedPageJs);
+
+        $templateStorageBase = '';
+        $assetSource = $preparedPageCss . "\n" . ((string) ($page->html ?? '')) . "\n" . $preparedPageJs;
+        if (preg_match('#/storage/builder-templates/[^"\'\s)]+#i', $assetSource, $assetMatch) === 1) {
+            $detectedPath = (string) ($assetMatch[0] ?? '');
+            $templateStorageBase = preg_replace('#/assets/.*$#i', '', $detectedPath) ?? $detectedPath;
+            $templateStorageBase = rtrim($templateStorageBase, '/');
+        }
+
+        if ($templateStorageBase !== '' && str_contains($preparedPageJs, 'assets/')) {
+            $preparedPageJs = preg_replace_callback(
+                '/([\'"])(\/?(?:\.{1,2}\/)?assets\/[^\'"]*)(\1)/i',
+                function ($matches) use ($templateStorageBase) {
+                    $quote = (string) ($matches[1] ?? "'");
+                    $raw = trim((string) ($matches[2] ?? ''));
+                    if ($raw === '' || str_starts_with($raw, '/storage/')) {
+                        return (string) ($matches[0] ?? '');
+                    }
+
+                    $normalized = $raw;
+                    $normalized = ltrim($normalized, '/');
+                    $normalized = preg_replace('#^(?:\./)+#', '', $normalized) ?? $normalized;
+                    while (str_starts_with($normalized, '../')) {
+                        $normalized = substr($normalized, 3);
+                    }
+
+                    if (!str_starts_with($normalized, 'assets/')) {
+                        return (string) ($matches[0] ?? '');
+                    }
+
+                    return $quote . $templateStorageBase . '/' . $normalized . $quote;
+                },
+                $preparedPageJs
+            ) ?? $preparedPageJs;
+        }
+
+        $needsThreeImportMap = false;
+
+        if ($preparedPageJs !== '' && str_contains($preparedPageJs, '<script')) {
+            $preparedPageJs = preg_replace_callback('/<script\b([^>]*)src=["\']([^"\']+)["\']([^>]*)><\/script>/i', function ($matches) use (&$needsThreeImportMap) {
+                $before = trim((string) ($matches[1] ?? ''));
+                $src = trim((string) ($matches[2] ?? ''));
+                $after = trim((string) ($matches[3] ?? ''));
+
+                $attrs = trim($before . ' src="' . $src . '" ' . $after);
+                $attrs = preg_replace('/\s+/', ' ', $attrs) ?? $attrs;
+
+                $path = (string) parse_url($src, PHP_URL_PATH);
+                if ($path !== '' && str_starts_with($path, '/storage/')) {
+                    $relative = ltrim(substr($path, strlen('/storage/')), '/');
+                    $absolute = storage_path('app/public/' . $relative);
+                    if (is_file($absolute)) {
+                        $content = (string) @file_get_contents($absolute);
+                        $isModule = preg_match('/^\s*(?:import\s+.+from\s+|import\s+[\'"]|export\s+)/m', $content) === 1;
+                        $usesThreeBareImport = preg_match('/from\s+[\'"]three(?:\/addons\/)?/i', $content) === 1;
+
+                        if ($isModule && !preg_match('/\btype\s*=\s*["\']module["\']/i', $attrs)) {
+                            $attrs .= ' type="module"';
+                        }
+
+                        if ($isModule && $usesThreeBareImport) {
+                            $needsThreeImportMap = true;
+                        }
+                    }
+                }
+
+                return '<script ' . trim($attrs) . '></script>';
+            }, $preparedPageJs) ?? $preparedPageJs;
+
+            // Repair malformed inline Three.js import maps that were stored without type="importmap".
+            // Example bad payload:
+            //   <script>{ "imports": { "three": "...", "three/addons/": "..." } }</script>
+            $preparedPageJs = preg_replace_callback('/<script\b([^>]*)>([\s\S]*?)<\/script>/i', function ($matches) use (&$needsThreeImportMap) {
+                $attrs = trim((string) ($matches[1] ?? ''));
+                $content = trim((string) ($matches[2] ?? ''));
+
+                // Keep external scripts untouched.
+                if (preg_match('/\bsrc\s*=/i', $attrs)) {
+                    return (string) ($matches[0] ?? '');
+                }
+
+                // If already importmap, keep as-is.
+                if (preg_match('/\btype\s*=\s*["\']importmap["\']/i', $attrs)) {
+                    $needsThreeImportMap = false;
+                    return (string) ($matches[0] ?? '');
+                }
+
+                // If inline content looks like an import map, convert it.
+                if ($content !== '' && preg_match('/^\s*\{[\s\S]*"imports"\s*:/i', $content)) {
+                    $needsThreeImportMap = false;
+                    return '<script type="importmap">' . "\n" . $content . "\n" . '</script>';
+                }
+
+                return (string) ($matches[0] ?? '');
+            }, $preparedPageJs) ?? $preparedPageJs;
+
+            if (preg_match_all('/<script\b[^>]*>.*?<\/script>/is', $preparedPageJs, $scriptBlocks) && !empty($scriptBlocks[0])) {
+                $preparedPageJs = trim(implode("\n\n", array_map(fn ($block) => trim((string) $block), $scriptBlocks[0])));
+            }
+        }
+    @endphp
+
+    @if($needsThreeImportMap)
+        <script type="importmap">
+        {
+          "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+          }
+        }
+        </script>
+    @endif
+
+    @if($preparedPageJs !== '')
+        @if(str_contains($preparedPageJs, '<script'))
+            {!! $preparedPageJs !!}
         @else
             <script>
-                {!! $page->js !!}
+                {!! $preparedPageJs !!}
             </script>
         @endif
     @endif

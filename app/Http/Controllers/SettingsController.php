@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Support\LandingPublicUrl;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -17,7 +18,17 @@ class SettingsController extends Controller
         
         // Ensure settings exist
         if (!$workspace->settings) {
-            $workspace->settings()->create([]);
+            $workspace->settings()->create([
+                'workspace_public_endpoint' => LandingPublicUrl::defaultWorkspaceEndpoint($workspace->name, $workspace->id),
+            ]);
+            $workspace->refresh();
+        }
+
+        $currentEndpoint = trim((string) ($workspace->settings->workspace_public_endpoint ?? ''));
+        if ($currentEndpoint === '' || in_array(strtolower($currentEndpoint), LandingPublicUrl::RESERVED_ENDPOINTS, true)) {
+            $workspace->settings->update([
+                'workspace_public_endpoint' => LandingPublicUrl::defaultWorkspaceEndpoint($workspace->name, $workspace->id),
+            ]);
             $workspace->refresh();
         }
 
@@ -64,11 +75,26 @@ class SettingsController extends Controller
                 'thankyou_style' => 'required|string',
                 'thankyou_show_summary' => 'nullable|in:1,0,on,off',
                 'thankyou_show_invoice_btn' => 'nullable|in:1,0,on,off',
+                'workspace_public_endpoint' => [
+                    'required',
+                    'string',
+                    'min:3',
+                    'max:80',
+                    'regex:/^[a-z0-9]+(?:-[a-z0-9]+)*$/',
+                    Rule::unique('workspace_settings', 'workspace_public_endpoint')->ignore($settings->id),
+                    function (string $attribute, mixed $value, \Closure $fail) {
+                        $endpoint = strtolower(trim((string) $value));
+                        if (in_array($endpoint, LandingPublicUrl::RESERVED_ENDPOINTS, true)) {
+                            $fail('This workspace endpoint is reserved. Please choose another one.');
+                        }
+                    },
+                ],
             ]);
             
             // Handle Checkboxes
             $validatedTheme['thankyou_show_summary'] = $request->has('thankyou_show_summary');
             $validatedTheme['thankyou_show_invoice_btn'] = $request->has('thankyou_show_invoice_btn');
+            $validatedTheme['workspace_public_endpoint'] = strtolower(trim((string) $validatedTheme['workspace_public_endpoint']));
 
             $settings->update($validatedTheme);
         }

@@ -250,9 +250,9 @@
                     <div x-show="tab === 'products'" x-cloak style="display: none;">
                         @php
                             $checkoutPage = $pages->firstWhere('type', 'checkout');
-                            $checkoutSlug = $checkoutPage?->slug ?? 'checkout';
-                            $checkoutPath = $landing->is_main ? '/' . ltrim($checkoutSlug, '/') : '/' . $landing->slug . '/' . ltrim($checkoutSlug, '/');
-                            $baseCheckoutUrl = url($checkoutPath);
+                            $baseCheckoutUrl = $checkoutPage
+                                ? \App\Support\LandingPublicUrl::pageUrl($landing, $checkoutPage)
+                                : \App\Support\LandingPublicUrl::indexUrl($landing);
                         @endphp
 
                         <div class="mb-6 flex items-center justify-between">

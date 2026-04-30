@@ -7,6 +7,7 @@ use App\Events\Email\LeadCreated;
 use App\Models\Landing;
 use App\Models\Lead;
 use App\Models\Product;
+use App\Support\LandingPublicUrl;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -389,14 +390,9 @@ class LeadsController extends Controller
         $thankYouPage = $landing->pages()->where('type', 'thankyou')->first();
         
         if ($thankYouPage) {
-            if ($landing->is_main && $landing->status === 'published') {
-                return redirect()->to(\Illuminate\Support\Facades\URL::signedRoute('public.page', [
-                    'slug' => $thankYouPage->slug,
-                    'lead' => $lead->id
-                ]));
-            } else {
-                 return redirect()->route('landings.preview', [$landing, $thankYouPage, 'lead' => $lead->id]); 
-            }
+            return redirect()->to(LandingPublicUrl::signedPageUrl($landing, $thankYouPage, [
+                'lead' => $lead->id,
+            ]));
         }
 
         return redirect()->back()->with('success', 'Order placed successfully!');

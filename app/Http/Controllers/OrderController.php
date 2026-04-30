@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use App\Models\Order;
 use App\Models\Landing;
 use App\Models\Product;
+use App\Support\LandingPublicUrl;
 use Illuminate\Support\Facades\Auth;
 
 class OrderController extends Controller
@@ -149,11 +150,7 @@ class OrderController extends Controller
         $thankYouPage = $landing->pages()->where('type', 'thankyou')->first();
         
         if ($thankYouPage) {
-            if ($landing->is_main && $landing->status === 'published') {
-                return redirect('/' . $thankYouPage->slug);
-            } else {
-                 return redirect()->route('landings.preview', [$landing, $thankYouPage]); 
-            }
+            return redirect()->to(LandingPublicUrl::signedPageUrl($landing, $thankYouPage));
         }
 
         return redirect()->back()->with('success', 'Order created successfully!');

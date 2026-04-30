@@ -68,6 +68,24 @@
                                     </div>
 
                                     <div>
+                                        <label for="workspace_public_endpoint" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Workspace Public Endpoint</label>
+                                        <input
+                                            type="text"
+                                            name="workspace_public_endpoint"
+                                            id="workspace_public_endpoint"
+                                            value="{{ old('workspace_public_endpoint', $workspace->settings->workspace_public_endpoint ?? '') }}"
+                                            placeholder="my-workspace"
+                                            class="mt-1 block w-full rounded-lg border-gray-300 dark:bg-[#0D1117] dark:border-white/[0.06] dark:text-white shadow-sm focus:border-brand-orange focus:ring-brand-orange/20"
+                                        >
+                                        @error('workspace_public_endpoint')
+                                            <p class="mt-1 text-xs text-red-600">{{ $message }}</p>
+                                        @enderror
+                                        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+                                            Public base URL: <code>/w/{{ old('workspace_public_endpoint', $workspace->settings->workspace_public_endpoint ?? 'my-workspace') }}</code>
+                                        </p>
+                                    </div>
+
+                                    <div>
                                         <label for="dashboard_primary_color" class="block text-sm font-medium text-gray-700 dark:text-gray-300">Primary Color</label>
                                         <div class="mt-1 flex items-center space-x-2">
                                             <input type="color" name="dashboard_primary_color" id="dashboard_primary_color" value="{{ $workspace->settings->dashboard_primary_color ?? '#F97316' }}" class="h-10 w-20 rounded p-1 border border-gray-300 dark:border-white/[0.06]">

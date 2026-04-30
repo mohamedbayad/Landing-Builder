@@ -277,6 +277,7 @@ class LandingPageController extends Controller
 
         // Repair bad saves like: <script><script src=...></script>...</script>
         $result = $this->unwrapNestedScriptBlocks($result);
+        $result = $this->normalizeImportMapScripts($result);
 
         // Preserve old external script src tags that might be missing.
         $existingSrcMap = $this->extractScriptSrcTagMap($existing);
@@ -293,6 +294,38 @@ class LandingPageController extends Controller
         }
 
         return trim($this->dedupeScriptSrcTags($result));
+    }
+
+    /**
+     * Ensure inline import maps are saved with type="importmap".
+     *
+     * Fixes malformed payloads like:
+     * <script>{ "imports": { ... } }</script>
+     */
+    protected function normalizeImportMapScripts(string $js): string
+    {
+        if ($js === '') {
+            return '';
+        }
+
+        return preg_replace_callback('/<script\b([^>]*)>([\s\S]*?)<\/script>/i', function ($m) {
+            $attrs = trim((string) ($m[1] ?? ''));
+            $inner = trim((string) ($m[2] ?? ''));
+
+            if (preg_match('/\bsrc\s*=/i', $attrs)) {
+                return (string) ($m[0] ?? '');
+            }
+
+            if (preg_match('/\btype\s*=\s*["\']importmap["\']/i', $attrs)) {
+                return (string) ($m[0] ?? '');
+            }
+
+            if ($inner !== '' && preg_match('/^\s*\{[\s\S]*"imports"\s*:/i', $inner)) {
+                return "<script type=\"importmap\">\n{$inner}\n</script>";
+            }
+
+            return (string) ($m[0] ?? '');
+        }, $js) ?? $js;
     }
 
     /**
@@ -537,7 +570,8 @@ class LandingPageController extends Controller
         }
 
         if (str_starts_with($decoded, '/storage/')) {
-            return parse_url($decoded, PHP_URL_PATH) ?: null;
+            $directPath = parse_url($decoded, PHP_URL_PATH) ?: null;
+            return is_string($directPath) ? $this->resolveExistingStoragePath($directPath) : null;
         }
 
         $parsed = parse_url($decoded);
@@ -552,12 +586,56 @@ class LandingPageController extends Controller
         }
 
         if (str_starts_with($path, '/storage/')) {
-            return $path;
+            return $this->resolveExistingStoragePath($path);
         }
 
         $pos = stripos($path, '/storage/');
         if ($pos !== false) {
-            return substr($path, $pos);
+            return $this->resolveExistingStoragePath(substr($path, $pos));
+        }
+
+        return null;
+    }
+
+    /**
+     * Resolve a /storage asset path and repair common missing-segment paths.
+     */
+    protected function resolveExistingStoragePath(string $storagePath): ?string
+    {
+        if (!str_starts_with($storagePath, '/storage/')) {
+            return null;
+        }
+
+        $normalizedPath = parse_url($storagePath, PHP_URL_PATH) ?: $storagePath;
+        $relative = ltrim(substr($normalizedPath, strlen('/storage/')), '/');
+        $absolute = storage_path('app/public/' . $relative);
+
+        if (File::exists($absolute)) {
+            return '/storage/' . $relative;
+        }
+
+        // Repair malformed template paths:
+        // /storage/builder-templates/{token}/assets/...  ->
+        // /storage/builder-templates/{token}/{subfolder}/assets/...
+        if (!preg_match('#^builder-templates/([^/]+)/(.+)$#', $relative, $matches)) {
+            return null;
+        }
+
+        $templateToken = $matches[1];
+        $tail = ltrim($matches[2], '/');
+        $templateBase = storage_path('app/public/builder-templates/' . $templateToken);
+
+        if (!File::isDirectory($templateBase)) {
+            return null;
+        }
+
+        $subfolders = File::directories($templateBase);
+        foreach ($subfolders as $folder) {
+            $candidateAbsolute = rtrim($folder, DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR . str_replace('/', DIRECTORY_SEPARATOR, $tail);
+            if (File::exists($candidateAbsolute)) {
+                $folderName = basename($folder);
+                return '/storage/builder-templates/' . $templateToken . '/' . $folderName . '/' . $tail;
+            }
         }
 
         return null;

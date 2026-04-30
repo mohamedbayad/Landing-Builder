@@ -205,14 +205,14 @@
                 </a>
             @endif
 
-            <!-- Custom Domains (Coming Soon) -->
-            <div class="flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-500 dark:text-gray-600 cursor-not-allowed select-none">
-                <svg class="w-4 h-4 flex-shrink-0 text-gray-500 dark:text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
-                </svg>
-                <span class="ml-2.5 flex-1">Custom Domains</span>
-                <span class="text-[9px] uppercase font-bold tracking-wider bg-gray-100 dark:bg-white/5 text-gray-500 dark:text-gray-600 px-1.5 py-0.5 rounded">Soon</span>
-            </div>
+            @if(auth()->user()->hasPermission('custom_domains.manage'))
+                <a class="flex items-center px-3 py-2 text-sm font-medium transition-all duration-150 rounded-md group {{ request()->routeIs('domains.*') ? 'bg-white/[0.08] text-white nav-active-indicator' : 'text-gray-400 hover:bg-white/[0.05] hover:text-gray-100' }}" href="{{ route('domains.index') }}">
+                    <svg class="w-4 h-4 flex-shrink-0 {{ request()->routeIs('domains.*') ? 'text-brand-orange' : 'text-gray-500 group-hover:text-gray-300' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.75">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                    </svg>
+                    <span class="ml-2.5">Custom Domains</span>
+                </a>
+            @endif
 
             <!-- Settings -->
             @if(auth()->user()->hasPermission('tech.manage'))
