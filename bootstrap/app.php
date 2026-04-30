@@ -13,12 +13,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        $middleware->web(append: [
+        $webMiddleware = [
             \App\Http\Middleware\SecurityHeaders::class,
             \App\Http\Middleware\TrackPageVisit::class,
             \App\Http\Middleware\TrackUserActivity::class,
-            \App\Http\Middleware\DetectCustomDomain::class,
-        ]);
+        ];
+
+        // Avoid hard-failing boot if custom-domain middleware is absent on a deployment.
+        if (class_exists(\App\Http\Middleware\DetectCustomDomain::class)) {
+            $webMiddleware[] = \App\Http\Middleware\DetectCustomDomain::class;
+        }
+
+        $middleware->web(append: $webMiddleware);
 
         $middleware->alias([
             'permission' => \App\Http\Middleware\EnsurePermission::class,
