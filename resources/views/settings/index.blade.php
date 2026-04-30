@@ -731,7 +731,9 @@
                                                             {{ $providerLabels[$provider->provider] ?? ucfirst($provider->provider) }}
                                                         </span>
                                                     </h4>
-                                                    @php($apiKeySuffix = $provider->api_key ? substr((string) $provider->api_key, -4) : 'N/A')
+                                                    @php
+                                                        $apiKeySuffix = $provider->api_key ? substr((string) $provider->api_key, -4) : 'N/A';
+                                                    @endphp
                                                     <p class="text-xs text-gray-500 mt-1 font-mono hover:text-gray-700 cursor-help" title="API Key ending in {{ $apiKeySuffix }}">
                                                         sk-••••••••••••{{ $apiKeySuffix }}
                                                     </p>
