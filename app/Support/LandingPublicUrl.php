@@ -58,15 +58,38 @@ class LandingPublicUrl
         return $candidate;
     }
 
-    public static function isAdminOwnedLanding(?Landing $landing): bool
+    private static function resolveLandingModel(mixed $landing): ?Landing
     {
-        if (!$landing || !$landing->workspace) {
+        if ($landing instanceof Landing) {
+            return $landing;
+        }
+
+        $landingId = null;
+        if (is_object($landing) && isset($landing->id)) {
+            $landingId = (int) $landing->id;
+        } elseif (is_array($landing) && isset($landing['id'])) {
+            $landingId = (int) $landing['id'];
+        }
+
+        if (!$landingId) {
+            return null;
+        }
+
+        return Landing::query()
+            ->with(['workspace.user.roles:id,slug'])
+            ->find($landingId);
+    }
+
+    public static function isAdminOwnedLanding(mixed $landing): bool
+    {
+        $landingModel = self::resolveLandingModel($landing);
+        if (!$landingModel || !$landingModel->workspace) {
             return false;
         }
 
-        $user = $landing->workspace->user;
+        $user = $landingModel->workspace->user;
         if (!$user) {
-            $user = $landing->workspace->user()->with('roles:id,slug')->first();
+            $user = $landingModel->workspace->user()->with('roles:id,slug')->first();
         }
 
         if (!$user) {
@@ -80,9 +103,18 @@ class LandingPublicUrl
         return $user->roles()->whereIn('slug', ['admin', 'super-admin'])->exists();
     }
 
-    public static function isPlatformMainLanding(?Landing $landing): bool
+    public static function isPlatformMainLanding(mixed $landing): bool
     {
-        return (bool) ($landing && $landing->is_main && self::isAdminOwnedLanding($landing));
+        $isMain = false;
+        if ($landing instanceof Landing) {
+            $isMain = (bool) $landing->is_main;
+        } elseif (is_object($landing) && isset($landing->is_main)) {
+            $isMain = (bool) $landing->is_main;
+        } elseif (is_array($landing) && isset($landing['is_main'])) {
+            $isMain = (bool) $landing['is_main'];
+        }
+
+        return (bool) ($isMain && self::isAdminOwnedLanding($landing));
     }
 
     public static function indexPath(Landing $landing): string
@@ -139,4 +171,3 @@ class LandingPublicUrl
         ], $extraParams));
     }
 }
-
