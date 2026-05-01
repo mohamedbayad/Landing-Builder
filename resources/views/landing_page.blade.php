@@ -1381,6 +1381,7 @@
     @endif
 
     @php
+        $assistantProfileName = 'Samya';
         $countryCode = strtoupper((string) ($visitorCountryCode ?? 'XX'));
         $countryName = trim((string) ($visitorCountryName ?? 'Unknown'));
         $offerLabelForChat = trim((string) ($landing->name ?? 'this offer'));
@@ -1397,18 +1398,18 @@
         }
 
         $countryMessages = [
-            'MA' => 'Marhba! Ana AI assistant dyal "' . $offerLabelForChat . '". Nchrah lik l offer, nsowlk 1-2 as2ila 3la hadafk w budget, w n3tik ahsan next step bach twali lead.',
-            'FR' => 'Bienvenue. Je suis votre assistant commercial pour "' . $offerLabelForChat . '". Je peux expliquer l offre, qualifier votre besoin, puis vous guider vers la meilleure action pour demarrer.',
-            'US' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I will clarify the offer, ask 1-2 qualification questions, then guide you to the best next step.',
-            'GB' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain the offer, qualify your goals, and point you to the best action on this page.',
-            'ES' => 'Bienvenido. Soy tu asistente comercial para "' . $offerLabelForChat . '". Te explico la oferta, te hago 1-2 preguntas clave y te guio al mejor siguiente paso.',
-            'DE' => 'Willkommen. Ich bin Ihr Vertriebsassistent fuer "' . $offerLabelForChat . '". Ich erklaere das Angebot, stelle 1-2 Qualifizierungsfragen und fuehre Sie zum besten naechsten Schritt.',
-            'IT' => 'Benvenuto. Sono il tuo assistente commerciale per "' . $offerLabelForChat . '". Ti spiego l offerta, faccio 1-2 domande chiave e ti guido al prossimo passo migliore.',
-            'AE' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain the offer, qualify your needs, and guide you to the best next step on this page.',
-            'SA' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I will help you understand the offer, qualify your goal, and guide you to the right action.',
-            'EG' => 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can clarify the offer, qualify your need, and guide you to the best next step quickly.',
+            'MA' => 'Marhba! Ana ' . $assistantProfileName . '. Ila mazal katdour f nafs lmochkil, nkhllik tchof achno khassek daba bach t7ssn natiija b sor3a.',
+            'FR' => 'Bienvenue. Moi c est ' . $assistantProfileName . '. Si votre blocage continue, je vais vous montrer la meilleure prochaine action maintenant.',
+            'US' => 'Welcome. I am ' . $assistantProfileName . '. If you are still stuck with the same pain point, I will show you the fastest next move now.',
+            'GB' => 'Welcome. I am ' . $assistantProfileName . '. If the same problem keeps repeating, I will guide you to the strongest next step right now.',
+            'ES' => 'Bienvenido. Soy ' . $assistantProfileName . '. Si sigues con el mismo problema, te guio al siguiente paso mas fuerte ahora.',
+            'DE' => 'Willkommen. Ich bin ' . $assistantProfileName . '. Wenn das gleiche Problem bleibt, fuehre ich Sie jetzt zum klarsten naechsten Schritt.',
+            'IT' => 'Benvenuto. Sono ' . $assistantProfileName . '. Se il problema continua, ti guido subito al prossimo passo piu efficace.',
+            'AE' => 'Welcome. I am ' . $assistantProfileName . '. If the same pain point is still blocking you, I will guide you to the fastest next step now.',
+            'SA' => 'Welcome. I am ' . $assistantProfileName . '. If you are still facing the same pain, I will direct you to the strongest next action now.',
+            'EG' => 'Welcome. I am ' . $assistantProfileName . '. If this pain point is still holding you back, I will guide you to the right next move now.',
         ];
-        $defaultCountryMessage = 'Welcome. I am your sales assistant for "' . $offerLabelForChat . '". I can explain this offer, ask a few qualification questions, and guide you to the best next step.';
+        $defaultCountryMessage = 'Welcome. I am ' . $assistantProfileName . '. If you are still stuck, I will guide you to the strongest next step now.';
         $countryWelcomeText = $countryMessages[$countryCode] ?? $defaultCountryMessage;
         if ($lpPromiseSnippet !== '') {
             $countryWelcomeText .= ' Main promise on this page: "' . $lpPromiseSnippet . '".';
@@ -1720,12 +1721,12 @@
             ? $lpPromiseSnippet
             : (trim((string) optional($landing->settings)->meta_title) ?: $offerLabelForChat);
         $offerAnchor = \Illuminate\Support\Str::limit($offerAnchor, 95, '...');
-        $aiCommercialIntro = 'Bonjour. Je peux vous expliquer cette offre, ses avantages, et vous orienter vers la meilleure prochaine etape.';
+        $aiCommercialIntro = $assistantProfileName . ' ici. Je suis votre closer pour cette offre. Mon role: vous qualifier vite, traiter vos doutes, puis vous pousser vers la meilleure action.';
     @endphp
-    <div id="lp-ai-chat" class="lp-ai-chat" data-endpoint="{{ route('public.ai.chat') }}" data-landing-id="{{ $landing->id }}" data-page-id="{{ $page->id ?? '' }}">
+    <div id="lp-ai-chat" class="lp-ai-chat" data-endpoint="{{ route('public.ai.chat') }}" data-landing-id="{{ $landing->id }}" data-page-id="{{ $page->id ?? '' }}" data-assistant-name="{{ $assistantProfileName }}">
         <div id="lp-ai-chat-intro" class="lp-ai-chat__intro is-visible" role="status" aria-live="polite">
             <div class="lp-ai-chat__intro-head">
-                <p class="lp-ai-chat__intro-title">Assistant de l'offre</p>
+                <p class="lp-ai-chat__intro-title">{{ $assistantProfileName }} - Assistant de l'offre</p>
                 <button id="lp-ai-chat-intro-close" class="lp-ai-chat__intro-close" type="button" aria-label="Fermer l intro">&times;</button>
             </div>
             <p class="lp-ai-chat__intro-text">{{ $aiCommercialIntro }}</p>
@@ -1733,8 +1734,8 @@
         <div id="lp-ai-chat-panel" class="lp-ai-chat__panel" aria-hidden="true">
             <div class="lp-ai-chat__head">
                 <div>
-                    <p class="lp-ai-chat__title">Assistant Offre</p>
-                    <p class="lp-ai-chat__subtitle">Je vous aide a comprendre cette offre et a choisir la meilleure suite.</p>
+                    <p class="lp-ai-chat__title">{{ $assistantProfileName }}</p>
+                    <p class="lp-ai-chat__subtitle">Je vous aide a sortir du blocage et passer a l action avec la bonne prochaine etape.</p>
                 </div>
                 <button id="lp-ai-chat-close" class="lp-ai-chat__close" type="button" aria-label="Fermer assistant">&times;</button>
             </div>
@@ -1742,7 +1743,7 @@
                 <div class="lp-ai-chat__message lp-ai-chat__message--assistant">{{ $aiWelcome }}</div>
             </div>
             <div class="lp-ai-chat__composer">
-                <p id="lp-ai-chat-status" class="lp-ai-chat__status">Partagez votre objectif, votre budget ou votre delai. Je vous guide selon cette offre.</p>
+                <p id="lp-ai-chat-status" class="lp-ai-chat__status">Donnez-moi votre objectif en 1 phrase, et je vous donne la meilleure prochaine action.</p>
                 <form id="lp-ai-chat-form" class="lp-ai-chat__form">
                     <textarea id="lp-ai-chat-input" class="lp-ai-chat__input" rows="1" maxlength="1200" placeholder="Posez une question sur l'offre, le prix ou les resultats attendus..." required></textarea>
                     <button id="lp-ai-chat-send" class="lp-ai-chat__send" type="submit">Envoyer</button>
@@ -1767,6 +1768,7 @@
             const landingId = Number(root.dataset.landingId || 0);
             const pageIdRaw = root.dataset.pageId || '';
             const pageId = pageIdRaw !== '' ? Number(pageIdRaw) : null;
+            const assistantName = (root.dataset.assistantName || 'Samya').trim() || 'Samya';
             const panel = document.getElementById('lp-ai-chat-panel');
             const toggle = document.getElementById('lp-ai-chat-toggle');
             const closeBtn = document.getElementById('lp-ai-chat-close');
@@ -1786,6 +1788,30 @@
             let isBusy = false;
             let history = [];
             let typingBubble = null;
+            let latestCta = null;
+            let proactiveTimer = null;
+            let proactiveShown = false;
+            let silenceTimer = null;
+            let silenceStep = 0;
+            let userHasMessaged = false;
+
+            const PROACTIVE_DELAY_MS = 8000;
+            const FOLLOW_UP_1_DELAY_MS = 60000;
+            const FOLLOW_UP_2_DELAY_MS = 90000;
+
+            const proactiveOpeners = [
+                'You are still dealing with the same pain point, right? What is the biggest thing blocking results for you right now?',
+                'If this problem keeps draining your time, why let it continue one more week? What is your main goal now?',
+                'Most people stay stuck because they wait too long. What exactly do you want to fix first right now?'
+            ];
+
+            const fomoLines = [
+                'Honestly, people who wait usually come back after the best window is gone.',
+                'The visitors who move now are usually the ones who get results first.',
+                'If this pain is real for you, delaying it rarely makes it easier.',
+                'Most people who decide quickly break the cycle faster.',
+                'If this already feels relevant, your best move is to lock the next step now.'
+            ];
 
             const setOpen = (open) => {
                 panel.classList.toggle('is-open', open);
@@ -1803,6 +1829,143 @@
             const setStatus = (text, isError = false) => {
                 statusEl.textContent = text;
                 statusEl.classList.toggle('is-error', isError);
+            };
+
+            const pickRandom = (items) => {
+                if (!Array.isArray(items) || items.length === 0) return '';
+                return items[Math.floor(Math.random() * items.length)] || '';
+            };
+
+            const clearProactiveTimer = () => {
+                if (!proactiveTimer) return;
+                clearTimeout(proactiveTimer);
+                proactiveTimer = null;
+            };
+
+            const clearSilenceTimer = () => {
+                if (!silenceTimer) return;
+                clearTimeout(silenceTimer);
+                silenceTimer = null;
+            };
+
+            const getCtaLink = () => {
+                const cta = latestCta && typeof latestCta === 'object' ? latestCta : null;
+                const target = cta && typeof cta.target === 'string' ? cta.target.trim() : '';
+                if (target) return target;
+                return window.location.href;
+            };
+
+            const buildCtaPushLine = () => {
+                const cta = latestCta && typeof latestCta === 'object' ? latestCta : null;
+                const actionText = cta && typeof cta.action_text === 'string' && cta.action_text.trim() !== ''
+                    ? cta.action_text.trim()
+                    : 'Take the next step now';
+                return actionText + ': ' + getCtaLink();
+            };
+
+            const runSilenceNudge = () => {
+                if (!userHasMessaged || isBusy) {
+                    return;
+                }
+
+                if (silenceStep === 0) {
+                    const nudge1 = 'Quick check: this offer helps you solve the current pain faster. What is stopping you from starting today?';
+                    addMessage('assistant', nudge1);
+                    history.push({ role: 'assistant', content: nudge1 });
+                    history = history.slice(-10);
+                    setStatus('If you are serious about results, answer this and I will guide your next move.');
+                    silenceStep = 1;
+                    silenceTimer = setTimeout(runSilenceNudge, FOLLOW_UP_2_DELAY_MS);
+                    return;
+                }
+
+                if (silenceStep === 1) {
+                    const nudge2 = 'Final push: ' + pickRandom(fomoLines) + ' Ready to move now?';
+                    const ctaDrop = buildCtaPushLine();
+                    addMessage('assistant', nudge2);
+                    addMessage('assistant', ctaDrop);
+                    history.push({ role: 'assistant', content: nudge2 });
+                    history.push({ role: 'assistant', content: ctaDrop });
+                    history = history.slice(-10);
+                    addCtaAction(latestCta);
+                    setStatus('Final step shared. Take action from the CTA now.');
+                    silenceStep = 2;
+                    clearSilenceTimer();
+                }
+            };
+
+            const scheduleSilenceNudges = () => {
+                clearSilenceTimer();
+                if (!userHasMessaged || isBusy || silenceStep >= 2) {
+                    return;
+                }
+                silenceStep = 0;
+                silenceTimer = setTimeout(runSilenceNudge, FOLLOW_UP_1_DELAY_MS);
+            };
+
+            const scheduleProactiveOpener = () => {
+                clearProactiveTimer();
+                if (proactiveShown || userHasMessaged || isBusy) {
+                    return;
+                }
+                proactiveTimer = setTimeout(() => {
+                    if (proactiveShown || userHasMessaged || isBusy) {
+                        return;
+                    }
+                    proactiveShown = true;
+                    const opener = pickRandom(proactiveOpeners);
+                    if (!opener) {
+                        return;
+                    }
+                    addMessage('assistant', opener);
+                    history.push({ role: 'assistant', content: opener });
+                    history = history.slice(-10);
+                    setStatus('Reply with your biggest pain point and I will guide your best next step.');
+                }, PROACTIVE_DELAY_MS);
+            };
+
+            const normalizeText = (value) => {
+                return (value || '')
+                    .toString()
+                    .toLowerCase()
+                    .replace(/[^a-z0-9\s]/g, ' ')
+                    .replace(/\s+/g, ' ')
+                    .trim();
+            };
+
+            const isGreetingMessage = (value) => {
+                const text = normalizeText(value);
+                if (!text) return false;
+
+                const tokens = text.split(' ').filter(Boolean);
+                if (tokens.length > 5) {
+                    return false;
+                }
+
+                const greetingKeywords = new Set([
+                    'hi', 'hello', 'hey', 'yo', 'salut', 'bonjour', 'bonsoir', 'coucou',
+                    'salam', 'slm', 'marhba', 'mar7ba', 'ahlan', 'hola'
+                ]);
+
+                return tokens.some((token) => greetingKeywords.has(token));
+            };
+
+            const detectSimpleLang = (value) => {
+                const text = normalizeText(value);
+                if (/\b(bonjour|bonsoir|salut|coucou)\b/.test(text)) return 'fr';
+                if (/\b(salam|slm|marhba|mar7ba|ahlan)\b/.test(text)) return 'darija';
+                return 'en';
+            };
+
+            const buildGreetingReply = (value) => {
+                const lang = detectSimpleLang(value);
+                if (lang === 'fr') {
+                    return 'Salut, moi c est ' + assistantName + '. Si vous avez encore ce blocage, on le traite maintenant. Quel est votre objectif principal?';
+                }
+                if (lang === 'darija') {
+                    return 'Salam, ana ' + assistantName + '. Ila mazal nafs lmochkil kay7besk, nkhdmo 3lih daba. Chno lhadaf dyalk daba?';
+                }
+                return 'Hi, I am ' + assistantName + '. If this pain point is still blocking you, let us fix it now. What is your main goal right now?';
             };
 
             const addMessage = (role, text) => {
@@ -1851,6 +2014,7 @@
                 if (!cta || typeof cta !== 'object') {
                     return;
                 }
+                latestCta = cta;
 
                 const ctaType = typeof cta.type === 'string' && cta.type.trim() !== ''
                     ? cta.type.trim()
@@ -1990,8 +2154,24 @@
                 addMessage('user', message);
                 history.push({ role: 'user', content: message });
                 history = history.slice(-10);
+                userHasMessaged = true;
+                proactiveShown = true;
+                clearProactiveTimer();
+                clearSilenceTimer();
                 input.value = '';
                 autoResizeInput();
+
+                if (isGreetingMessage(message)) {
+                    const greetingReply = buildGreetingReply(message);
+                    addMessage('assistant', greetingReply);
+                    history.push({ role: 'assistant', content: greetingReply });
+                    history = history.slice(-10);
+                    setStatus('Parfait. Donnez-moi votre blocage principal et je vous donne la meilleure prochaine action.');
+                    scheduleSilenceNudges();
+                    input.focus();
+                    return;
+                }
+
                 setStatus('Analyse en cours de cette offre pour preparer une recommandation claire...');
                 showTyping();
 
@@ -2025,11 +2205,15 @@
 
                     const reply = data.reply.trim() || 'Je peux vous aider sur cette offre et les details de commande.';
                     hideTyping();
+                    if (data && data.cta && typeof data.cta === 'object') {
+                        latestCta = data.cta;
+                    }
                     addMessage('assistant', reply);
                     addCtaAction(data.cta);
                     history.push({ role: 'assistant', content: reply });
                     history = history.slice(-10);
-                    setStatus('Pour un conseil plus precis, partagez votre objectif et votre budget.');
+                    setStatus('Recu. Repondez en 1 phrase et je vous pousse vers la meilleure prochaine etape.');
+                    scheduleSilenceNudges();
                 } catch (error) {
                     hideTyping();
                     const fallback = 'Je suis temporairement indisponible. Merci de reessayer dans un instant.';
@@ -2047,6 +2231,19 @@
             });
 
             autoResizeInput();
+
+            // Proactive opener after inactivity.
+            scheduleProactiveOpener();
+            const activityEvents = ['click', 'keydown', 'scroll', 'mousemove', 'touchstart'];
+            activityEvents.forEach((eventName) => {
+                document.addEventListener(eventName, function () {
+                    if (!proactiveShown && !userHasMessaged) {
+                        scheduleProactiveOpener();
+                    } else if (userHasMessaged && silenceStep < 2) {
+                        scheduleSilenceNudges();
+                    }
+                }, { passive: true });
+            });
 
             // Auto-hide outside intro after short time if user ignores it.
             if (intro) {

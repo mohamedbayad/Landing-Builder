@@ -17,7 +17,21 @@
         isSending: false,
         history: [],
         maxHistory: 10,
+        inactivityTimer: null,
+        proactiveTimer: null,
+        proactiveShown: false,
+        noResponseFollowUpsSent: 0,
+        maxNoResponseFollowUps: 2,
+        lastCta: null,
     };
+    const PROACTIVE_DELAY_MS = 8 * 1000;
+    const SILENCE_FOLLOW_UP_DELAY_MS = 60 * 1000;
+    const FINAL_FOLLOW_UP_DELAY_MS = 90 * 1000;
+    const proactiveOpeners = [
+        'Still stuck with the same pain point? What is the biggest blocker for you right now?',
+        'If this problem keeps costing you time, why let it continue? What result do you want first?',
+        'Most people stay stuck because they wait too long. What exactly do you want to fix now?'
+    ];
 
     const styleTagId = 'lp-ai-chatbot-style';
     if (!document.getElementById(styleTagId)) {
@@ -178,7 +192,7 @@
 
     root.innerHTML = `
         <div class="lp-ai-chatbot-panel" aria-live="polite">
-            <div class="lp-ai-chatbot-header">AI Assistant</div>
+            <div class="lp-ai-chatbot-header">Sales Assistant</div>
             <div class="lp-ai-chatbot-body" id="lp-ai-chatbot-body"></div>
             <form class="lp-ai-chatbot-form" id="lp-ai-chatbot-form">
                 <input
@@ -186,7 +200,7 @@
                     id="lp-ai-chatbot-input"
                     type="text"
                     maxlength="1200"
-                    placeholder="Ask anything about this offer..."
+                    placeholder="Tell me your goal and I will guide your best next step..."
                     autocomplete="off"
                 />
                 <button class="lp-ai-chatbot-send" id="lp-ai-chatbot-send" type="submit">Send</button>
@@ -212,7 +226,110 @@
         return;
     }
 
-    const appendMessage = function (role, content) {
+    const clearInactivityTimer = function () {
+        if (state.inactivityTimer) {
+            window.clearTimeout(state.inactivityTimer);
+            state.inactivityTimer = null;
+        }
+    };
+
+    const clearProactiveTimer = function () {
+        if (state.proactiveTimer) {
+            window.clearTimeout(state.proactiveTimer);
+            state.proactiveTimer = null;
+        }
+    };
+
+    const pickRandom = function (items) {
+        if (!Array.isArray(items) || items.length === 0) {
+            return '';
+        }
+        return items[Math.floor(Math.random() * items.length)] || '';
+    };
+
+    const hasUserMessage = function () {
+        return state.history.some(function (item) {
+            return item && item.role === 'user';
+        });
+    };
+
+    const buildCtaNudge = function () {
+        const cta = state.lastCta;
+        if (!cta || typeof cta !== 'object') {
+            return 'If you are ready, hit the main CTA on this page now.';
+        }
+
+        const actionText = (cta.action_text || cta.label || 'Get Started').toString().trim() || 'Get Started';
+        const type = (cta.type || 'form').toString().trim();
+        const target = (cta.target || '').toString().trim();
+
+        if ((type === 'custom_link' || type === 'instagram') && target) {
+            return 'Do this now: ' + actionText + ' -> ' + target;
+        }
+
+        if (type === 'whatsapp' && target) {
+            return 'Do this now: ' + actionText + ' on WhatsApp (' + target + ').';
+        }
+
+        if (type === 'custom_phone' && target) {
+            return 'Do this now: ' + actionText + ' and call ' + target + '.';
+        }
+
+        return 'Do this now: click "' + actionText + '" and complete your request.';
+    };
+
+    const scheduleInactivityFollowUp = function () {
+        clearInactivityTimer();
+        if (!state.isOpen || state.isSending || state.noResponseFollowUpsSent >= state.maxNoResponseFollowUps) {
+            return;
+        }
+
+        const delay = state.noResponseFollowUpsSent === 0
+            ? SILENCE_FOLLOW_UP_DELAY_MS
+            : FINAL_FOLLOW_UP_DELAY_MS;
+
+        state.inactivityTimer = window.setTimeout(function () {
+            if (!state.isOpen || state.isSending || state.noResponseFollowUpsSent >= state.maxNoResponseFollowUps) {
+                return;
+            }
+
+            const followUpMessage = state.noResponseFollowUpsSent === 0
+                ? 'Quick check: this can solve your current pain faster. What is stopping you from starting now?'
+                : 'Final heads-up: people who move now usually get results first. Ready to lock your next step?';
+
+            appendMessage('assistant', followUpMessage, { isFollowUp: true });
+            pushToHistory('assistant', followUpMessage);
+            state.noResponseFollowUpsSent += 1;
+            if (state.noResponseFollowUpsSent === state.maxNoResponseFollowUps) {
+                const finalCta = buildCtaNudge();
+                appendMessage('assistant', finalCta, { isFollowUp: true });
+                pushToHistory('assistant', finalCta);
+            }
+            scheduleInactivityFollowUp();
+        }, delay);
+    };
+
+    const scheduleProactiveOpener = function () {
+        clearProactiveTimer();
+        if (!state.isOpen || state.isSending || state.proactiveShown || hasUserMessage()) {
+            return;
+        }
+        state.proactiveTimer = window.setTimeout(function () {
+            if (!state.isOpen || state.isSending || state.proactiveShown || hasUserMessage()) {
+                return;
+            }
+            const opener = pickRandom(proactiveOpeners);
+            if (!opener) {
+                return;
+            }
+            appendMessage('assistant', opener);
+            pushToHistory('assistant', opener);
+            state.proactiveShown = true;
+        }, PROACTIVE_DELAY_MS);
+    };
+
+    const appendMessage = function (role, content, options) {
+        const opts = options || {};
         const row = document.createElement('div');
         row.className = 'lp-ai-chatbot-row ' + (role === 'user' ? 'user' : 'assistant');
 
@@ -223,6 +340,13 @@
         row.appendChild(bubble);
         body.appendChild(row);
         body.scrollTop = body.scrollHeight;
+
+        if (role === 'assistant' && state.isOpen) {
+            if (!opts.isFollowUp) {
+                state.noResponseFollowUpsSent = 0;
+            }
+            scheduleInactivityFollowUp();
+        }
     };
 
     const setOpenState = function (open) {
@@ -235,6 +359,11 @@
 
         if (open) {
             input.focus();
+            scheduleProactiveOpener();
+            scheduleInactivityFollowUp();
+        } else {
+            clearInactivityTimer();
+            clearProactiveTimer();
         }
     };
 
@@ -255,6 +384,10 @@
     const sendMessage = async function (messageText) {
         const historyForRequest = state.history.slice(-8);
 
+        clearInactivityTimer();
+        clearProactiveTimer();
+        state.noResponseFollowUpsSent = 0;
+        state.proactiveShown = true;
         appendMessage('user', messageText);
         pushToHistory('user', messageText);
         setSendingState(true);
@@ -291,6 +424,10 @@
 
             if (!response.ok) {
                 throw new Error(payload.message || 'Request failed');
+            }
+
+            if (payload && payload.cta && typeof payload.cta === 'object') {
+                state.lastCta = payload.cta;
             }
 
             const reply = (payload.reply || '').toString().trim();
@@ -338,5 +475,5 @@
         }
     });
 
-    appendMessage('assistant', 'Hi, I am your AI assistant. Ask me anything about this page or offer.');
+    appendMessage('assistant', 'Salam, ana sales assistant dyalk. Chno lhadaf lraisi li bghiti twsel lih daba?');
 })();
