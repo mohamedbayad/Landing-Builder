@@ -45,6 +45,8 @@ return Application::configure(basePath: dirname(__DIR__))
             'api/rec/*',
             'api/record-session/*',
             'api/track/*',
+            'api/public/ai-chat',
+            'api/public/ai-chat/*',
             'f/*',
         ]);
     })

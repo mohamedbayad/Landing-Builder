@@ -408,6 +408,7 @@
 
             const response = await fetch(endpoint, {
                 method: 'POST',
+                credentials: 'same-origin',
                 headers: headers,
                 body: JSON.stringify({
                     landing_id: landingId,
