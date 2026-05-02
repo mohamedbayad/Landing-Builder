@@ -1047,6 +1047,31 @@ PROMPT;
         $raw = mb_strtolower(trim($userMessage));
         $actionText = trim((string) ($ctaPayload['action_text'] ?? ''));
 
+        $hasGoalIntent = preg_match('/\b(goal|objectif|hadaf|bghit|je veux|i want|i need|my goal|mon objectif)\b/u', $raw) === 1;
+        $leadGoal = preg_match('/\b(leads?|prospects?|prospect)\b/u', $raw) === 1;
+        $clientGoal = preg_match('/\b(clients?|customers?)\b/u', $raw) === 1;
+        $salesGoal = preg_match('/\b(sales?|ventes?|revenue|ca|chiffre)\b/u', $raw) === 1;
+
+        if ($hasGoalIntent || $leadGoal || $clientGoal || $salesGoal) {
+            if ($leadGoal) {
+                $base = 'Perfect. For more leads this week: keep this form short, answer fast on WhatsApp/phone, and push one clear CTA. Want me to guide your exact next move now?';
+                return $actionText !== '' ? $base . ' Click: ' . $actionText . '.' : $base;
+            }
+
+            if ($clientGoal) {
+                $base = 'Great. To get more clients this week: qualify quickly, handle one key objection, then move them to action in the same conversation. Ready for the next step now?';
+                return $actionText !== '' ? $base . ' Click: ' . $actionText . '.' : $base;
+            }
+
+            if ($salesGoal) {
+                $base = 'Excellent. For more sales this week: sharpen the offer angle, reduce friction in the form, and follow up same day. Do you want the fastest action plan now?';
+                return $actionText !== '' ? $base . ' Click: ' . $actionText . '.' : $base;
+            }
+
+            $base = 'Top. Goal received. Tell me if your priority is leads, clients, or sales so I can give you the exact next action.';
+            return $actionText !== '' ? $base . ' Then: ' . $actionText . '.' : $base;
+        }
+
         if (preg_match('/\b(salam|slm|chno|kifach|bghit|daba|3la)\b/u', $raw) === 1) {
             $base = 'Mzyan, n9dro nkmlou daba b tariqa s7i7a. Chno wa7ed lhadaf wa9i3i bghiti twslo had simana: leads, clients, wla ventes?';
             return $actionText !== '' ? $base . ' Ila wde7at lik, ' . $actionText . '.' : $base;
