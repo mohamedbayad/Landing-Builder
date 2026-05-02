@@ -309,6 +309,23 @@ PROMPT;
                 'cta' => $showActionCta ? $ctaPayload : null,
             ]);
         } catch (\Throwable $e) {
+            if ($this->isProviderConfigurationIssue($e)) {
+                $showActionCta = $ctaPayload !== null && $this->shouldShowActionCta($userMessage, $history);
+                $fallbackReply = $this->buildProviderFallbackReply($userMessage, $showActionCta ? $ctaPayload : null);
+
+                Log::warning('Public AI chat used provider-config fallback reply', [
+                    'landing_id' => $landing->id,
+                    'error' => $e->getMessage(),
+                ]);
+
+                return response()->json([
+                    'status' => 'success',
+                    'reply' => $fallbackReply,
+                    'cta' => $showActionCta ? $ctaPayload : null,
+                    'fallback' => true,
+                ]);
+            }
+
             $clientError = $this->mapClientError($e);
 
             Log::error('Public AI chat failed', [
@@ -1009,5 +1026,38 @@ PROMPT;
             ->value('id');
 
         return $adminWorkspaceId ? (int) $adminWorkspaceId : null;
+    }
+
+    private function isProviderConfigurationIssue(\Throwable $e): bool
+    {
+        $raw = mb_strtolower(trim((string) $e->getMessage()));
+        if ($raw === '') {
+            return false;
+        }
+
+        return str_contains($raw, "no active ai model found for role: 'text_generation'")
+            || str_contains($raw, 'authentication failed')
+            || str_contains($raw, 'invalid api key')
+            || str_contains($raw, 'user not found')
+            || str_contains($raw, '"code":401');
+    }
+
+    private function buildProviderFallbackReply(string $userMessage, ?array $ctaPayload = null): string
+    {
+        $raw = mb_strtolower(trim($userMessage));
+        $actionText = trim((string) ($ctaPayload['action_text'] ?? ''));
+
+        if (preg_match('/\b(salam|slm|chno|kifach|bghit|daba|3la)\b/u', $raw) === 1) {
+            $base = 'Mzyan, n9dro nkmlou daba b tariqa s7i7a. Chno wa7ed lhadaf wa9i3i bghiti twslo had simana: leads, clients, wla ventes?';
+            return $actionText !== '' ? $base . ' Ila wde7at lik, ' . $actionText . '.' : $base;
+        }
+
+        if (preg_match('/\b(bonjour|salut|offre|prix|objectif|resultat)\b/u', $raw) === 1) {
+            $base = "Parfait. Donnez-moi votre objectif exact cette semaine (plus de leads, plus de clients, ou plus de ventes) et je vous donne la meilleure prochaine action.";
+            return $actionText !== '' ? $base . ' Ensuite: ' . $actionText . '.' : $base;
+        }
+
+        $base = 'Great. Tell me your exact goal for this week (more leads, more clients, or more sales), and I will give you the best next action.';
+        return $actionText !== '' ? $base . ' Then: ' . $actionText . '.' : $base;
     }
 }
