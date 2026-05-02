@@ -1633,6 +1633,60 @@
                     });
                 });
             }
+
+            // 4. Make CTA "Submit Form" actions actually submit the target form.
+            const resolveTargetForm = (trigger) => {
+                if (!trigger) return null;
+
+                const target =
+                    trigger.getAttribute('data-cta-target')
+                    || trigger.getAttribute('form')
+                    || trigger.getAttribute('href')
+                    || '';
+
+                const cleanedTarget = String(target).trim();
+                if (cleanedTarget && cleanedTarget !== '#') {
+                    if (cleanedTarget.startsWith('#')) {
+                        const byId = document.querySelector(cleanedTarget);
+                        if (byId && byId.tagName === 'FORM') {
+                            return byId;
+                        }
+                    }
+
+                    const byName = document.querySelector(`form[name="${cleanedTarget}"]`);
+                    if (byName) {
+                        return byName;
+                    }
+                }
+
+                const nearestForm = trigger.closest('form');
+                if (nearestForm) {
+                    return nearestForm;
+                }
+
+                return document.querySelector('form');
+            };
+
+            document.addEventListener('click', function (event) {
+                const submitTrigger = event.target.closest('[data-cta-action="submit_form"]');
+                if (!submitTrigger) {
+                    return;
+                }
+
+                event.preventDefault();
+
+                const form = resolveTargetForm(submitTrigger);
+                if (!form) {
+                    console.warn('[Landing Form] No target form found for submit_form action.');
+                    return;
+                }
+
+                if (typeof form.requestSubmit === 'function') {
+                    form.requestSubmit();
+                } else {
+                    form.submit();
+                }
+            });
     </script>
 
     @auth

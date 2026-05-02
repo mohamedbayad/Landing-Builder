@@ -47,6 +47,9 @@
                                     <tr class="hover:bg-gray-50 dark:hover:bg-white/[0.02] transition-colors">
                                         <td class="px-4 py-3 text-sm font-medium text-gray-900 dark:text-white">
                                             {{ $automation->name }}
+                                            @if($automation->builder_mode)
+                                                <span class="ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold bg-blue-100 text-blue-700 dark:bg-blue-500/20 dark:text-blue-200">Visual</span>
+                                            @endif
                                         </td>
                                         <td class="px-4 py-3 text-sm text-gray-600 dark:text-gray-300">
                                             {{ str_replace('_', ' ', $automation->trigger_type) }}

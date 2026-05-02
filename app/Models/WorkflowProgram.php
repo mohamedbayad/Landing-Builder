@@ -5,7 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
-class EmailAutomation extends Model
+class WorkflowProgram extends Model
 {
     use HasFactory;
 
@@ -15,42 +15,26 @@ class EmailAutomation extends Model
         'status',
         'trigger_type',
         'trigger_config',
-        'conditions',
         'timezone',
-        'settings',
-        'builder_mode',
         'visual_nodes',
         'visual_edges',
         'builder_version',
+        'settings',
+        'published_at',
     ];
 
     protected $casts = [
         'trigger_config' => 'array',
-        'conditions' => 'array',
-        'settings' => 'array',
-        'builder_mode' => 'boolean',
         'visual_nodes' => 'array',
         'visual_edges' => 'array',
+        'settings' => 'array',
         'builder_version' => 'integer',
+        'published_at' => 'datetime',
     ];
 
     public function user()
     {
         return $this->belongsTo(User::class);
     }
-
-    public function steps()
-    {
-        return $this->hasMany(EmailAutomationStep::class, 'automation_id')->orderBy('step_order');
-    }
-
-    public function messages()
-    {
-        return $this->hasMany(EmailMessage::class, 'automation_id');
-    }
-
-    public function executions()
-    {
-        return $this->hasMany(AutomationExecution::class, 'automation_id');
-    }
 }
+

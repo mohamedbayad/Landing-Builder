@@ -50,9 +50,13 @@ class EmailContact extends Model
         return $this->hasMany(EmailUnsubscribe::class, 'contact_id');
     }
 
+    public function tags()
+    {
+        return $this->hasMany(EmailContactTag::class, 'contact_id');
+    }
+
     public function getFullNameAttribute(): string
     {
         return trim(sprintf('%s %s', $this->first_name, $this->last_name));
     }
 }
-

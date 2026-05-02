@@ -8,7 +8,6 @@
     <div class="py-8">
         <div class="max-w-5xl mx-auto px-4 sm:px-6 md:px-8">
             @include('email-automation._subnav')
-
             <form action="{{ $action }}" method="POST" class="space-y-6">
                 @csrf
                 @if($method !== 'POST')

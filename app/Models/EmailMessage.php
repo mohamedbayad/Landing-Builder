@@ -18,9 +18,12 @@ class EmailMessage extends Model
         'lead_id',
         'order_id',
         'landing_page_id',
+        'channel',
         'recipient_email',
+        'recipient_phone',
         'subject',
         'body_html',
+        'body_text',
         'status',
         'provider',
         'provider_message_id',
@@ -87,4 +90,3 @@ class EmailMessage extends Model
         return $this->hasMany(EmailLink::class, 'email_message_id');
     }
 }
-

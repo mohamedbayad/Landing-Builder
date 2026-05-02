@@ -1,0 +1,635 @@
+openapi: 3.1.0
+info:
+  title: Visual Workflow Automation API
+  version: 1.0.0
+  description: MVP API contract for visual workflow automation builder.
+servers:
+  - url: https://api.example.com/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Workflows
+  - name: Contacts
+  - name: Executions
+  - name: Analytics
+  - name: Triggers
+
+paths:
+  /workflows:
+    get:
+      tags: [Workflows]
+      summary: List workflows
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: query
+          name: status
+          schema:
+            $ref: "#/components/schemas/WorkflowStatus"
+      responses:
+        "200":
+          description: Workflow list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Workflow"
+    post:
+      tags: [Workflows]
+      summary: Create workflow draft
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWorkflowRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+
+  /workflows/{workflowId}:
+    get:
+      tags: [Workflows]
+      summary: Get workflow
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Workflow
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+    patch:
+      tags: [Workflows]
+      summary: Update workflow draft
+      description: Uses optimistic concurrency with version.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateWorkflowRequest"
+      responses:
+        "200":
+          description: Updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "409":
+          description: Version conflict
+    delete:
+      tags: [Workflows]
+      summary: Archive workflow
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "204":
+          description: Archived
+
+  /workflows/{workflowId}/validate:
+    post:
+      tags: [Workflows]
+      summary: Validate workflow graph and configs
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResult"
+
+  /workflows/{workflowId}/publish:
+    post:
+      tags: [Workflows]
+      summary: Publish a validated workflow
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Published
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Workflow"
+        "422":
+          description: Validation failed
+
+  /workflows/{workflowId}/pause:
+    post:
+      tags: [Workflows]
+      summary: Pause a live workflow
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Paused
+
+  /workflows/{workflowId}/resume:
+    post:
+      tags: [Workflows]
+      summary: Resume a paused workflow
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Resumed
+
+  /workflows/{workflowId}/preview:
+    post:
+      tags: [Workflows]
+      summary: Generate workflow execution preview for a sample contact
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                contactId:
+                  type: string
+                  format: uuid
+      responses:
+        "200":
+          description: Preview path and rendered content
+
+  /contacts:
+    get:
+      tags: [Contacts]
+      summary: List contacts
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: query
+          name: q
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Contact list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Contact"
+    post:
+      tags: [Contacts]
+      summary: Create contact
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateContactRequest"
+      responses:
+        "201":
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Contact"
+
+  /contacts/import:
+    post:
+      tags: [Contacts]
+      summary: Import contacts CSV
+      description: Async import. Supports consent source mapping.
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                mapping:
+                  type: string
+                  description: JSON mapping of CSV columns to fields.
+      responses:
+        "202":
+          description: Import started
+
+  /contacts/{contactId}/tags:
+    post:
+      tags: [Contacts]
+      summary: Add or remove tags
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/ContactId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [action, tag]
+              properties:
+                action:
+                  type: string
+                  enum: [add, remove]
+                tag:
+                  type: string
+      responses:
+        "200":
+          description: Updated
+
+  /contacts/{contactId}/consents:
+    put:
+      tags: [Contacts]
+      summary: Upsert contact channel consent
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/ContactId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConsentUpsertRequest"
+      responses:
+        "200":
+          description: Updated
+
+  /executions:
+    get:
+      tags: [Executions]
+      summary: List workflow executions
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: query
+          name: workflowId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: status
+          schema:
+            type: string
+            enum: [active, completed, exited, failed, paused]
+      responses:
+        "200":
+          description: Execution list
+
+  /executions/{executionId}:
+    get:
+      tags: [Executions]
+      summary: Get execution details
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: path
+          name: executionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: Execution
+
+  /executions/{executionId}/history:
+    get:
+      tags: [Executions]
+      summary: Get execution node history
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - in: path
+          name: executionId
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        "200":
+          description: History
+
+  /workflows/{workflowId}/enroll:
+    post:
+      tags: [Executions]
+      summary: Manual enrollment of contacts
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contactIds]
+              properties:
+                contactIds:
+                  type: array
+                  items:
+                    type: string
+                    format: uuid
+      responses:
+        "202":
+          description: Enrollment queued
+
+  /analytics/workflows/{workflowId}/summary:
+    get:
+      tags: [Analytics]
+      summary: Workflow summary metrics
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date
+      responses:
+        "200":
+          description: Summary
+
+  /analytics/workflows/{workflowId}/blocks:
+    get:
+      tags: [Analytics]
+      summary: Per-block metrics
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Block metrics
+
+  /analytics/workflows/{workflowId}/messages:
+    get:
+      tags: [Analytics]
+      summary: Per-message metrics
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      responses:
+        "200":
+          description: Message metrics
+
+  /triggers/webhook/{workflowId}:
+    post:
+      tags: [Triggers]
+      summary: Webhook trigger endpoint
+      parameters:
+        - $ref: "#/components/parameters/WorkspaceId"
+        - $ref: "#/components/parameters/WorkflowId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        "202":
+          description: Trigger accepted
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    WorkspaceId:
+      in: header
+      name: X-Workspace-Id
+      required: true
+      schema:
+        type: string
+        format: uuid
+    WorkflowId:
+      in: path
+      name: workflowId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    ContactId:
+      in: path
+      name: contactId
+      required: true
+      schema:
+        type: string
+        format: uuid
+  schemas:
+    WorkflowStatus:
+      type: string
+      enum: [draft, live, paused, archived]
+
+    Workflow:
+      type: object
+      required: [id, name, status, version, nodes, edges]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          $ref: "#/components/schemas/WorkflowStatus"
+        version:
+          type: integer
+        timezone:
+          type: string
+          example: Africa/Casablanca
+        triggerConfig:
+          type: object
+          additionalProperties: true
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowEdge"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WorkflowNode:
+      type: object
+      required: [id, type, position, config]
+      properties:
+        id:
+          type: string
+        type:
+          type: string
+          enum: [trigger, send_message, send_sequence, delay, branch, tag, goal, end]
+        position:
+          type: object
+          properties:
+            x:
+              type: number
+            y:
+              type: number
+        config:
+          type: object
+          additionalProperties: true
+
+    WorkflowEdge:
+      type: object
+      required: [id, source, target]
+      properties:
+        id:
+          type: string
+        source:
+          type: string
+        target:
+          type: string
+        conditionLabel:
+          type: string
+          nullable: true
+
+    CreateWorkflowRequest:
+      type: object
+      required: [name, timezone]
+      properties:
+        name:
+          type: string
+          minLength: 1
+        timezone:
+          type: string
+        triggerConfig:
+          type: object
+          additionalProperties: true
+
+    UpdateWorkflowRequest:
+      type: object
+      required: [name, version, nodes, edges]
+      properties:
+        name:
+          type: string
+        version:
+          type: integer
+        triggerConfig:
+          type: object
+          additionalProperties: true
+        nodes:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowNode"
+        edges:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkflowEdge"
+
+    ValidationResult:
+      type: object
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              code:
+                type: string
+              message:
+                type: string
+              nodeId:
+                type: string
+                nullable: true
+
+    Contact:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          nullable: true
+        phoneE164:
+          type: string
+          nullable: true
+        firstName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        tags:
+          type: array
+          items:
+            type: string
+        customFields:
+          type: object
+          additionalProperties: true
+
+    CreateContactRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+        phoneE164:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        customFields:
+          type: object
+          additionalProperties: true
+
+    ConsentUpsertRequest:
+      type: object
+      required: [channel, status, source]
+      properties:
+        channel:
+          type: string
+          enum: [email, whatsapp, sms, instagram]
+        status:
+          type: string
+          enum: [opted_in, opted_out, unconfirmed]
+        source:
+          type: string
+        consentedAt:
+          type: string
+          format: date-time
+          nullable: true
+        evidence:
+          type: object
+          additionalProperties: true

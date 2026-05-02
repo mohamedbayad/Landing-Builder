@@ -8,6 +8,7 @@ use App\Models\EmailTemplate;
 use App\Models\FormEndpoint;
 use App\Models\Landing;
 use App\Models\Product;
+use App\Services\Email\AutomationEngineService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
@@ -15,6 +16,16 @@ use Illuminate\Validation\ValidationException;
 
 class EmailAutomationController extends Controller
 {
+    public function builderHub()
+    {
+        return redirect()->route('email-automation.automations.index');
+    }
+
+    public function globalBuilder(EmailAutomation $automation)
+    {
+        return $this->renderBuilderPage($automation);
+    }
+
     public function index()
     {
         $automations = EmailAutomation::query()
@@ -117,6 +128,92 @@ class EmailAutomationController extends Controller
 
         return redirect()->route('email-automation.automations.index')
             ->with('success', 'Automation updated.');
+    }
+
+    public function builder(EmailAutomation $automation)
+    {
+        return $this->renderBuilderPage($automation);
+    }
+
+    public function saveBuilder(Request $request, EmailAutomation $automation)
+    {
+        $this->authorizeAutomation($automation);
+
+        $payload = $request->validate([
+            'name' => 'required|string|max:255',
+            'status' => ['required', Rule::in(['draft', 'active', 'paused'])],
+            'trigger_type' => ['required', Rule::in(['form_submitted', 'checkout_completed', 'lead_created'])],
+            'trigger_config' => 'nullable|array',
+            'timezone' => 'nullable|string|max:64',
+            'nodes' => 'required|array|min:1',
+            'edges' => 'required|array|min:0',
+        ]);
+
+        $this->validateVisualGraph($payload['nodes'], $payload['edges']);
+
+        $automation->update([
+            'name' => $payload['name'],
+            'status' => $payload['status'],
+            'trigger_type' => $payload['trigger_type'],
+            'trigger_config' => $payload['trigger_config'] ?? [],
+            'timezone' => $payload['timezone'] ?? config('app.timezone'),
+            'builder_mode' => true,
+            'visual_nodes' => array_values($payload['nodes']),
+            'visual_edges' => array_values($payload['edges']),
+            'builder_version' => max(1, (int) $automation->builder_version + 1),
+        ]);
+
+        // Compatibility bridge for legacy flows and metrics.
+        $compiledSteps = $this->compileLegacyStepsFromGraph($payload['nodes'], $payload['edges']);
+        $automation->steps()->delete();
+        $this->syncSteps($automation, $compiledSteps);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Builder saved successfully.',
+            'automation' => [
+                'id' => $automation->id,
+                'name' => $automation->name,
+                'status' => $automation->status,
+            ],
+        ]);
+    }
+
+    public function previewBuilder(Request $request, EmailAutomation $automation, AutomationEngineService $engine)
+    {
+        $this->authorizeAutomation($automation);
+
+        $context = $request->validate([
+            'context' => 'nullable|array',
+        ]);
+
+        $path = $engine->previewPath($automation, $context['context'] ?? []);
+
+        return response()->json([
+            'ok' => true,
+            'path' => $path,
+        ]);
+    }
+
+    public function publishBuilder(EmailAutomation $automation)
+    {
+        $this->authorizeAutomation($automation);
+
+        $nodes = is_array($automation->visual_nodes) ? $automation->visual_nodes : [];
+        $edges = is_array($automation->visual_edges) ? $automation->visual_edges : [];
+
+        $this->validateVisualGraph($nodes, $edges);
+
+        $automation->update([
+            'status' => 'active',
+            'builder_mode' => true,
+        ]);
+
+        return response()->json([
+            'ok' => true,
+            'message' => 'Workflow published and activated.',
+            'status' => $automation->status,
+        ]);
     }
 
     public function destroy(EmailAutomation $automation)
@@ -275,6 +372,104 @@ class EmailAutomationController extends Controller
         if ($automation->user_id !== Auth::id()) {
             abort(403);
         }
+    }
+
+    private function renderBuilderPage(EmailAutomation $automation)
+    {
+        $this->authorizeAutomation($automation);
+
+        return view('email-automation.automations.builder', [
+            'automation' => $automation,
+            'templates' => $this->templates(),
+        ]);
+    }
+
+    private function validateVisualGraph(array $nodes, array $edges): void
+    {
+        $triggerCount = collect($nodes)->filter(fn ($node) => ($node['type'] ?? null) === 'trigger')->count();
+        if ($triggerCount !== 1) {
+            throw ValidationException::withMessages([
+                'nodes' => 'Workflow must include exactly one trigger node.',
+            ]);
+        }
+
+        $hasEnd = collect($nodes)->contains(fn ($node) => in_array(($node['type'] ?? ''), ['end', 'end_workflow'], true));
+        if (!$hasEnd) {
+            throw ValidationException::withMessages([
+                'nodes' => 'Workflow must include at least one end node.',
+            ]);
+        }
+
+        $nodeIds = collect($nodes)->pluck('id')->filter()->values();
+        if ($nodeIds->count() !== $nodeIds->unique()->count()) {
+            throw ValidationException::withMessages([
+                'nodes' => 'Node IDs must be unique.',
+            ]);
+        }
+
+        foreach ($edges as $idx => $edge) {
+            $source = (string) ($edge['source'] ?? '');
+            $target = (string) ($edge['target'] ?? '');
+
+            if (!$nodeIds->contains($source) || !$nodeIds->contains($target)) {
+                throw ValidationException::withMessages([
+                    "edges.$idx" => 'Each edge source and target must reference existing nodes.',
+                ]);
+            }
+        }
+    }
+
+    private function compileLegacyStepsFromGraph(array $nodes, array $edges): array
+    {
+        $indexedNodes = collect($nodes)->keyBy(fn ($node) => (string) ($node['id'] ?? ''));
+        $trigger = collect($nodes)->first(fn ($node) => ($node['type'] ?? '') === 'trigger');
+        if (!$trigger) {
+            return [['step_type' => 'wait', 'delay_value' => 1, 'delay_unit' => 'minutes']];
+        }
+
+        $currentId = (string) ($trigger['id'] ?? '');
+        $steps = [];
+        $guard = 0;
+
+        while ($currentId !== '' && $guard < 40) {
+            $guard++;
+            $nextEdge = collect($edges)->first(fn ($edge) => (string) ($edge['source'] ?? '') === $currentId);
+            if (!$nextEdge) {
+                break;
+            }
+
+            $nextId = (string) ($nextEdge['target'] ?? '');
+            $node = $indexedNodes->get($nextId);
+            if (!$node) {
+                break;
+            }
+
+            $type = (string) ($node['type'] ?? '');
+            $config = (array) ($node['config'] ?? []);
+
+            if ($type === 'send_message' && strtolower((string) ($config['channel'] ?? 'email')) === 'email' && !empty($config['template_id'])) {
+                $steps[] = [
+                    'step_type' => 'send_email',
+                    'template_id' => (int) $config['template_id'],
+                ];
+            }
+
+            if ($type === 'delay') {
+                $steps[] = [
+                    'step_type' => 'wait',
+                    'delay_value' => max(1, (int) ($config['value'] ?? $config['delay_value'] ?? 1)),
+                    'delay_unit' => (string) ($config['unit'] ?? $config['delay_unit'] ?? 'minutes'),
+                ];
+            }
+
+            if (in_array($type, ['end', 'end_workflow'], true)) {
+                break;
+            }
+
+            $currentId = $nextId;
+        }
+
+        return !empty($steps) ? $steps : [['step_type' => 'wait', 'delay_value' => 1, 'delay_unit' => 'minutes']];
     }
 
     private function templates()

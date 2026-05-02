@@ -23,6 +23,21 @@ Route::get('/api/online-users/stats', [App\Http\Controllers\OnlineUsersControlle
     ->name('online-users.api');
 
 Route::middleware('auth')->group(function () {
+    Route::get('/workflow-builder', [App\Http\Controllers\WorkflowProgramController::class, 'hub'])
+        ->name('workflow-builder.index');
+    Route::post('/workflow-builder/programs', [App\Http\Controllers\WorkflowProgramController::class, 'store'])
+        ->name('workflow-builder.programs.store');
+    Route::get('/workflow-builder/programs/{program}', [App\Http\Controllers\WorkflowProgramController::class, 'show'])
+        ->name('workflow-builder.programs.show');
+    Route::put('/workflow-builder/programs/{program}', [App\Http\Controllers\WorkflowProgramController::class, 'update'])
+        ->name('workflow-builder.programs.update');
+    Route::post('/workflow-builder/programs/{program}/preview', [App\Http\Controllers\WorkflowProgramController::class, 'preview'])
+        ->name('workflow-builder.programs.preview');
+    Route::post('/workflow-builder/programs/{program}/publish', [App\Http\Controllers\WorkflowProgramController::class, 'publish'])
+        ->name('workflow-builder.programs.publish');
+    Route::delete('/workflow-builder/programs/{program}', [App\Http\Controllers\WorkflowProgramController::class, 'destroy'])
+        ->name('workflow-builder.programs.destroy');
+
     Route::post('/dashboard/assistant/chat', [App\Http\Controllers\DashboardAssistantController::class, 'chat'])
         ->name('dashboard.assistant.chat')
         ->middleware('throttle:60,1');
@@ -148,7 +163,11 @@ Route::middleware('auth')->group(function () {
         Route::get('/automations/create', [App\Http\Controllers\EmailAutomationController::class, 'create'])->name('automations.create');
         Route::post('/automations', [App\Http\Controllers\EmailAutomationController::class, 'store'])->name('automations.store');
         Route::get('/automations/{automation}/edit', [App\Http\Controllers\EmailAutomationController::class, 'edit'])->name('automations.edit');
+        Route::get('/automations/{automation}/builder', [App\Http\Controllers\EmailAutomationController::class, 'builder'])->name('automations.builder');
         Route::put('/automations/{automation}', [App\Http\Controllers\EmailAutomationController::class, 'update'])->name('automations.update');
+        Route::put('/automations/{automation}/builder', [App\Http\Controllers\EmailAutomationController::class, 'saveBuilder'])->name('automations.builder.save');
+        Route::post('/automations/{automation}/builder/preview', [App\Http\Controllers\EmailAutomationController::class, 'previewBuilder'])->name('automations.builder.preview');
+        Route::post('/automations/{automation}/builder/publish', [App\Http\Controllers\EmailAutomationController::class, 'publishBuilder'])->name('automations.builder.publish');
         Route::delete('/automations/{automation}', [App\Http\Controllers\EmailAutomationController::class, 'destroy'])->name('automations.destroy');
         Route::post('/automations/{automation}/duplicate', [App\Http\Controllers\EmailAutomationController::class, 'duplicate'])->name('automations.duplicate');
         Route::patch('/automations/{automation}/status', [App\Http\Controllers\EmailAutomationController::class, 'updateStatus'])->name('automations.status');
